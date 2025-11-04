@@ -1,21 +1,6 @@
 <template>
   <div>
     <div class="rounded bg-white w-full mt-4">
-      <!-- Modern Tab Headers -->
-      <div class="flex justify-center gap-4 py-4">
-        <button
-          :class="['tab-btn', activeTab === 0 ? 'active' : '']"
-          @click="activeTab = 0; $router.push({ name: 'articlesOptionsGroups' })"
-        >
-          Option Groups
-        </button>
-        <button
-          :class="['tab-btn', activeTab === 1 ? 'active' : '']"
-          @click="activeTab = 1; $router.push({ name: 'articlesOptionsList' })"
-        >
-          Options
-        </button>
-      </div>
 
       <!-- Display Tab Content -->
       <RouterView />

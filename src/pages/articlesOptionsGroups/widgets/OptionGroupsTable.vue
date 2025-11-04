@@ -185,7 +185,7 @@ const filteredItems = computed(() => {
   }
   return items.value
 })
-
+const activeTab = ref<'groups' | 'options'>('groups')
 // Modal open functions
 function onButtonEditOptionGroup(rowData) { isEditArticleOptionsModal.value = true; selectedOptions.value = rowData }
 function onButtonEditOptionGroupItems(rowData) { isEditArticleOptionGroupsItemsModal.value = true; selectedItems.value = rowData }
@@ -195,8 +195,42 @@ function onButtonEditOptionGroupArticles(rowData) { isEditOptionGroupArticlesMod
 <template>
   <div>
  <!-- HEADER -->
-<div class="flex flex-col sm:flex-row justify-between items-center mb-5 gap-4">
+<div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
   <div class="flex items-center gap-2">
+
+    <!-- Option Groups / Options Toggle -->
+  <div class="flex bg-slate-100 rounded-xl shadow-sm overflow-hidden h-9">
+    <button
+      :class="[
+        'whitespace-nowrap px-4 text-base font-medium transition-colors',
+        $route.name === 'articlesOptionsGroups'
+          ? 'bg-blue-600 text-white'
+          : 'text-slate-700 hover:bg-slate-200'
+      ]"
+      @click="$router.push({ name: 'articlesOptionsGroups' })"
+    >
+      Option Groups
+    </button>
+    <button
+      :class="[
+        'whitespace-nowrap px-4 text-base font-medium transition-colors',
+        $route.name === 'articlesOptionsList'
+          ? 'bg-blue-600 text-white'
+          : 'text-slate-700 hover:bg-slate-200'
+      ]"
+      @click="$router.push({ name: 'articlesOptionsList' })"
+    >
+      Options
+    </button>
+  </div>
+  
+<!-- FE Counter Badge -->
+  <div
+    class="px-2.5 py-0.5 text-sm rounded-full bg-blue-100 text-blue-700 
+           dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+    {{ totalOptionGroupsCount }}
+  </div>
+
   <!-- Search Input -->
   <div
     class="relative flex items-center w-full sm:w-[240px] md:w-[300px] 
@@ -209,17 +243,9 @@ function onButtonEditOptionGroupArticles(rowData) { isEditOptionGroupArticlesMod
     <input
       v-model="searchQuery"
       type="text"
-      placeholder="Search Option Groups..."
+      placeholder="Search by Name"
       class="w-full pl-9 pr-3 py-2 text-sm bg-transparent focus:outline-none text-slate-700 dark:text-slate-200 rounded-xl"
     />
-  </div>
-
-  <!-- FE Counter Badge -->
-  <div
-    class="px-2.5 py-0.5 text-sm rounded-full bg-blue-100 text-blue-700 
-           dark:bg-blue-900/40 dark:text-blue-300 font-medium"
-  >
-    {{ totalOptionGroupsCount }}
   </div>
 </div>
 
@@ -306,6 +332,7 @@ function onButtonEditOptionGroupArticles(rowData) { isEditOptionGroupArticlesMod
   </div>
 
     <!-- DATA TABLE -->
+     <div class="flex flex-col h-[calc(100vh-12rem)]">
     <VaDataTable
       :columns="visibleColumns"
       :items="filteredItems"
@@ -313,7 +340,6 @@ function onButtonEditOptionGroupArticles(rowData) { isEditOptionGroupArticlesMod
       :disable-client-side-sorting="true"
       sticky-header
       :style="{
-        '--va-data-table-height': '670px',
         '--va-data-table-thead-background': '#f8fafc',
         '--va-data-table-thead-color': '#64748b',
       }"
@@ -554,6 +580,7 @@ function onButtonEditOptionGroupArticles(rowData) { isEditOptionGroupArticlesMod
         </div>
       </template>
     </VaDataTable>
+    </div>
 
     <!-- MODALS -->
     <EditArticleOptionGroupsModal v-if="isEditArticleOptionGroupsModal" :selected-option-groups="selectedOptionGroups" @cancel="isEditArticleOptionGroupsModal=false; selectedOptionGroups=''; emits('getOptionGroups', searchQuery)" />

@@ -260,11 +260,11 @@ const sharedGroupNotice = computed(() => {
 </script>
 
 <template>
-  <div class="organize-menu flex gap-4 pt-4 pb-4 h-screen">
+  <div class="organize-menu flex gap-4 pt-4 h-screen bg-slate-100">
     <!-- Categories -->
     <div
       :class="[
-        'column border rounded bg-white flex flex-col transition-all duration-300',
+        'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
         collapsed.categories ? 'collapsed' : 'flex-1',
       ]"
     >
@@ -298,7 +298,7 @@ const sharedGroupNotice = computed(() => {
     <!-- Subcategories -->
     <div
       :class="[
-        'column border rounded bg-white flex flex-col transition-all duration-300',
+        'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
         collapsed.subcategories ? 'collapsed' : 'flex-1',
       ]"
     >
@@ -326,7 +326,7 @@ const sharedGroupNotice = computed(() => {
     <!-- Articles -->
     <div
       :class="[
-        'column border rounded bg-white flex flex-col transition-all duration-300',
+        'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
         collapsed.articles ? 'collapsed' : 'flex-1',
       ]"
     >
@@ -357,7 +357,7 @@ const sharedGroupNotice = computed(() => {
     <!-- Groups -->
     <div
       :class="[
-        'column border rounded bg-white flex flex-col transition-all duration-300',
+        'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
         collapsed.groups ? 'collapsed' : 'flex-1',
       ]"
     >
@@ -385,7 +385,7 @@ const sharedGroupNotice = computed(() => {
     <!-- Options -->
     <div
       :class="[
-        'column border rounded bg-white flex flex-col transition-all duration-300',
+        'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
         collapsed.options ? 'collapsed' : 'flex-1',
       ]"
     >
@@ -415,7 +415,7 @@ const sharedGroupNotice = computed(() => {
 <style scoped>
 .organize-menu {
   width: 100%;
-  height: calc(100vh - 6rem);
+  height: calc(100vh - 5.5rem);
 }
 
 .column {

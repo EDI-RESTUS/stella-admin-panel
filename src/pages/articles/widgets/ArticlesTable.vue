@@ -36,6 +36,7 @@ const emits = defineEmits([
   'importArticle',
 ])
 
+const activeOnly = ref(true)
 const { confirm } = useModal()
 const { init } = useToast()
 const currentPage = ref(1)
@@ -104,11 +105,25 @@ const pages = computed(() => {
 })
 
 const filteredItems = computed(() => {
-  if (!selectedCategoryFilter.value) return props.items
-  return props.items.filter((item) =>
-    item.categories.some((cat) => cat._id === selectedCategoryFilter.value || cat.id === selectedCategoryFilter.value),
-  )
+  let result = props.items
+
+  // Category filter
+  if (selectedCategoryFilter.value) {
+    result = result.filter((item) =>
+      item.categories.some(
+        (cat) => cat._id === selectedCategoryFilter.value || cat.id === selectedCategoryFilter.value,
+      ),
+    )
+  }
+
+  // Active-only filter
+  if (activeOnly.value) {
+    result = result.filter((item) => item.isActive)
+  }
+
+  return result
 })
+
 const totalVisibleCount = computed(() => {
   // If category filter is active, use local filtered count
   if (selectedCategoryFilter.value) return filteredItems.value.length
@@ -294,7 +309,7 @@ function openFileModal(data) {
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Search Articles by Name or Code..."
+            placeholder="Search by Name or Code"
             class="w-full pl-9 pr-3 py-2 text-sm bg-transparent focus:outline-none text-slate-700 dark:text-slate-200 rounded-xl truncate"
           />
         </div>
@@ -305,13 +320,24 @@ function openFileModal(data) {
         <!-- Active Only Toggle -->
         <div class="flex items-center gap-1">
           <span class="hidden md:inline text-sm font-medium text-slate-700 dark:text-slate-200">Active Only</span>
-          <label class="relative inline-block w-9 h-5 cursor-not-allowed">
-            <input type="checkbox" class="sr-only" checked />
-            <span class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out bg-emerald-500"></span>
-            <span
-              class="absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out translate-x-4"
-            ></span>
-          </label>
+          <label class="relative inline-block w-9 h-5 cursor-pointer">
+  <input
+    v-model="activeOnly"
+    type="checkbox"
+    class="sr-only"
+  />
+  <!-- Track -->
+  <span
+    class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
+    :class="activeOnly ? 'bg-emerald-500' : 'bg-slate-300'"
+  ></span>
+  <!-- Thumb -->
+  <span
+    class="absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out"
+    :class="activeOnly ? 'translate-x-4' : 'translate-x-1'"
+  ></span>
+</label>
+
         </div>
 
         <!-- Columns Button -->
