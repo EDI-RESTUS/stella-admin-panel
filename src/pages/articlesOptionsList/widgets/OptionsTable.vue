@@ -152,13 +152,43 @@ function formatPrice(value) {
 <template>
   <div>
     <!-- HEADER -->
-    <div class="flex flex-col sm:flex-row justify-between items-center mb-5 gap-4">
+    <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
       <div class="flex items-center gap-2">
+
+        <!-- Option Groups / Options Toggle -->
+        <div class="flex bg-slate-100 rounded-xl shadow-sm overflow-hidden h-9">
+    <button
+      :class="[
+        'whitespace-nowrap px-4 text-base font-medium transition-colors',
+        $route.name === 'articlesOptionsGroups'
+          ? 'bg-blue-600 text-white'
+          : 'text-slate-700 hover:bg-slate-200'
+      ]"
+      @click="$router.push({ name: 'articlesOptionsGroups' })"
+    >
+      Option Groups
+    </button>
+    <button
+      :class="[
+        'whitespace-nowrap px-4 text-base font-medium transition-colors',
+        $route.name === 'articlesOptionsList'
+          ? 'bg-blue-600 text-white'
+          : 'text-slate-700 hover:bg-slate-200'
+      ]"
+      @click="$router.push({ name: 'articlesOptionsList' })"
+    >
+      Options
+    </button>
+        </div>
+        <!-- COUNTER -->
+        <div class="px-2.5 py-0.5 text-sm rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+  {{ filteredItems.length }}
+        </div>
+        <!-- SEARCH -->
         <div class="relative flex items-center w-full sm:w-[240px] md:w-[300px] bg-white/60 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-200">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none"/>
-          <input v-model="searchQuery" type="text" placeholder="Search Options..." class="w-full pl-9 pr-3 py-2 text-sm bg-transparent focus:outline-none text-slate-700 dark:text-slate-200 rounded-xl"/>
+          <input v-model="searchQuery" type="text" placeholder="Search by Name or Code" class="w-full pl-9 pr-3 py-2 text-sm bg-transparent focus:outline-none text-slate-700 dark:text-slate-200 rounded-xl"/>
         </div>
-        <div class="px-2.5 py-0.5 text-sm rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">{{ filteredItems.length }}</div>
       </div>
 
       <div class="flex items-center gap-3">
@@ -202,8 +232,9 @@ function formatPrice(value) {
     </div>
 
     <!-- DATA TABLE -->
+     <div class="flex flex-col h-[calc(100vh-12rem)]">
     <VaDataTable :columns="visibleColumns" :items="filteredItems" :loading="$props.loading" sticky-header :disable-client-side-sorting="true" 
-      :style="{ '--va-data-table-height':'670px', '--va-data-table-thead-background':'#f8fafc', '--va-data-table-thead-color':'#64748b'}"
+      :style="{ '--va-data-table-thead-background':'#f8fafc', '--va-data-table-thead-color':'#64748b'}"
       @update:sortBy="(sortBy) => emits('sortBy', sortBy)"
       @update:sortingOrder="(sortDesc) => emits('sortingOrder', sortDesc)">
 
@@ -468,6 +499,7 @@ function formatPrice(value) {
         </div>
       </template>
     </VaDataTable>
+</div>
 
     <EditArticleOptionModal
       v-if="isEditArticleOptionModal"

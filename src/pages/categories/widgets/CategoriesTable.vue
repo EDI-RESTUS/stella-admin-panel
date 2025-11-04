@@ -181,7 +181,7 @@ const onButtonCategoryDelete = async (payload) => {
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Search by Name or Code..."
+            placeholder="Search by Name or Code"
             class="w-full pl-9 pr-3 py-2 text-sm bg-transparent focus:outline-none text-slate-700 dark:text-slate-200 rounded-xl"
           />
         </div>
@@ -267,13 +267,13 @@ const onButtonCategoryDelete = async (payload) => {
     </div>
 
     <!-- TABLE -->
+     <div class="flex flex-col h-[calc(100vh-12rem)]">
     <VaDataTable
       :columns="visibleColumns"
       :items="filteredItems"
       :loading="$props.loading"
       :disable-client-side-sorting="true"
       :style="{
-        '--va-data-table-height': '710px',
         '--va-data-table-thead-background': '#f8fafc',
         '--va-data-table-thead-color': '#64748b',
       }"
@@ -504,6 +504,7 @@ const onButtonCategoryDelete = async (payload) => {
         </div>
       </template>
     </VaDataTable>
+    </div>
   </div>
 </template>
 
