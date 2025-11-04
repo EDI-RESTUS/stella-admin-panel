@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { defineVaDataTableColumns, useModal, useToast } from 'vuestic-ui'
 import { useRouter } from 'vue-router'
-import { ref, toRef, watch, computed } from 'vue'
+import { ref, toRef, watch, computed, reactive, onMounted, onUnmounted } from 'vue'
 import { useServiceStore } from '@/stores/services'
 import FileUpload from '@/components/file-uploader/FileUpload.vue'
 import AddSelectionModal from '../modals/AddSelectionModal.vue'
 import axios from 'axios'
-import { Plus, Search, CirclePlus, Pencil, Copy } from 'lucide-vue-next';
+import { Plus, Search, CirclePlus, Pencil, Columns3 } from 'lucide-vue-next';
 
 const emits = defineEmits(['getOffers', 'editOffers', 'openOfferModal'])
 const props = defineProps({
@@ -29,19 +29,88 @@ const isEditSelection = ref(false)
 const router = useRouter()
 const servicesStore = useServiceStore()
 const columns = defineVaDataTableColumns([
-  { label: 'Image', key: 'imageUrl', sortable: false },
-  { label: 'Name', key: 'name', sortable: true, sortingOptions: ['asc', 'desc'] },
-  { label: 'Description', key: 'description', sortable: false, width: '150px' },
-  { label: 'Code', key: 'code', sortable: true, sortingOptions: ['asc', 'desc'] },
-  { label: 'Price', key: 'price', sortable: true, sortingOptions: ['asc', 'desc'] },
-  { label: 'Date Range', key: 'startDate', sortable: true, sortingOptions: ['asc', 'desc'] },
-  { label: 'Week Days', key: 'weeklyOffer', sortable: false, width: '150px' },
-  { label: 'Time Range', key: 'timeRange', sortable: true, sortingOptions: ['asc', 'desc'] },
-  { label: 'Order Type', key: 'orderType', sortable: true, sortingOptions: ['asc', 'desc'] },
-  { label: 'Selections', key: 'selections', sortable: false },
-  { label: 'Actions', key: 'actions', sortable: false },
+  { label: 'Image', key: 'imageUrl' },
+  { label: 'Name', key: 'name' },
+  { label: 'Description', key: 'description' },
+  { label: 'Code', key: 'code', width: '90px' },
+  { label: 'Price', key: 'price', width: '90px' },
+  { label: 'Date Range', key: 'startDate', thAlign: 'center' },
+  { label: 'Time Range', key: 'timeRange', thAlign: 'center' },
+  { label: 'Week Days', key: 'weeklyOffer', thAlign: 'center', width: '190px' },
+  { label: 'Order Type', key: 'orderType' },
+  { label: 'Selections', key: 'selections', thAlign: 'center' },
+  { label: 'Actions', key: 'actions' },
 ])
+const columnsVisibility = reactive<Record<string, boolean>>({})
 
+// Initialize visibility to true for all columns
+columns.forEach(c => columnsVisibility[c.key] = true)
+
+// Storage key for persistence
+const storageKey = computed(() => `offers_columns_visibility`)
+
+// Load column visibility from localStorage
+function loadColumnVisibility() {
+  try {
+    const raw = localStorage.getItem(storageKey.value)
+    if (!raw) return
+    const parsed = JSON.parse(raw)
+    columns.forEach(c => {
+      if (Object.prototype.hasOwnProperty.call(parsed, c.key)) {
+        columnsVisibility[c.key] = !!parsed[c.key]
+      }
+    })
+  } catch (e) {
+    console.warn('Failed to load column visibility', e)
+  }
+}
+
+// Save column visibility to localStorage
+function saveColumnVisibility() {
+  try {
+    const payload: Record<string, boolean> = {}
+    columns.forEach(c => payload[c.key] = !!columnsVisibility[c.key])
+    localStorage.setItem(storageKey.value, JSON.stringify(payload))
+  } catch (e) {
+    console.warn('Failed to save column visibility', e)
+  }
+}
+
+// Reset all columns to visible
+function resetColumnVisibility() {
+  columns.forEach(c => columnsVisibility[c.key] = true)
+  localStorage.removeItem(storageKey.value)
+  saveColumnVisibility()
+}
+
+// Compute visible columns dynamically
+const visibleColumns = computed(() =>
+  defineVaDataTableColumns(columns.filter(c => columnsVisibility[c.key] !== false))
+)
+
+// Watch changes and save
+watch(
+  () => Object.fromEntries(columns.map(c => [c.key, columnsVisibility[c.key]])),
+  () => saveColumnVisibility(),
+  { deep: true }
+)
+
+onMounted(() => loadColumnVisibility())
+
+// Dropdown state
+const showColumnsMenu = ref(false)
+const columnsMenuWrapper = ref<HTMLElement | null>(null)
+
+// Close dropdown on outside click
+function onDocumentClick(e: MouseEvent) {
+  if (!columnsMenuWrapper.value) return
+  if (!columnsMenuWrapper.value.contains(e.target as Node)) {
+    showColumnsMenu.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', onDocumentClick))
+onUnmounted(() => document.removeEventListener('click', onDocumentClick))
 const selectionColumns = defineVaDataTableColumns([
   { label: 'Name', key: 'name' },
   { label: 'Options', key: 'menuItems' },
@@ -192,9 +261,30 @@ watch(
     items.value = newItems.map((item) => ({ ...item }))
   },
 )
+function toggleDay(rowData, day: string) {
+  if (!rowData.weeklyOffer) rowData.weeklyOffer = []
+
+  const dayLower = day.toLowerCase()
+  const index = rowData.weeklyOffer.map(d => d.toLowerCase()).indexOf(dayLower)
+
+  if (index >= 0) {
+    // Day is present → remove it
+    rowData.weeklyOffer.splice(index, 1)
+  } else {
+    // Day is not present → add it
+    rowData.weeklyOffer.push(day)
+  }
+
+  // Persist the change
+  updateData(rowData)
+}
 
 const selectedRest = toRef(servicesStore, 'selectedRest')
-
+const isGroupActive = (offerDays, groupDays) => {
+  if (!Array.isArray(offerDays)) return false
+  const lowerDays = offerDays.map(d => d.toLowerCase())
+  return groupDays.some(day => lowerDays.includes(day))
+}
 function openFileModal(data) {
   console.log(data)
   document.getElementById('file-upload-' + data._id).click()
@@ -280,6 +370,45 @@ function formatReadableDate(dateStr: string): string {
   <!-- Right: Buttons -->
   <div class="flex flex-wrap gap-2 justify-end items-center flex-shrink-0">
 
+<!-- Columns dropdown button -->
+<div class="relative" ref="columnsMenuWrapper">
+  <button
+    @click="showColumnsMenu = !showColumnsMenu"
+    class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium 
+           bg-white/60 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200 dark:border-slate-700 
+           shadow-sm hover:shadow-md hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all duration-200 active:scale-[0.97]"
+  >
+    <Columns3 class="w-4 h-4" /> Columns
+  </button>
+
+  <!-- Dropdown -->
+  <div
+    v-if="showColumnsMenu"
+    class="absolute left-0 mt-2 w-56 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/90 backdrop-blur-md shadow-2xl p-4 z-50 transition-all duration-200"
+  >
+    <div class="flex flex-col gap-3 max-h-[420px] overflow-auto pr-1">
+      <label
+        v-for="col in columns"
+        :key="col.key"
+        class="flex items-center justify-between text-sm cursor-pointer text-slate-700 dark:text-slate-200 hover:text-blue-500"
+      >
+        <div class="flex items-center gap-2">
+          <input type="checkbox" v-model="columnsVisibility[col.key]" class="accent-blue-500 h-4 w-4 rounded" />
+          <span class="select-none">{{ col.label }}</span>
+        </div>
+      </label>
+    </div>
+    <div class="flex justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
+      <button @click="resetColumnVisibility" class="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+        Reset
+      </button>
+      <button @click="() => (showColumnsMenu = false)" class="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
+        Done
+      </button>
+    </div>
+  </div>
+</div>
+
     <!-- Add Offer Button -->
    <button
   @click="onAddOfferClick"
@@ -296,7 +425,7 @@ function formatReadableDate(dateStr: string): string {
     <!-- TABLE -->
     <div class="flex flex-col h-[calc(100vh-12rem)]">
     <VaDataTable
-      :columns="columns"
+      :columns="visibleColumns"
       :items="filteredItems"
       :loading="$props.loading"
       :style="{
@@ -466,7 +595,7 @@ function formatReadableDate(dateStr: string): string {
       
       <!-- DATES -->    
       <template #cell(startDate)="{ rowData }">
-        <div>
+        <div class= "flex justify-center items-center">
           {{ formatReadableDate(rowData.dateOffer?.startDate) }}
           <span v-if="rowData.dateOffer?.startDate && rowData.dateOffer?.endDate" class="mx-1 font-bold"> - </span>
           {{ formatReadableDate(rowData.dateOffer?.endDate) }}
@@ -474,20 +603,45 @@ function formatReadableDate(dateStr: string): string {
       </template>
 
       <!-- DAYS -->
-      <template #cell(weeklyOffer)="{ rowData }">
-        <div class="weekdays-ellipsis">
-          {{
-            (rowData.weeklyOffer || [])
-              .filter((day) => typeof day === 'string')
-              .map((day) => weekdayShortMap[day.toLowerCase()] || '')
-              .join(', ')
-          }}
-        </div>
-      </template>
+<template #cell(weeklyOffer)="{ rowData }">
+  <div class="flex flex-col items-center gap-1">
+    <!-- Top pill: Mon–Wed -->
+    <div class="flex rounded-xl border overflow-hidden h-7">
+      <span
+        v-for="(day, index) in ['monday', 'tuesday', 'wednesday']"
+        :key="day"
+        class="flex-1 flex justify-center items-center text-xs font-medium transition-colors duration-150 px-2 cursor-pointer select-none"
+        :class="(rowData.weeklyOffer || []).map(d => d.toLowerCase()).includes(day)
+          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+          : 'bg-slate-100 text-slate-400 hover:bg-slate-200'"
+        :style="index > 0 ? 'border-left:1px solid rgba(100,116,139,0.3);' : ''"
+        @click.stop="toggleDay(rowData, day)"
+      >
+        {{ weekdayShortMap[day] }}
+      </span>
+    </div>
+
+    <!-- Bottom pill: Thu–Sun -->
+    <div class="flex rounded-xl border overflow-hidden h-7">
+      <span
+        v-for="(day, index) in ['thursday', 'friday', 'saturday', 'sunday']"
+        :key="day"
+        class="flex-1 flex justify-center items-center text-xs font-medium transition-colors duration-150 px-2 cursor-pointer select-none"
+        :class="(rowData.weeklyOffer || []).map(d => d.toLowerCase()).includes(day)
+          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+          : 'bg-slate-100 text-slate-400 hover:bg-slate-200'"
+        :style="index > 0 ? 'border-left:1px solid rgba(100,116,139,0.3);' : ''"
+        @click.stop="toggleDay(rowData, day)"
+      >
+        {{ weekdayShortMap[day] }}
+      </span>
+    </div>
+  </div>
+</template>
       
       <!-- TIMES -->
       <template #cell(timeRange)="{ rowData }">
-        <div>
+        <div class= "flex justify-center items-center">
           {{ rowData.timeOffer?.startTime || '' }}
           <span v-if="rowData.timeOffer?.startTime && rowData.timeOffer?.endTime" class="mx-1 font-bold"> - </span>
           {{ rowData.timeOffer?.endTime || '' }}
@@ -496,39 +650,64 @@ function formatReadableDate(dateStr: string): string {
 
       <!-- ORDER TYPE -->
       <template #cell(orderType)="{ rowData }">
-        <div>
-          {{ (rowData.orderType || []).map((type) => type.charAt(0).toUpperCase() + type.slice(1)).join(', ') }}
-        </div>
-      </template>
+  <div class="flex flex-col items-center justify-center text-center">
+    <span
+      v-for="type in rowData.orderType || []"
+      :key="type"
+      class="block text-slate-700 dark:text-slate-200 font-medium"
+    >
+      {{ type.charAt(0).toUpperCase() + type.slice(1) }}
+    </span>
+  </div>
+</template>
 
       <!-- SELECTIONS -->
-      <template #cell(selections)="{ row, rowData, isExpanded }">
-        <div class="ellipsis">
-          <VaButton
-            :icon="isExpanded ? 'va-arrow-up' : 'va-arrow-down'"
-            preset="secondary"
-            @click="row.toggleRowDetails()"
-          >
-            {{ rowData.selections?.length || 0 }} Selections
-          </VaButton>
-        </div>
-      </template>
+<template #cell(selections)="{ row, rowData, isExpanded }">
+  <div class="relative flex justify-center items-center">
+    <button
+      @click.stop="row.toggleRowDetails()"
+      class="flex items-center gap-1 px-3 py-1.5 text-sm rounded-full 
+             bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+    >
+      {{ rowData.selections?.length || 0 }}
+      {{ rowData.selections?.length === 1 ? 'Selection' : 'Selections' }}
+      <svg
+        class="w-4 h-4 text-blue-700 transition-transform duration-200"
+        :class="{ 'rotate-180': isExpanded }"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+  </div>
+</template>
+
       <template #expandableRow="{ rowData }">
         <div class="expandable_table rounded p-5">
           <div class="flex justify-end mb-4">
-            <VaButton color="primary" icon="mso-add" @click="(isAddSelectionModalOpen = true), (offerData = rowData)">
-              Add Selection
-            </VaButton>
-          </div>
+  <button
+    @click="(isAddSelectionModalOpen = true), (offerData = rowData)"
+    class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium 
+           bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.97] transition-all duration-200 
+           shadow-sm hover:shadow-md h-10 w-10 md:w-auto md:h-auto"
+  >
+    <Plus class="w-4 h-4" />
+    <span class="hidden md:inline">Add Selection</span>
+  </button>
+</div>
+
 
           <table class="w-full table-fixed border-collapse">
             <thead>
               <tr class="text-left border-b">
-                <th class="py-2 px-3 w-[25%]">Name</th>
-                <th class="py-2 px-3 w-[20%]">Options</th>
-                <th class="py-2 px-3 w-[15%]">Min Choice</th>
-                <th class="py-2 px-3 w-[15%]">Max Choice</th>
-                <th class="py-2 px-3 w-[25%] text-right">Actions</th>
+                <th class="py-2 px-3 w-[30%]">Name</th>
+                <th class="py-2 px-3 w-[20%]">Choices</th>
+                <th class="py-2 px-3 w-[20%]">Min Choice</th>
+                <th class="py-2 px-3 w-[20%]">Max Choice</th>
+                <th class="py-2 px-3 w-[10%] text-right">Actions</th>
               </tr>
             </thead>
 
@@ -550,7 +729,7 @@ function formatReadableDate(dateStr: string): string {
                   />
                 </td>
 
-                <td class="py-2 px-3">{{ selection.menuItems?.length || 0 }} Article</td>
+                <td class="py-2 px-3">{{ selection.menuItems?.length || 0 }} Articles</td>
 
                 <td class="py-2 px-3">
                   <div v-if="!selection.editMinChoice" @click="selection.editMinChoice = true">

@@ -18,12 +18,14 @@
     <template #right>
       <div class="flex items-center">
         <VaSelect
-          v-model="selectedRest"
-          :options="restOptions"
-          placeholder="Select an option"
-          searchable
-          highlight-matched-text
-        />
+  v-model="selectedRest"
+  :options="restOptions"
+  placeholder="Select restaurant"
+  searchable
+  highlight-matched-text
+  class="rest-select"
+/>
+
         <AppNavbarActions class="app-navbar__actions" :is-mobile="isMobile" />
       </div>
     </template>
@@ -143,4 +145,56 @@ watch(selectedRest, (newValue) => {
 .x-flip {
   transform: scaleX(-100%);
 }
+
+.rest-select {
+  min-width: 220px;
+
+  /* Outer wrapper */
+  ::v-deep(.va-select) {
+    border-radius: 0.75rem !important; /* rounded-xl */
+    border: 1px solid #e2e8f0 !important; /* slate-200 */
+    background-color: rgba(255, 255, 255, 0.6) !important; /* bg-white/60 */
+    backdrop-filter: blur(12px);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: all 0.2s ease-in-out;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.75) !important;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+    }
+  }
+
+  /* Input field inside the select */
+  ::v-deep(.va-input-wrapper__field) {
+    border: none !important;
+    background: transparent !important;
+    padding: 0.45rem 0.75rem;
+    font-weight: 500;
+    color: #1e293b !important; /* slate-800 */
+  }
+
+  /* Placeholder and dropdown content */
+  ::v-deep(.va-select__content) {
+    color: #334155 !important; /* slate-700 */
+  }
+
+  /* Clear icon (optional: hide it) */
+  ::v-deep(.va-select__clear-icon) {
+    display: none !important;
+  }
+
+  /* Dark mode */
+  @media (prefers-color-scheme: dark) {
+    ::v-deep(.va-select) {
+      background-color: rgba(30, 41, 59, 0.6) !important; /* dark:bg-slate-800/60 */
+      border-color: #475569 !important; /* dark:border-slate-700 */
+    }
+
+    ::v-deep(.va-select__content),
+    ::v-deep(.va-input-wrapper__field) {
+      color: #f1f5f9 !important; /* slate-100 */
+    }
+  }
+}
+
 </style>

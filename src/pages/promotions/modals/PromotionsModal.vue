@@ -76,7 +76,8 @@
     label="Affect Type"
     required-mark
     placeholder="Single/Multiple Items"
-  />
+    :disabled="formData.affect !== 'Selected Items' || !['Value Discount', 'Percentage Discount'].includes(formData.promotionType)"
+/>
             </div>
             <div v-if="formData.affect === 'Selected Items'" class="flex gap-2 mt-2">
               <VaButton @click="openArticlesModal">Articles</VaButton>
@@ -111,7 +112,8 @@
     label="Affect Type"
     required-mark
     placeholder="Single/Multiple Items"
-  />
+    :disabled="formData.affect !== 'Selected Items' || !['Value Discount', 'Percentage Discount'].includes(formData.promotionType)"
+/>
             </div>
             <div v-if="formData.affect === 'Selected Items'" class="flex gap-2 mt-2">
               <VaButton @click="openArticlesModal">Articles</VaButton>
@@ -267,6 +269,7 @@
             </div>
             <div class="flex items-center gap-6 mt-3">
               <VaCheckbox v-model="formData.availableAtCC" label="Available at CC" />
+              <VaCheckbox v-model="formData.availableAtWeb" label="Available at Web" />
               <VaCheckbox v-model="formData.affectOffers" label="Affect Offers" />
             </div>
           </section>
@@ -456,6 +459,7 @@ const formData = ref({
   orderType: [],
   deliveryZones: [],
   availableAtCC: false,
+  availableAtWeb: false,
   affectOffers: false,
   minimumOrder: null,
   takeQuantity: null,
@@ -487,6 +491,7 @@ const resetForm = () => {
     orderType: [],
     deliveryZones: [],
     availableAtCC: false,
+    availableAtWeb: false,
     affectOffers: false,
     minimumOrder: null,
     takeQuantity: null,
@@ -547,6 +552,18 @@ watch(
   },
 )
 
+watch(
+  () => [formData.value.affect, formData.value.promotionType],
+  ([affect, promotionType]) => {
+    if (
+      affect !== 'Selected Items' ||
+      !['Value Discount', 'Percentage Discount'].includes(promotionType)
+    ) {
+      formData.value.affectItems = ''
+    }
+  }
+)
+
 function populateFormData(promotion) {
   // Parse timeRange "HH:MM - HH:MM"
   let startTime = ''
@@ -580,6 +597,7 @@ function populateFormData(promotion) {
       .map((id) => props.deliveryZones.find((z) => z.value === id))
       .filter(Boolean),
     availableAtCC: !!promotion.availableAtCC,
+    availableAtWeb: !!promotion.availableAtWeb,
     affectOffers: !!promotion.availableWithOffers,
     minimumOrder: promotion.minimumOrder ?? null,
     takeQuantity: promotion.takeQuantity || null,
@@ -723,6 +741,7 @@ const submit = async () => {
     quantity: raw.codeType === 'MULTI' ? raw.quantity : 1,
     prefix: raw.codeType === 'MULTI' ? raw.prefix : '',
     availableAtCC: raw.availableAtCC,
+    availableAtWeb: raw.availableAtWeb,
     availableWithOffers: raw.affectOffers,
     minimumOrder: raw.minimumOrder,
     takeQuantity: raw.takeQuantity,
