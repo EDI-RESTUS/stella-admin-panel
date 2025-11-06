@@ -228,6 +228,11 @@ const filteredArticles = computed(() => {
 })
 const filteredGroups = computed(() => selectedArticle.value?.articlesOptionsGroup || [])
 const filteredOptions = computed(() => selectedGroup.value?.articlesOptions || [])
+const categoriesCount = computed(() => categories.value.length)
+const subcategoriesCount = computed(() => filteredSubcategories.value.length)
+const articlesCount = computed(() => filteredArticles.value.length)
+const groupsCount = computed(() => filteredGroups.value.length)
+const optionsCount = computed(() => filteredOptions.value.length)
 
 const sharedGroupNotice = computed(() => {
   if (!selectedGroup.value || !selectedCategory.value) return null
@@ -262,32 +267,32 @@ const sharedGroupNotice = computed(() => {
 <template>
   <div class="organize-menu flex gap-4 pt-4 h-screen bg-slate-100">
     <!-- Categories -->
-    <div
-      :class="[
-        'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
-        collapsed.categories ? 'collapsed' : 'flex-1',
-      ]"
-    >
-      <div class="header">
+    <div :class="[
+      'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
+      collapsed.categories ? 'collapsed' : 'flex-1',
+    ]">
+      <div class="header flex justify-between items-center">
+        <div v-if="!collapsed.categories" class="h-7 min-w-[32px] flex items-center justify-center px-2 text-sm font-medium rounded-xl 
+           bg-blue-100 text-blue-700">
+          {{ categoriesCount }}
+        </div>
         <h3 v-if="!collapsed.categories" class="title">Categories</h3>
+
         <button class="toggle-btn" @click="collapsed.categories = !collapsed.categories">
           {{ collapsed.categories ? '+' : '−' }}
         </button>
       </div>
+
       <div v-if="!collapsed.categories" class="flex-1 overflow-y-auto p-2">
         <VueDraggableNext :list="categories" @change="movedCategory">
-          <div
-            v-for="cat in categories"
-            :key="cat._id"
-            :class="['item-card', selectedCategory?._id === cat._id ? 'selected' : '']"
-            @click="
+          <div v-for="cat in categories" :key="cat._id"
+            :class="['item-card', selectedCategory?._id === cat._id ? 'selected' : '']" @click="
               (selectedCategory = cat),
                 (selectedSubcategory = null),
                 (selectedArticle = null),
                 (selectedGroup = null),
                 getArticles()
-            "
-          >
+            ">
             <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ cat.name }}
           </div>
         </VueDraggableNext>
@@ -296,119 +301,135 @@ const sharedGroupNotice = computed(() => {
     </div>
 
     <!-- Subcategories -->
+    <div :class="[
+  'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
+  collapsed.subcategories ? 'collapsed' : 'flex-1',
+]">
+  <div class="header flex justify-between items-center">
     <div
-      :class="[
-        'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
-        collapsed.subcategories ? 'collapsed' : 'flex-1',
-      ]"
+      v-if="!collapsed.subcategories && filteredSubcategories.length > 0"
+      class="h-7 min-w-[32px] flex items-center justify-center px-2 text-sm font-medium rounded-xl 
+             bg-blue-100 text-blue-700"
     >
-      <div class="header">
-        <h3 v-if="!collapsed.subcategories" class="title">Sub-Categories</h3>
-        <button class="toggle-btn" @click="collapsed.subcategories = !collapsed.subcategories">
-          {{ collapsed.subcategories ? '+' : '−' }}
-        </button>
-      </div>
-      <div v-if="!collapsed.subcategories" class="flex-1 overflow-y-auto p-2">
-        <VueDraggableNext :list="filteredSubcategories" @change="(cat) => movedSubCategory(cat, selectedCategory)">
-          <div
-            v-for="sub in filteredSubcategories"
-            :key="sub._id"
-            :class="['item-card', selectedSubcategory?._id === sub._id ? 'selected' : '']"
-            @click="(selectedSubcategory = sub), (selectedArticle = null), (selectedGroup = null), getArticles()"
-          >
-            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ sub.name }}
-          </div>
-        </VueDraggableNext>
-      </div>
-      <div v-else class="collapsed-title">Sub-Categories</div>
+      {{ filteredSubcategories.length }}
     </div>
+    <h3 v-if="!collapsed.subcategories" class="title">Sub-Categories</h3>
+    <button class="toggle-btn" @click="collapsed.subcategories = !collapsed.subcategories">
+      {{ collapsed.subcategories ? '+' : '−' }}
+    </button>
+  </div>
+  <div v-if="!collapsed.subcategories" class="flex-1 overflow-y-auto p-2">
+    <VueDraggableNext :list="filteredSubcategories" @change="(cat) => movedSubCategory(cat, selectedCategory)">
+      <div
+        v-for="sub in filteredSubcategories"
+        :key="sub._id"
+        :class="['item-card', selectedSubcategory?._id === sub._id ? 'selected' : '']"
+        @click="(selectedSubcategory = sub), (selectedArticle = null), (selectedGroup = null), getArticles()"
+      >
+        <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ sub.name }}
+      </div>
+    </VueDraggableNext>
+  </div>
+  <div v-else class="collapsed-title">Sub-Categories</div>
+</div>
 
     <!-- Articles -->
+    <div :class="[
+  'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
+  collapsed.articles ? 'collapsed' : 'flex-1',
+]">
+  <div class="header flex justify-between items-center">
     <div
-      :class="[
-        'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
-        collapsed.articles ? 'collapsed' : 'flex-1',
-      ]"
+      v-if="!collapsed.articles && filteredArticles.length > 0"
+      class="h-7 min-w-[32px] flex items-center justify-center px-2 text-sm font-medium rounded-xl 
+             bg-blue-100 text-blue-700"
     >
-      <div class="header">
-        <h3 v-if="!collapsed.articles" class="title">Articles</h3>
-        <button class="toggle-btn" @click="collapsed.articles = !collapsed.articles">
-          {{ collapsed.articles ? '+' : '−' }}
-        </button>
-      </div>
-      <div v-if="!collapsed.articles" class="flex-1 overflow-y-auto p-2">
-        <VueDraggableNext
-          :list="filteredArticles"
-          @change="(cat) => movedArticle(cat, selectedCategory, selectedSubcategory)"
-        >
-          <div
-            v-for="art in filteredArticles"
-            :key="art._id"
-            :class="['item-card', selectedArticle?._id === art._id ? 'selected' : '']"
-            @click="(selectedArticle = art), (selectedGroup = null)"
-          >
-            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ art.name }}
-          </div>
-        </VueDraggableNext>
-      </div>
-      <div v-else class="collapsed-title">Articles</div>
+      {{ filteredArticles.length }}
     </div>
+    <h3 v-if="!collapsed.articles" class="title">Articles</h3>
+    <button class="toggle-btn" @click="collapsed.articles = !collapsed.articles">
+      {{ collapsed.articles ? '+' : '−' }}
+    </button>
+  </div>
+  <div v-if="!collapsed.articles" class="flex-1 overflow-y-auto p-2">
+    <VueDraggableNext :list="filteredArticles" @change="(cat) => movedArticle(cat, selectedCategory, selectedSubcategory)">
+      <div
+        v-for="art in filteredArticles"
+        :key="art._id"
+        :class="['item-card', selectedArticle?._id === art._id ? 'selected' : '']"
+        @click="(selectedArticle = art), (selectedGroup = null)"
+      >
+        <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ art.name }}
+      </div>
+    </VueDraggableNext>
+  </div>
+  <div v-else class="collapsed-title">Articles</div>
+</div>
 
     <!-- Groups -->
+    <div :class="[
+  'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
+  collapsed.groups ? 'collapsed' : 'flex-1',
+]">
+  <div class="header flex justify-between items-center">
     <div
-      :class="[
-        'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
-        collapsed.groups ? 'collapsed' : 'flex-1',
-      ]"
+      v-if="!collapsed.groups && filteredGroups.length > 0"
+      class="h-7 min-w-[32px] flex items-center justify-center px-2 text-sm font-medium rounded-xl 
+             bg-blue-100 text-blue-700"
     >
-      <div class="header">
-        <h3 v-if="!collapsed.groups" class="title">Groups</h3>
-        <button class="toggle-btn" @click="collapsed.groups = !collapsed.groups">
-          {{ collapsed.groups ? '+' : '−' }}
-        </button>
-      </div>
-      <div v-if="!collapsed.groups" class="flex-1 overflow-y-auto p-2">
-        <VueDraggableNext :list="filteredGroups" @change="movedArticleGroup">
-          <div
-            v-for="grp in filteredGroups"
-            :key="grp._id"
-            :class="['item-card', selectedGroup?._id === grp._id ? 'selected' : '']"
-            @click="selectedGroup = grp"
-          >
-            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ grp.name }}
-          </div>
-        </VueDraggableNext>
-      </div>
-      <div v-else class="collapsed-title">Groups</div>
+      {{ filteredGroups.length }}
     </div>
+    <h3 v-if="!collapsed.groups" class="title">Groups</h3>
+    <button class="toggle-btn" @click="collapsed.groups = !collapsed.groups">
+      {{ collapsed.groups ? '+' : '−' }}
+    </button>
+  </div>
+  <div v-if="!collapsed.groups" class="flex-1 overflow-y-auto p-2">
+    <VueDraggableNext :list="filteredGroups" @change="movedArticleGroup">
+      <div
+        v-for="grp in filteredGroups"
+        :key="grp._id"
+        :class="['item-card', selectedGroup?._id === grp._id ? 'selected' : '']"
+        @click="selectedGroup = grp"
+      >
+        <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ grp.name }}
+      </div>
+    </VueDraggableNext>
+  </div>
+  <div v-else class="collapsed-title">Groups</div>
+</div>
 
     <!-- Options -->
+    <div :class="[
+  'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
+  collapsed.options ? 'collapsed' : 'flex-1',
+]">
+  <div class="header flex justify-between items-center">
     <div
-      :class="[
-        'column border rounded-lg bg-white flex flex-col transition-all duration-300 overflow-hidden',
-        collapsed.options ? 'collapsed' : 'flex-1',
-      ]"
+      v-if="!collapsed.options && filteredOptions.length > 0"
+      class="h-7 min-w-[32px] flex items-center justify-center px-2 text-sm font-medium rounded-xl 
+             bg-blue-100 text-blue-700"
     >
-      <div class="header">
-        <h3 v-if="!collapsed.options" class="title">Options</h3>
-        <button class="toggle-btn" @click="collapsed.options = !collapsed.options">
-          {{ collapsed.options ? '+' : '−' }}
-        </button>
-      </div>
-      <div v-if="!collapsed.options" class="flex-1 overflow-y-auto p-2">
-        <div v-if="sharedGroupNotice" class="shared-group-notice mb-2 text-sm text-gray-600 flex items-center gap-3">
-          <VaIcon name="info" class="text-blue-500 w-4 h-4" />
-          <span>{{ sharedGroupNotice }}</span>
-        </div>
-
-        <VueDraggableNext :list="filteredOptions" @change="movedArticleOption">
-          <div v-for="opt in filteredOptions" :key="opt._id" class="item-card">
-            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ opt.name }}
-          </div>
-        </VueDraggableNext>
-      </div>
-      <div v-else class="collapsed-title">Options</div>
+      {{ filteredOptions.length }}
     </div>
+    <h3 v-if="!collapsed.options" class="title">Options</h3>
+    <button class="toggle-btn" @click="collapsed.options = !collapsed.options">
+      {{ collapsed.options ? '+' : '−' }}
+    </button>
+  </div>
+  <div v-if="!collapsed.options" class="flex-1 overflow-y-auto p-2">
+    <div v-if="sharedGroupNotice" class="shared-group-notice mb-2 text-sm text-gray-600 flex items-center gap-3">
+      <VaIcon name="info" class="text-blue-500 w-4 h-4" />
+      <span>{{ sharedGroupNotice }}</span>
+    </div>
+    <VueDraggableNext :list="filteredOptions" @change="movedArticleOption">
+      <div v-for="opt in filteredOptions" :key="opt._id" class="item-card">
+        <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ opt.name }}
+      </div>
+    </VueDraggableNext>
+  </div>
+  <div v-else class="collapsed-title">Options</div>
+</div>
   </div>
 </template>
 
@@ -447,7 +468,6 @@ const sharedGroupNotice = computed(() => {
   font-weight: bold;
   color: #374151;
   margin: 0;
-  margin-top: 1rem;
   align-items: center;
   justify-content: center;
   display: flex;

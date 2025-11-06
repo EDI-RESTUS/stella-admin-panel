@@ -222,27 +222,19 @@
           <!-- Validity & Availability -->
           <section>
             <h2 class="text-md font-semibold mb-2">Validity & Availability</h2>
-            <div class="grid md:grid-cols-4 gap-3 mb-3">
+            <div class="grid md:grid-cols-5 gap-3 mb-3">
               <VaInput v-model="formData.startDate" label="Start Date" type="date" required-mark />
               <VaInput v-model="formData.endDate" label="End Date" type="date" required-mark />
               <VaInput v-model="formData.startTime" label="Time From" type="time" required-mark />
               <VaInput v-model="formData.endTime" label="Time To" type="time" required-mark />
-            </div>
-            <div class="grid md:grid-cols-2 gap-2">
-              <VaSelect
-                v-model="formData.days"
-                label="Available Days"
-                placeholder="Select days"
-                multiple
-                required-mark
-                :options="daysOfWeek"
+              <VaSelect v-model="formData.days" label="Available Days" placeholder="Select days" multiple required-mark :options="daysOfWeek"
               />
             </div>
           </section>
 
           <!-- Other Configuration -->
           <section>
-            <h2 class="text-md font-semibold mb-2">Other Configuration</h2>
+            <h2 class="text-md font-semibold mb-2">Other Configurations</h2>
             <div class="grid md:grid-cols-3 gap-4">
               <VaSelect
                 v-model="formData.orderType"
@@ -278,7 +270,7 @@
 
       <!-- FOOTER -->
       <template #footer>
-        <div class="flex justify-end gap-2 p-4 border-t">
+        <div class="flex justify-end gap-2 p-4">
           <VaButton color="secondary" @click="onCancel">Cancel</VaButton>
           <VaButton color="primary" @click="submit">
             {{ isUpdating ? 'Update' : 'Add' }}

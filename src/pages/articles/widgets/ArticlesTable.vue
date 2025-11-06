@@ -290,20 +290,20 @@ function openFileModal(data) {
     <!-- HEADER -->
     <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
       <!-- Left: Title + Counter + Search -->
-      <div class="flex flex-1 min-w-0 items-center gap-4 flex-wrap">
+      <div class="flex flex-1 min-w-0 items-center gap-2 flex-wrap">
         <!-- Title + Counter -->
         <div class="flex items-center gap-2 flex-shrink-0">
           <h1 class="text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight">Articles</h1>
           <div
-            class="px-2.5 py-0.5 text-sm rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium"
-          >
+            class="h-9 flex items-center px-3 text-sm font-medium rounded-xl 
+           bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"          >
             {{ totalVisibleCount }}
           </div>
         </div>
 
         <!-- Search Bar -->
         <div
-          class="relative flex-1 min-w-[150px] max-w-[300px] w-full sm:w-[240px] md:w-[300px] bg-white/60 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
+          class="relative flex-1 min-w-[150px] max-w-[300px] w-full sm:w-[240px] md:w-[300px] bg-white/60 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
         >
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
           <input

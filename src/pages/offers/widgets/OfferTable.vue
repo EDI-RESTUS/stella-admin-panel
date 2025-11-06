@@ -27,6 +27,7 @@ const offerData = ref('')
 const offerSelection = ref('')
 const isEditSelection = ref(false)
 const router = useRouter()
+const filterMode = ref(2)
 const servicesStore = useServiceStore()
 const columns = defineVaDataTableColumns([
   { label: 'Image', key: 'imageUrl' },
@@ -39,6 +40,7 @@ const columns = defineVaDataTableColumns([
   { label: 'Week Days', key: 'weeklyOffer', thAlign: 'center', width: '190px' },
   { label: 'Order Type', key: 'orderType' },
   { label: 'Selections', key: 'selections', thAlign: 'center' },
+ { label: 'Active', key: 'isActive', thAlign: 'center' },
   { label: 'Actions', key: 'actions' },
 ])
 const columnsVisibility = reactive<Record<string, boolean>>({})
@@ -48,6 +50,10 @@ columns.forEach(c => columnsVisibility[c.key] = true)
 
 // Storage key for persistence
 const storageKey = computed(() => `offers_columns_visibility`)
+function cycleFilterMode() {
+  // 0 = Inactive, 1 = All, 2 = Active
+  filterMode.value = (filterMode.value + 1) % 3
+}
 
 // Load column visibility from localStorage
 function loadColumnVisibility() {
@@ -121,24 +127,29 @@ const selectionColumns = defineVaDataTableColumns([
 const totalVisibleCount = computed(() => filteredItems.value.length)
 const searchQuery = ref('')
 const filteredItems = ref([])
-watch(
-  [() => props.items, searchQuery],
-  ([newItems, query]) => {
-    const lowerQuery = query.toLowerCase().trim()
-    const mappedItems = newItems.map((item) => ({ ...item }))
+watch([() => props.items, searchQuery, filterMode], ([newItems, query, mode]) => {
+  const lowerQuery = query.toLowerCase().trim()
+  let mappedItems = newItems.map(item => ({ ...item }))
 
-    if (!lowerQuery) {
-      filteredItems.value = mappedItems
-    } else {
-      filteredItems.value = mappedItems.filter((item) =>
-        [item.name, item.code]
-          .filter(Boolean)
-          .some((field) => field.toLowerCase().includes(lowerQuery))
-      )
-    }
-  },
-  { immediate: true }
-)
+  // Filter by active mode
+  if (mode === 0) {
+    // Only inactive
+    mappedItems = mappedItems.filter(item => !item.isActive)
+  } else if (mode === 2) {
+    // Only active
+    mappedItems = mappedItems.filter(item => item.isActive)
+  }
+
+  // Search filter
+  if (lowerQuery) {
+    mappedItems = mappedItems.filter(item =>
+      [item.name, item.code].filter(Boolean).some(field => field.toLowerCase().includes(lowerQuery))
+    )
+  }
+
+  filteredItems.value = mappedItems
+}, { immediate: true })
+
 const IsActive = ref(true)
 
 const weekdayShortMap = {
@@ -342,11 +353,12 @@ function formatReadableDate(dateStr: string): string {
     <!-- HEADER -->
 <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
   <!-- Left: Title + Counter + Search -->
-  <div class="flex flex-1 min-w-0 items-center gap-4 flex-wrap">
+  <div class="flex flex-1 min-w-0 items-center gap-2 flex-wrap">
     <!-- Title + Counter -->
     <div class="flex items-center gap-2 flex-shrink-0">
       <h1 class="text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight">Offers</h1>
-      <div class="px-2.5 py-0.5 text-sm rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+      <div class="h-9 flex items-center px-3 text-sm font-medium rounded-xl 
+           bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
         {{ totalVisibleCount }}
       </div>
     </div>
@@ -369,6 +381,31 @@ function formatReadableDate(dateStr: string): string {
 
   <!-- Right: Buttons -->
   <div class="flex flex-wrap gap-2 justify-end items-center flex-shrink-0">
+
+<!-- Active Only -->
+        <div class="flex items-center gap-2">
+  <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Active Only</span>
+  <label class="relative inline-block w-9 h-5 cursor-pointer" @click="cycleFilterMode">
+    <!-- Track -->
+    <span
+      class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
+      :class="{
+        'bg-red-500': filterMode === 0,
+        'bg-slate-300': filterMode === 1,
+        'bg-emerald-500': filterMode === 2
+      }"
+    ></span>
+    <!-- Thumb -->
+    <span
+      class="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out"
+      :class="{
+        'translate-x-1': filterMode === 0,
+        'translate-x-2.5': filterMode === 1,
+        'translate-x-4': filterMode === 2
+      }"
+    ></span>
+  </label>
+        </div>
 
 <!-- Columns dropdown button -->
 <div class="relative" ref="columnsMenuWrapper">
@@ -666,11 +703,11 @@ function formatReadableDate(dateStr: string): string {
   <div class="relative flex justify-center items-center">
     <button
       @click.stop="row.toggleRowDetails()"
-      class="flex items-center gap-1 px-3 py-1.5 text-sm rounded-full 
-             bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+      class="flex items-center justify-center gap-1 px-3 py-1.5 text-sm rounded-full
+             bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors
+             min-w-[3rem]"
     >
-      {{ rowData.selections?.length || 0 }}
-      {{ rowData.selections?.length === 1 ? 'Selection' : 'Selections' }}
+      <span>{{ rowData.selections?.length || 0 }}</span>
       <svg
         class="w-4 h-4 text-blue-700 transition-transform duration-200"
         :class="{ 'rotate-180': isExpanded }"
@@ -686,8 +723,8 @@ function formatReadableDate(dateStr: string): string {
 </template>
 
       <template #expandableRow="{ rowData }">
-        <div class="expandable_table rounded p-5">
-          <div class="flex justify-end mb-4">
+        <div class="expandable_table mt-2 mb-2 rounded-lg overflow-hidden border">
+          <div class="flex justify-end p-4">
   <button
     @click="(isAddSelectionModalOpen = true), (offerData = rowData)"
     class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium 
@@ -703,11 +740,11 @@ function formatReadableDate(dateStr: string): string {
           <table class="w-full table-fixed border-collapse">
             <thead>
               <tr class="text-left border-b">
-                <th class="py-2 px-3 w-[30%]">Name</th>
-                <th class="py-2 px-3 w-[20%]">Choices</th>
-                <th class="py-2 px-3 w-[20%]">Min Choice</th>
-                <th class="py-2 px-3 w-[20%]">Max Choice</th>
-                <th class="py-2 px-3 w-[10%] text-right">Actions</th>
+                <th class="py-2 px-3 w-[35%]">NAME</th>
+                <th class="py-2 px-3 w-[15%] text-center">CHOICES</th>
+                <th class="py-2 px-3 w-[15%] text-center">MIN CHOICES</th>
+                <th class="py-2 px-3 w-[15%] text-center">MAX CHOICES</th>
+                <th class="py-2 px-3 w-[20%] text-right">ACTIONS</th>
               </tr>
             </thead>
 
@@ -729,9 +766,9 @@ function formatReadableDate(dateStr: string): string {
                   />
                 </td>
 
-                <td class="py-2 px-3">{{ selection.menuItems?.length || 0 }} Articles</td>
+                <td class="py-2 px-3 text-center">{{ selection.menuItems?.length || 0 }} Articles</td>
 
-                <td class="py-2 px-3">
+                <td class="py-2 px-3 text-center">
                   <div v-if="!selection.editMinChoice" @click="selection.editMinChoice = true">
                     {{ selection.min }}
                   </div>
@@ -749,7 +786,7 @@ function formatReadableDate(dateStr: string): string {
                   />
                 </td>
 
-                <td class="py-2 px-3">
+                <td class="py-2 px-3 text-center">
                   <div v-if="!selection.editMaxChoice" @click="selection.editMaxChoice = true">
                     {{ selection.max }}
                   </div>
@@ -769,32 +806,51 @@ function formatReadableDate(dateStr: string): string {
 
                 <td class="py-2 px-3 text-right">
                   <div class="flex justify-end gap-2">
-                    <VaButton
-                      preset="primary"
-                      size="small"
-                      icon="mso-edit"
-                      @click="
-                        () => {
-                          isAddSelectionModalOpen = true
-                          offerData = rowData
-                          isEditSelection = true
-                          offerSelection = selection
-                        }
-                      "
-                    />
-                    <VaButton
-                      preset="primary"
-                      size="small"
-                      icon="mso-delete"
-                      color="danger"
-                      @click="onDeleteSelection({ ...rowData, selectionId: selection._id, offerId: rowData._id })"
-                    />
+                    <!-- Edit Button -->
+<button
+  class="flex items-center justify-center w-7 h-7 rounded-lg text-slate-600 hover:bg-slate-200 transition-colors duration-150 active:scale-95"
+  title="Edit Selection"
+  @click="() => {
+    isAddSelectionModalOpen = true
+    offerData = rowData
+    isEditSelection = true
+    offerSelection = selection
+  }"
+>
+  <Pencil class="w-3.5 h-3.5" />
+</button>
+
+<!-- Delete Button -->
+<button
+  class="flex items-center justify-center w-7 h-7 rounded-lg text-red-600 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-700 transition-colors duration-150 active:scale-95"
+  title="Delete Selection"
+  @click="onDeleteSelection({ ...rowData, selectionId: selection._id, offerId: rowData._id })"
+>
+  <VaIcon name="mso-delete" class="w-4.5 h-4.5 block" />
+</button>
+
                   </div>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+      </template>
+
+<!-- ACTIVE -->
+      <template #cell(isActive)="{ rowData }">
+  <div class="flex justify-center items-center">
+    <label class="relative inline-block w-9 h-5 cursor-pointer">
+      <input type="checkbox"
+             :checked="rowData.isActive"
+             class="sr-only"
+             @change="updateData({ ...rowData, isActive: $event.target.checked })" />
+      <span class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
+            :class="rowData.isActive ? 'bg-emerald-500' : 'bg-red-500'"></span>
+      <span class="absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out"
+            :class="rowData.isActive ? 'translate-x-4' : 'translate-x-1'"></span>
+    </label>
+  </div>
       </template>
 
       <!-- ACTIONS -->
@@ -862,8 +918,14 @@ function formatReadableDate(dateStr: string): string {
 }
 
 .expandable_table {
-  background-color: var(--va-background-element);
+  background-color: #dbeafe;
   color: var(--va-on-background-element);
+  
+}
+.expandable_table thead th {
+  background-color: var(--va-data-table-thead-background);
+  color: var(--va-data-table-thead-color);
+
 }
 
 .editable-field {
@@ -948,7 +1010,11 @@ function formatReadableDate(dateStr: string): string {
   padding: 0.75rem;
 }
 
-.expandable_table tr:hover {
+.expandable_table tbody tr td {
+  background-color: #ffffff;
+}
+
+.expandable_table tbody tr:hover td {
   background-color: var(--va-background-secondary);
 }
 </style>
