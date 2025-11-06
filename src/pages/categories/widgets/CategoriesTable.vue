@@ -157,14 +157,14 @@ const onButtonCategoryDelete = async (payload) => {
     <!-- HEADER -->
     <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
       <!-- LEFT: Title + Count + Search -->
-      <div class="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
         <div class="flex items-center gap-2">
           <h1 class="text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight">
             Categories
           </h1>
           <div
-            class="px-2.5 py-0.5 text-sm rounded-full bg-blue-100 text-blue-700 
-                   dark:bg-blue-900/40 dark:text-blue-300 font-medium"
+            class="h-9 flex items-center px-3 text-sm font-medium rounded-xl 
+           bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
           >
             {{ filteredItems.length }}
           </div>
@@ -188,9 +188,9 @@ const onButtonCategoryDelete = async (payload) => {
       </div>
 
       <!-- RIGHT: Buttons -->
-      <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
         <!-- Active Only Toggle Button waiting for api -->
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
   <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Active Only</span>
   <label class="relative inline-block w-9 h-5 cursor-pointer">
     <input

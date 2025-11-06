@@ -181,7 +181,8 @@ function formatPrice(value) {
     </button>
         </div>
         <!-- COUNTER -->
-        <div class="px-2.5 py-0.5 text-sm rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+        <div class="h-9 flex items-center px-3 text-sm font-medium rounded-xl 
+           bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
   {{ filteredItems.length }}
         </div>
         <!-- SEARCH -->
@@ -191,7 +192,7 @@ function formatPrice(value) {
         </div>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
         <!-- Active Only Toggle -->
         <div class="flex items-center gap-2">
           <span class="text-sm font-medium text-slate-700">Active Only</span>

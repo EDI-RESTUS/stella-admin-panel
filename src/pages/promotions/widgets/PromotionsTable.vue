@@ -351,12 +351,13 @@ function downloadCodeList(codes: string[], promotionName: string) {
   <div>
     <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
       <!-- Left: Title + Counter + Search -->
-      <div class="flex flex-1 min-w-0 items-center gap-4 flex-wrap">
+      <div class="flex flex-1 min-w-0 items-center gap-2 flex-wrap">
         <!-- Title + Counter -->
         <div class="flex items-center gap-2 flex-shrink-0">
           <h1 class="text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight">Promotions</h1>
           <div
-            class="px-2.5 py-0.5 text-sm rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+            class="h-9 flex items-center px-3 text-sm font-medium rounded-xl 
+           bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
             {{ totalVisibleCount }}
           </div>
         </div>
@@ -374,7 +375,7 @@ function downloadCodeList(codes: string[], promotionName: string) {
       <div class="flex flex-wrap gap-2 justify-end items-center flex-shrink-0">
 
         <!-- Active Only -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
   <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Active Only</span>
   <label class="relative inline-block w-9 h-5 cursor-pointer" @click="cycleFilterMode">
     <!-- Track -->

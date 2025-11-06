@@ -226,8 +226,8 @@ function onButtonEditOptionGroupArticles(rowData) { isEditOptionGroupArticlesMod
   
 <!-- FE Counter Badge -->
   <div
-    class="px-2.5 py-0.5 text-sm rounded-full bg-blue-100 text-blue-700 
-           dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+    class="h-9 flex items-center px-3 text-sm font-medium rounded-xl 
+           bg-blue-100 text-blue-700">
     {{ totalOptionGroupsCount }}
   </div>
 
@@ -249,7 +249,7 @@ function onButtonEditOptionGroupArticles(rowData) { isEditOptionGroupArticlesMod
   </div>
 </div>
 
-  <div class="flex items-center gap-3">
+  <div class="flex items-center gap-2">
   <!-- Active Only Toggle -->
   <div class="flex items-center gap-2">
     <span class="text-sm font-medium text-slate-700">Active Only</span>
@@ -512,7 +512,7 @@ function onButtonEditOptionGroupArticles(rowData) { isEditOptionGroupArticlesMod
   <div class="flex justify-center items-center">
     <template v-if="rowData.options && rowData.options.length > 0">
       <span
-        class="inline-block px-3 py-1 text-sm rounded-xl font-medium text-blue-800 bg-blue-100 hover:bg-blue-200 cursor-pointer transition-colors text-center min-w-[2.5rem]"
+        class="inline-block px-3 py-1 text-sm rounded-xl font-medium text-green-800 bg-green-100 hover:bg-green-200 cursor-pointer transition-colors text-center min-w-[2.5rem]"
         @click="onButtonEditOptionGroup(rowData)"
       >
         {{ rowData.options.length }}
