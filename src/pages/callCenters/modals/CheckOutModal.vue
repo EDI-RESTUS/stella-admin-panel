@@ -212,7 +212,6 @@
     </div>
   </VaModal>
 </template>
-
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useToast } from 'vuestic-ui'
@@ -536,17 +535,15 @@ async function updateOrder() {
     )
   }
 
+  // --- CHANGED: batch & dedupe offer deletes into ONE call ---
   if (existingOffers.length) {
-    await Promise.all(
-      existingOffers.map((offer: any) => {
-        const data = {
-          offerId: offer.offerId,
-          offerMenuItems: [],
-        }
-        return applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, data)
-      }),
-    )
+    const uniq = Array.from(new Map(existingOffers.map((o: any) => [o.offerId, o])).values())
+    const payload = {
+      offerMenuItems: uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 })),
+    }
+    await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, payload)
   }
+  // --- END CHANGE ---
 
   const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
     offerId: offer.offerId,
@@ -569,7 +566,7 @@ async function updateOrder() {
     const res = await axios.post(
       `${url}/order-edits/${orderStore.editOrder._id}/apply`,
       {
-        action: 'edit',
+        action: 'add',
         tableNumber: orderStore.editOrder.tableNumber,
 
         menuItems: orderStore.cartItems.map((e: any) => {

@@ -650,6 +650,7 @@ async function fetchCustomerDetails(setUser = false) {
                 OtherAddresses: Array.isArray(user.OtherAddresses)
                   ? user.OtherAddresses.map((add) => ({
                       ...add,
+                      Address: typeof add.Address === 'string' ? add.Address : '',
                       ZipCode:
                       typeof add.Address === 'string' && add.Address.split(',').length
                         ? add.Address.split(',')[add.Address.split(',').length - 1].trim()
@@ -688,7 +689,7 @@ async function fetchCustomerDetails(setUser = false) {
                   address.district,
                   address.city,
                   address.postalCode,
-                ].join(','),
+                ].filter(val => val && String(val).trim()).join(','),
                 ZipCode: address.postalCode,
                 Phone: '',
                 Fax: '',
@@ -736,7 +737,7 @@ async function fetchCustomerDetails(setUser = false) {
                   address.district,
                   address.city,
                   address.postalCode,
-                ].join(','),
+                ].filter(val => val && String(val).trim()).join(','),
                 ZipCode: address.postalCode,
                 Phone: '',
                 Fax: '',
@@ -801,7 +802,7 @@ function selectUser(user) {
               addr.district,
               addr.city,
               addr.postalCode,
-            ].join(','),
+            ].filter(val => val && String(val).trim()).join(','),
             ZipCode: addr.postalCode,
             Phone: '',
             Fax: '',
@@ -1048,7 +1049,8 @@ watch(
             selectDeliveryZone(zoneWithMeetingPoint)
             orderStore.setDeliveryZone(zoneWithMeetingPoint)
             emits('setDeliveryZone', true)
-            orderStore.setAddress(fullAddress || currentText)
+            // Use the selected address's fullAddress, not a fallback
+            orderStore.setAddress(fullAddress)
             return
           }
         }
@@ -1057,7 +1059,8 @@ watch(
           selectDeliveryZone(matchingZone)
           orderStore.setDeliveryZone(matchingZone)
           emits('setDeliveryZone', true)
-          orderStore.setAddress(fullAddress || currentText)
+          // Use the selected address's fullAddress, not a fallback
+          orderStore.setAddress(fullAddress)
         } else {
           if (!currentText.includes('Meeting') && selectedTab.value === 'delivery') {
             init({

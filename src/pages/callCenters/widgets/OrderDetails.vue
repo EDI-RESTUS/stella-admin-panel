@@ -408,7 +408,7 @@ const promoOriginalItems = computed(() => {
 const promoOriginalOffers = computed(() => {
   const v = promoTotal.value
   if (!v?.offerDetails?.length) return 0
-  const n = v.offerDetails.reduce((sum, o) => sum + Number(o.basePrice || 0), 0)
+  const n = v.offerDetails.reduce((sum, o) => sum + Number(o.totalPrice || 0), 0)
   return Number(n.toFixed(2))
 })
 

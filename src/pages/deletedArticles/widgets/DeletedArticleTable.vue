@@ -9,19 +9,16 @@ const { confirm } = useModal()
 const { init } = useToast()
 const router = useRouter()
 const servicesStore = useServiceStore()
-
 const items = ref([])
 const loading = ref(false)
-
 const columns = defineVaDataTableColumns([
-  { label: 'ID', key: 'id', sortable: false },
-  { label: 'Code', key: 'code', sortable: false },
   { label: 'Name', key: 'name', sortable: false },
   { label: 'Description', key: 'description', sortable: false },
+  { label: 'Code', key: 'code', sortable: false },
   { label: 'Price', key: 'price', sortable: false },
-  { label: 'Actions', key: 'actions', sortable: false },
+  { label: 'Deleted Date', key: 'updatedAt', sortable: false },
+  { label: 'Actions', key: 'actions', sortable: false, thAlign: 'right' },
 ])
-
 // Fetch deleted articles
 const fetchDeletedArticles = async () => {
   try {
@@ -41,7 +38,6 @@ const fetchDeletedArticles = async () => {
     loading.value = false
   }
 }
-
 // Restore article
 const onRestore = async (rowData: any) => {
   const confirmed = await confirm({
@@ -72,14 +68,24 @@ const onRestore = async (rowData: any) => {
     })
   }
 }
-
+// Format date nicely
+const formatDate = (dateString: string) => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
 watch(
   () => servicesStore.selectedRest,
   () => {
     fetchDeletedArticles()
   },
 )
-
 if (servicesStore.selectedRest) {
   onMounted(() => {
     fetchDeletedArticles()
@@ -88,26 +94,71 @@ if (servicesStore.selectedRest) {
 </script>
 
 <template>
-  <div>
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="page-title">Deleted Article</h1>
-    </div>
-    <VaDataTable
-      :columns="columns"
-      :items="items"
-      :loading="loading"
-      :style="{
-        '--va-data-table-height': '710px',
-        '--va-data-table-thead-background': 'var(--va-background-element)',
-        '--va-data-table-thead-color': '#2C82E0',
-      }"
-      sticky-header
-    >
-      <template #cell(actions)="{ rowData }">
-        <div class="flex gap-2 justify-end">
-          <VaButton color="primary" size="small" @click="onRestore(rowData)"> Restore </VaButton>
+  <div class="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl shadow-sm">
+    <!-- HEADER -->
+    <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+      <!-- Left: Title -->
+      <div class="flex flex-1 min-w-0 items-center gap-4 flex-wrap">
+        <div class="flex items-center gap-2 flex-shrink-0 mt-1">
+          <h1 class="text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight">
+            Deleted Articles
+          </h1>
         </div>
-      </template>
-    </VaDataTable>
+      </div>
+      <!-- Right: empty for spacing consistency -->
+      <div class="flex flex-wrap gap-2 justify-end items-center flex-shrink-0"></div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="flex flex-col h-[calc(100vh-12rem)] ">
+      <VaDataTable
+        :columns="columns"
+        :items="items"
+        :loading="loading"
+        sticky-header
+        :style="{
+          '--va-data-table-thead-background': '#f8fafc',
+          '--va-data-table-thead-color': '#64748b',
+        }"
+      >
+        <!-- PRICE -->
+        <template #cell(price)="{ rowData }">
+          <span>
+            {{ rowData.price ? `€ ${Number(rowData.price).toFixed(2)}` : '€ 0.00' }}
+          </span>
+        </template>
+
+        <!-- DELETED DATE column -->
+        <template #cell(updatedAt)="{ rowData }">
+          <span>{{ formatDate(rowData.updatedAt) }}</span>
+        </template>
+
+        <!-- ACTIONS -->
+        <template #cell(actions)="{ rowData }">
+          <div class="flex justify-end">
+            <button
+              class="px-3 py-1 text-sm rounded-xl font-medium text-red-800 bg-red-100 hover:bg-red-200 transition-colors cursor-pointer"
+              @click="onRestore(rowData)"
+            >
+              Restore
+            </button>
+          </div>
+        </template>
+      </VaDataTable>
+    </div>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.va-data-table {
+  ::v-deep(.va-data-table__table-tr) {
+    border-bottom: 1px solid var(--va-background-border);
+  }
+}
+
+::v-deep(.va-data-table__table tbody tr:hover) {
+  background-color: #f8fafc;
+}
+
+
+</style>

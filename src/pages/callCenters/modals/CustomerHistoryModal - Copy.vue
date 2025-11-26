@@ -635,79 +635,170 @@ const removeSelected = async (orderId) => {
   const order = orders.value.find((o) => o._id === orderId)
   if (!order) return
 
-  const items = (selectedItems[orderId] || []).map((i) => order.menuItems[i])
-  if (!items.length) return
+  // indexes picked in the UI
+  const menuLines = (selectedItems && selectedItems[orderId] ? selectedItems[orderId] : [])
+    .map((i) => order.menuItems[i])
+    .filter(Boolean)
 
-  const payload = buildOfferMenuItemsPayload(items)
-  console.log(payload)
+  const offerLines = (selectedOfferItems && selectedOfferItems[orderId] ? selectedOfferItems[orderId] : [])
+    .map((i) => (order.offerDetails ? order.offerDetails[i] : null))
+    .filter(Boolean)
 
-  // Await all API calls in parallel and wait for all to finish
-  await Promise.all(
-    payload.menuItems.map((item) => {
-      const data = {
+  if (!menuLines.length && !offerLines.length) return
+
+  // 1) delete MENU lines (include options so we target the exact ticket line)
+  if (menuLines.length) {
+    const deletes = menuLines.map((mi) => {
+      const menuItemId =
+        (mi && mi.menuItem && (mi.menuItem._id || mi.menuItem)) ||
+        mi.menuItemId ||
+        mi._id
+
+      // options can be stored either as `mi.options` or derived from `articlesOptionsGroup`
+      let options = []
+      if (Array.isArray(mi && mi.options) && mi.options.length) {
+        options = mi.options.map((o) => ({
+          option: (o && o.option && (o.option._id || o.option)) || o._id,
+          quantity: (o && o.quantity) || 1,
+        }))
+      } else if (Array.isArray(mi && mi.articlesOptionsGroup)) {
+        options = mi.articlesOptionsGroup
+          .flatMap((g) => (g && Array.isArray(g.articlesOptions) ? g.articlesOptions : []))
+          .filter((opt) => opt && opt.selected)
+          .map((opt) => ({
+            option: opt.optionId || opt._id || opt.option,
+            quantity: opt.quantity || 1,
+          }))
+      }
+
+      const payload = {
         menuItems: [
           {
-            menuItem: item.menuItem,
+            menuItem: String(menuItemId),
+            quantity: mi.quantity || 1,
+            options,
           },
         ],
       }
-      return applyOrderEdit(orderId, 'delete', order.tableNumber, data)
-    }),
-  )
 
-  fetchOrders()
+      return applyOrderEdit(orderId, 'delete', order.tableNumber, payload)
+    })
+
+    await Promise.all(deletes)
+  }
+
+  // 2) delete OFFER blocks (no inner items for delete)
+  if (offerLines.length) {
+    const offerMenuItems = offerLines.map((of) => ({
+      offerId: String((of && of.offerId) || (of && of._id)),
+      quantity: 1,
+    }))
+    await applyOrderEdit(orderId, 'delete', order.tableNumber, { offerMenuItems })
+  }
+
+  await fetchOrders()
 }
-
 const editSelected = async (orderId) => {
   const order = orders.value.find((o) => o._id === orderId)
   if (!order) return
 
-  // const items = (selectedItems[orderId] || []).map((i) => order.menuItems[i])
-  // if (!items.length) return
+  // Use selected menu/offer indices; if none selected, fall back to all menu items
+  const menuIdx = (selectedItems && selectedItems[orderId]) || []
+  const offerIdx = (selectedOfferItems && selectedOfferItems[orderId]) || []
 
-  // console.log('Edit items:', items)
+  const items = (menuIdx.length ? menuIdx : order.menuItems.map((_, i) => i))
+    .map((i) => order.menuItems[i])
+    .filter(Boolean)
 
-  const data = order.menuItems.map((menuItem) => {
+  const offers = (order.offerDetails && offerIdx.length
+    ? offerIdx.map((i) => order.offerDetails[i]).filter(Boolean)
+    : [])
+
+  // Build originals for later delete->add
+  const originalMenuItems = items.map((mi) => {
+    const menuItemId =
+      (mi && mi.menuItem && (mi.menuItem._id || mi.menuItem)) ||
+      mi.menuItemId ||
+      mi._id
+
+    let options = []
+    if (Array.isArray(mi && mi.options) && mi.options.length) {
+      options = mi.options.map((o) => ({
+        option: (o && o.option && (o.option._id || o.option)) || o._id,
+        quantity: (o && o.quantity) || 1,
+      }))
+    } else if (Array.isArray(mi && mi.articlesOptionsGroup)) {
+      options = mi.articlesOptionsGroup
+        .flatMap((g) => (g && Array.isArray(g.articlesOptions) ? g.articlesOptions : []))
+        .filter((opt) => opt && opt.selected)
+        .map((opt) => ({
+          option: opt.optionId || opt._id || opt.option,
+          quantity: opt.quantity || 1,
+        }))
+    }
+
     return {
-      orderId: orderId,
-      itemId: menuItem._id,
-      itemName: menuItem.menuItem,
-      basePrice: parseFloat(menuItem.price) || 0,
-      totalPrice: 0,
-      imageUrl: menuItem.imageUrl || '',
-      promotionCode: menuItem.promotionCode || '',
-      isRepeatedOrder: true,
-      quantity: menuItem.quantity,
-      isFree: !!menuItem.isFree,
-      selectedOptions: menuItem.articlesOptionsGroup
-        .filter((group) => {
-          const doesGroupHasOptions = group.articlesOptions.filter((opt) => opt.selected)
-          return doesGroupHasOptions.length > 0
-        })
-        .map((group) => {
-          return {
-            groupId: group._id,
-            groupName: group.name,
-            categoryId: menuItem.categories.length > 0 ? menuItem.categories[0].id : null,
-            menuItemId: menuItem._id,
-            selected: group.articlesOptions
-              .filter((opt) => opt.selected)
-              .map((opt) => ({
-                ...opt,
-                optionId: opt._id,
-                optionName: opt.name,
-                price: parseFloat(opt.price) || 0,
-                type: opt.type,
-                quantity: opt.quantity || 1,
-              })),
-          }
-        }),
+      menuItem: String(menuItemId),
+      quantity: mi.quantity || 1,
+      options,
     }
   })
 
+  const originalOffersToDelete = offers.map((of) => ({
+    offerId: String((of && of.offerId) || (of && of._id)),
+    quantity: 1,
+  }))
+
+  // Prefill cart ONLY with selected menu items (offers stay stashed; we’ll re-add later)
+  const data = items.map((menuItem) => ({
+    orderId: orderId,
+    itemId: menuItem._id,
+    itemName: menuItem.menuItem,
+    basePrice: parseFloat(menuItem.price) || 0,
+    totalPrice: 0,
+    imageUrl: menuItem.imageUrl || '',
+    promotionCode: menuItem.promotionCode || '',
+    isRepeatedOrder: true,
+    quantity: menuItem.quantity,
+    isFree: !!menuItem.isFree,
+    selectedOptions: (menuItem.articlesOptionsGroup || [])
+      .map((group) => {
+        const selected = (group.articlesOptions || [])
+          .filter((opt) => opt && opt.selected)
+          .map((opt) => ({
+            ...opt,
+            optionId: opt._id,
+            optionName: opt.name,
+            price: parseFloat(opt.price) || 0,
+            type: opt.type,
+            quantity: opt.quantity || 1,
+          }))
+        if (!selected.length) return null
+        return {
+          groupId: group._id,
+          groupName: group.name,
+          categoryId:
+            menuItem.categories && menuItem.categories.length > 0
+              ? menuItem.categories[0].id
+              : null,
+          menuItemId: menuItem._id,
+          selected,
+        }
+      })
+      .filter(Boolean),
+  }))
+
   const orderStore = useOrderStore()
-  orderStore.addEditOrder(order)
-  data.map((e) => {
+  const orderForStore = {
+    ...order,
+    _editContext: {
+      originalMenuItems,
+      originalOffersToDelete,
+    },
+  }
+  orderStore.addEditOrder(orderForStore)
+
+  data.forEach((e) => {
     orderStore.addItemToCart(e)
     const newIndex = orderStore.cartItems.length - 1
     orderStore.calculateItemTotal(newIndex)
