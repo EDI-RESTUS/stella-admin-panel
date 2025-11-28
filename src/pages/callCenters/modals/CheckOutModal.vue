@@ -128,9 +128,9 @@
                   </div>
                 </div>
               <div class="item-total-price">
-                <template v-if="offerPromoDisplay(item).affected">
-                  <span class="original-price">€{{ offerPromoDisplay(item).original.toFixed(2) }}</span>
-                  <span class="updated-price">€{{ offerPromoDisplay(item).updated.toFixed(2) }}</span>
+                <template v-if="offerPromoDisplay(item, index).affected">
+                  <span class="original-price">€{{ offerPromoDisplay(item, index).original.toFixed(2) }}</span>
+                  <span class="updated-price">€{{ offerPromoDisplay(item, index).updated.toFixed(2) }}</span>
                 </template>
                 <template v-else>
                   <span class="font-semibold text-green-800">€{{ item.totalPrice.toFixed(2) }}</span>
@@ -680,8 +680,8 @@ function cartItemPromoDisplay(item: any, idx: number) {
 }
 
 // Offer display: use promoOfferItemPrice(item) when it returns something different
-function offerPromoDisplay(item: any) {
-  const updatedMaybe = promoOfferItemPrice(item)
+function offerPromoDisplay(item: any, index: number) {
+  const updatedMaybe = promoOfferItemPrice(item, index)
   const original = Number(item.totalPrice ?? 0)
   const updated  = updatedMaybe != null ? Number(updatedMaybe) : original
   const affected = updatedMaybe != null && !moneyEq(original, updated)
@@ -832,22 +832,34 @@ const codes = normalizeCodes(props.promoCode, props.promoCodes)
   }
 }
 
-const promoOfferItemPrice = (item: any) => {
-  if (!promoTotal.value || !item) return null
+const promoOfferItemPrice = (item: any, index: number) => {
+  const v = promoTotal.value
+  if (!v || !v.offerDetails || !v.offerDetails.length || !item) return null
 
-  const promoOffers = promoTotal.value.offerDetails || []
+  const offerId = item.offerId || (item.fullItem && item.fullItem.offerId)
+  if (!offerId) return null
 
-  const offerId = (item as any).offerId || (item as any).fullItem?.offerId
+  // All validator entries for this offer type
+  const matches = v.offerDetails.filter((o: any) => o.offerId === offerId)
+  if (!matches.length) return null
 
-  const promo = promoOffers.filter((a: any) => a.offerId === offerId)
-  // Get the minimum totalPrice from the list of promo
-  const miniMumPrice = Math.min(...orderStore.offerItems.map((p: any) => Number(p.totalPrice)))
-  if (!promo.length) return null
-  const updated = Number(promo[0].totalPrice)
-  if ((item as any).totalPrice === miniMumPrice) {
-    return Number(updated.toFixed(2))
+  // Determine which occurrence THIS UI item is among same-offer items
+  let seen = 0
+  let occ = 0
+  for (let i = 0; i < orderStore.offerItems.length; i++) {
+    const it = orderStore.offerItems[i]
+    const itOfferId = it.offerId || (it.fullItem && it.fullItem.offerId)
+    if (itOfferId === offerId) {
+      if (i === index) { occ = seen; break }
+      seen++
+    }
   }
-  return null
+
+  // Pick corresponding validator entry (fallback to last if fewer entries)
+  const picked = matches[Math.min(occ, matches.length - 1)]
+  const updated = Number((picked && picked.totalPrice) ? picked.totalPrice : 0)
+
+  return Number(updated.toFixed(2))
 }
 </script>
 

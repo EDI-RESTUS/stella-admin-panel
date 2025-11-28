@@ -381,6 +381,7 @@ const formattedLabel = (sel) => {
   const totalPrice = sel.price * sel.quantity
   return totalPrice > 0 ? `${sel.name} (+€${totalPrice.toFixed(2)})` : sel.name
 }
+
 function isBetween11to23(dt) {
   // 11:00 inclusive, 23:00 exclusive
   const mins = dt.getHours() * 60 + dt.getMinutes()
@@ -407,7 +408,14 @@ const promoOriginalItems = computed(() => {
 
 const promoOriginalOffers = computed(() => {
   const v = promoTotal.value
-  if (!v?.offerDetails?.length) return 0
+  if (!v) return 0
+
+  // If originalTotal is present, use it to derive offers total so Subtotal matches exactly
+  if (v.originalTotal !== undefined) {
+    return Number((v.originalTotal - promoOriginalItems.value).toFixed(2))
+  }
+
+  if (!v.offerDetails?.length) return 0
   const n = v.offerDetails.reduce((sum, o) => sum + Number(o.totalPrice || 0), 0)
   return Number(n.toFixed(2))
 })
@@ -596,6 +604,7 @@ const offersItems = computed(() =>
       total: totalPrice * item.quantity,
       fullItem: { ...item, offerId: item.offerId },
       // fullItem: item,
+      __storeIndex: index,
     }
   }),
 )
@@ -708,10 +717,11 @@ const promoOfferItemPrice = (item) => {
   // Determine which occurrence THIS UI item is among same-offer items
   let seen = 0
   let occ = 0
-  for (const it of orderStore.offerItems) {
+  for (let i = 0; i < orderStore.offerItems.length; i++) {
+    const it = orderStore.offerItems[i]
     const itOfferId = it.offerId || (it.fullItem && it.fullItem.offerId)
     if (itOfferId === offerId) {
-      if (it === item) { occ = seen; break }
+      if (i === item.__storeIndex) { occ = seen; break }
       seen++
     }
   }

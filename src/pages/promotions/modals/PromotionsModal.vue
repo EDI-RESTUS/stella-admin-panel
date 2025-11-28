@@ -599,6 +599,8 @@ function populateFormData(promotion) {
     codes: promotion.codes || [],
     isActive: promotion.isActive ?? true,
   }
+  promotionsArticles.value = promotion.menuItem || []
+  promotionOptions.value = promotion.option || []
 }
 
 watch(
@@ -760,11 +762,9 @@ const submit = async () => {
       .filter((id) => id && id !== 'string'),
     createdBy: servicesStore.currentUser?._id || '65edc27fa8c3e330d7db0a23',
     outletId: servicesStore.selectedRest,
-    menuItem: articles.value
-      .filter((a) => a.selected)
-      .map((a) => a._id)
-      .filter((id) => id && id !== 'string'),
-    option: [],
+    outletId: servicesStore.selectedRest,
+    menuItem: promotionsArticles.value,
+    option: promotionOptions.value,
   }
 
   if (raw.codeType === 'SINGLE') {
