@@ -468,7 +468,7 @@ async function checkPaymentStatus(requestId: string, paymentId: string) {
     })
     if (orderFor.value === 'current') {
       try {
-        await orderStore.sendOrderToWinmax(requestId, orderFor.value)
+        //await orderStore.sendOrderToWinmax(requestId, orderFor.value)
         init({
           color: 'success',
           message: 'Order sent to Winmax',
@@ -795,7 +795,7 @@ const codes = normalizeCodes(props.promoCode, props.promoCodes)
       } else {
         try {
           if (orderFor.value === 'current') {
-            await orderStore.sendOrderToWinmax(orderResponse.value.data.data._id, orderFor.value)
+            //await orderStore.sendOrderToWinmax(orderResponse.value.data.data._id, orderFor.value)
             init({
               color: 'success',
               message: 'Order sent to Winmax',
