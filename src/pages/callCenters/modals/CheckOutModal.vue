@@ -169,7 +169,10 @@
         </div>
       </div>
       <!-- Payment Section -->
-      <div v-if="!redirectUrl" class="md:col-span-2 flex flex-col bg-white">
+      <div v-if="!redirectUrl" class="md:col-span-2 flex flex-col bg-white relative">
+        <div v-if="apiLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-white/50">
+          <div class="loading-spinner !w-16 !h-16 border-4 !border-gray-300 !border-t-gray-600"></div>
+        </div>
         <div class="header-container">
           <h3 class="va-h3">{{ etaTime }}</h3>
         </div>
@@ -219,6 +222,9 @@
       <div v-else class="col-span-2 flex flex-col bg-white h-full">
         <div class="flex-grow relative">
           <iframe :src="redirectUrl" width="100%" height="100%" class="border-none" />
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
+            <div class="loading-spinner !w-16 !h-16 border-4 !border-gray-300 !border-t-gray-600"></div>
+          </div>
         </div>
         <div class="p-4 border-t border-gray-200 flex justify-between items-center bg-gray-50">
           <span class="text-sm text-gray-500 flex items-center gap-2">
@@ -937,6 +943,10 @@ const codes = normalizeCodes(props.promoCode, props.promoCodes)
     if (response.status === 201 || response.status === 200) {
       if (!orderId.value) {
         init({ color: 'success', message: 'Order created.' })
+        setTimeout(() => {
+            orderStore.cartItems = [] as any
+            window.location.reload()
+          }, 800)
       }
 
       if (selectedPayment.value.paymentGateway) {
