@@ -12,6 +12,7 @@ export const useOrderStore = defineStore('order', {
     redirectUrl: '',
     deliveryZone: '',
     address: '',
+    phoneNumber: '',
     orderFor: 'current',
     orderNotes: '',
     deliveryNotes: "",
@@ -235,6 +236,9 @@ export const useOrderStore = defineStore('order', {
       const next = window.location.href
 
       return await axios.post(`${url}/payments/retry/${orderId}?paymentTypeId=${paymentTypeId}`, { next })
+    },
+    setPhoneNumber(payload: string) {
+      this.phoneNumber = payload
     },
 
     // --- additions inside `actions: { ... }` ---

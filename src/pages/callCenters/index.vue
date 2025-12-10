@@ -277,6 +277,7 @@ function resetState() {
   orderStore.redirectUrl = ''
   orderStore.setAddress('')
   orderStore.setDeliveryZone('')
+  orderStore.setPhoneNumber('')
   customerDetailsId.value = ''
   isCustomerTabActivated.value = false
   orderType.value = ''

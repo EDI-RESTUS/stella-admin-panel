@@ -924,6 +924,7 @@ const codes = normalizeCodes(props.promoCode, props.promoCodes)
       orderDateTime: new Date(props.dateSelected).toISOString(),
       paymorderNotes: orderStore.orderNotes || '',
       address: sanitizeAddress(orderStore.address),
+      phoneNo: orderStore.phoneNumber || '',
   ...(codes.length ? { promoCodes: codes } : {}),
   ...(codes.length === 1 ? { promoCode: codes[0] } : {}),
     }
