@@ -384,6 +384,11 @@ const orderFor = ref('current')
 const showConfirmRemove = ref(false)
 const showHistoryModal = ref(false)
 
+
+watch(phoneNumber, (val) => {
+  orderStore.setPhoneNumber(val)
+})
+
 function handleRepeatOrder({ items, offersItems }) {
   // Clear existing cart items
   orderStore.cartItems = []
