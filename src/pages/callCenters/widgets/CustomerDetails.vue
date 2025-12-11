@@ -389,6 +389,14 @@ watch(phoneNumber, (val) => {
   orderStore.setPhoneNumber(val)
 })
 
+watch(selectedAddress, (val) => {
+  if (val && val.deliveryNote) {
+    orderStore.deliveryNotes = val.deliveryNote
+  } else {
+    orderStore.deliveryNotes = ''
+  }
+})
+
 function handleRepeatOrder({ items, offersItems }) {
   // Clear existing cart items
   orderStore.cartItems = []
@@ -686,6 +694,7 @@ async function fetchCustomerDetails(setUser = false) {
                       typeof add.Address === 'string' && add.Address.split(',').length
                         ? add.Address.split(',')[add.Address.split(',').length - 1].trim()
                         : '',
+                      deliveryNote: add.deliveryNote || '', // ADD THIS
                     }))
                   : [],
               }))
@@ -726,6 +735,7 @@ async function fetchCustomerDetails(setUser = false) {
                 Fax: '',
                 Location: '',
                 CountryCode: '',
+                deliveryNote: address.deliveryNote || '',
               })),
             }))
 
@@ -774,6 +784,7 @@ async function fetchCustomerDetails(setUser = false) {
                 Fax: '',
                 Location: '',
                 CountryCode: '',
+                deliveryNote: address.deliveryNote || '',
               })),
             }))
           })
@@ -839,6 +850,7 @@ function selectUser(user) {
             Fax: '',
             Location: '',
             CountryCode: '',
+            deliveryNote: addr.deliveryNote || '', // ADD THIS
           }))
         : [],
   }
@@ -992,6 +1004,7 @@ const filteredAddresses = computed(() => {
           value: `${e.Designation ? e.Designation + ' - ' : ''}, ${e.ZipCode}`,
           postalCode: e.ZipCode,
           fullAddress: e.Address || '',
+          deliveryNote: e.deliveryNote || '', // Add this
         }
       } else {
         const addressArray = e.Address.split(',')
@@ -1001,6 +1014,7 @@ const filteredAddresses = computed(() => {
           value: `${e.Designation ? e.Designation + ' - ' : ''}${getParsedAddress(e.Address)}`,
           postalCode: postalCode,
           fullAddress: e.Address,
+          deliveryNote: e.deliveryNote || '', // Add this
         }
       }
     })

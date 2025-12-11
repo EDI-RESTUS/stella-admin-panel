@@ -337,6 +337,7 @@ if (props.selectedUser) {
         district: add[4] || '',
         city: add[5] || '',
         postCode: add[6] || '',
+        deliveryNote: e.deliveryNote || '', // Add this
       })
     })
   }
@@ -422,6 +423,7 @@ async function addAddress() {
     district: district.value,
     postCode: postCode.value,
     city: muncipality.value,
+    deliveryNote: addressNote.value || '',
   }
   if (editAddress.value !== -1) {
     address.value[editAddress.value] = payload
@@ -440,6 +442,7 @@ async function addAddress() {
   district.value = ''
   postCode.value = ''
   muncipality.value = ''
+  addressNote.value = ''    // Clear address note
 
   // Clear search fields too
   searchAdd.postalCode = ''
@@ -457,6 +460,7 @@ function editAddressFields(addr: any, index: number) {
   floor.value = addr.floor || ''
   district.value = addr.district || ''
   designation.value = addr.designation || ''
+  addressNote.value = addr.deliveryNote || ''
 
   editAddress.value = index
 
@@ -543,6 +547,7 @@ async function stellaUpsertFromForm(
       district: e.district || '',
       city: e.city || '',
       postalCode: e.postCode || e.postalCode || '',
+      deliveryNote: e.deliveryNote || '',
     })),
     ...(wmMeta?.ID ? { ID: wmMeta.ID } : {}),
     ...(wmMeta?.Code ? { Code: wmMeta.Code } : {}),
@@ -570,6 +575,7 @@ async function winmaxCreateOrUpdate(base: any, outletId: string, selected?: any)
     district: e?.district || '',
     city: e?.city || '',
     postCode: e?.postCode || e?.postalCode || '',
+    deliveryNote: e?.deliveryNote || '',
   }))
 
   // 🔑 IMPORTANT: coerce to booleans — DO NOT pass the ref `isTick`
