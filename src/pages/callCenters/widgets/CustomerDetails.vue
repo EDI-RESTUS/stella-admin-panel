@@ -1008,13 +1008,14 @@ const filteredAddresses = computed(() => {
         }
       } else {
         const addressArray = e.Address.split(',')
-        const postalCode = addressArray[addressArray.length - 1].trim()
+        const postalCodeFromStr = addressArray[addressArray.length - 1].trim()
+        const postalCode = e.ZipCode || e.postalCode || e.postCode || postalCodeFromStr
         return {
           text: `${e.Designation ? e.Designation + ' - ' : ''}${getParsedAddress(e.Address)}`,
           value: `${e.Designation ? e.Designation + ' - ' : ''}${getParsedAddress(e.Address)}`,
           postalCode: postalCode,
           fullAddress: e.Address,
-          deliveryNote: e.deliveryNote || '', // Add this
+          deliveryNote: e.deliveryNote || '', 
         }
       }
     })
@@ -1085,19 +1086,53 @@ watch(
         .filter(Boolean)
 
       if (selectedTab.value === 'delivery') {
-        if (meetingPoints.length && currentText.includes('Meeting Point')) {
-          // Find the zone containing the meeting point
-          const zoneWithMeetingPoint = deliveryZoneOptions.value.find((zone) =>
-            zone.meetingPoints?.some((mp) => currentText.includes(mp.designation)),
-          )
-          if (zoneWithMeetingPoint) {
-            selectDeliveryZone(zoneWithMeetingPoint)
-            orderStore.setDeliveryZone(zoneWithMeetingPoint)
+        const isMeetingPointAddress = currentText.includes('Meeting Point') || currentText.includes('M.P')
+        
+        let foundZone = null
+        if (isMeetingPointAddress) {
+          // 1. Try to find a meeting point match in our zones
+          for (const zone of deliveryZoneOptions.value) {
+            if (!zone.meetingPoints) continue
+            // Simple check: does the address include the designation?
+            // OR checks if fuzzy match (e.g. M.P - Laka...)
+            const match = zone.meetingPoints.find(mp => {
+               // Normal match
+               if (currentText.includes(mp.designation)) return true
+               
+               // Abbreviation match: Meeting Point -> M.P with truncated middle part (same as CustomerModal logic)
+               // Regex: /(Meeting\s*Point)(\s*-\s*)([^-]+)(.*)/i
+               const abbr = mp.designation.replace(
+                  /(Meeting\s*Point)(\s*-\s*)([^-]+)(.*)/i,
+                  (_, _mp, sep, mid, rest) => `M.P${sep}${mid.trim().slice(0, 4)}${rest}`
+               )
+
+               // Remove spaces and case-insensitive check for fuzzier match
+               // Check if currentText includes the abbr
+               return currentText.toLowerCase().replace(/\s/g, '').includes(abbr.toLowerCase().replace(/\s/g, ''))
+            })
+            
+            if (match) {
+               // User request: "pass the id ... which is the delivy zone"
+               // matched id: meeting-68482fb4...-0
+               if (match.id && match.id.includes('-')) {
+                 const extractedId = match.id.split('-')[1] // 68482fb4...
+                 // Find zone by this ID if possible, or just use the current 'zone' iterate
+                 // But ensuring we pick the zone defined by ID is safer if shared
+                 foundZone = deliveryZoneOptions.value.find(z => z.restaurant_id === extractedId || z._id === extractedId || z.id === extractedId)
+               }
+               if (!foundZone) foundZone = zone
+               break;
+            }
+          }
+        }
+
+        if (foundZone) {
+            selectDeliveryZone(foundZone)
+            orderStore.setDeliveryZone(foundZone)
             emits('setDeliveryZone', true)
             // Use the selected address's fullAddress, not a fallback
             orderStore.setAddress(fullAddress)
             return
-          }
         }
 
         if (matchingZone) {
