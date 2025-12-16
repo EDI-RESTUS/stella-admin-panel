@@ -301,7 +301,7 @@ watch(showCustomerModal, (val) => {
 })
 
 const isAddressValid = computed(() => {
-  if (designation.value.trim().startsWith('Meet')) {
+  if (designation.value.trim().startsWith('Meet') || designation.value.trim().startsWith('M.P')) {
     return designation.value.trim() !== ''
   }
   return (
@@ -538,7 +538,7 @@ async function stellaUpsertFromForm(
     customerNote: base.customerNote || '',
     addressNote: base.addressNote || '',
     outletId,
-    addreswholeObj: (base.address || []).map((e: any) => ({
+    address: (base.address || []).map((e: any) => ({
       designation: e.designation || 'Home',
       aptNo: e.aptNo || '',
       floor: e.floor || '',
@@ -546,7 +546,7 @@ async function stellaUpsertFromForm(
       streetName: e.streetName || '',
       district: e.district || '',
       city: e.city || '',
-      postalCode: e.postCode || e.postalCode || '',
+      postCode: e.postCode || e.postalCode || '',
       deliveryNote: e.deliveryNote || '',
     })),
     ...(wmMeta?.ID ? { ID: wmMeta.ID } : {}),
@@ -582,10 +582,12 @@ async function winmaxCreateOrUpdate(base: any, outletId: string, selected?: any)
   const wmPayload = {
     name: String(base.name || ''),
     phone: String(base.phone || ''),
-    address: addressForWinmax,
+    address: addressForWinmax.map(a => ({ ...a, PostCode: a.postCode })),
     isTick: !!base.isTick,
     isPresent: !!base.isTick, // ← as requested: “isPresent: isTick”
     notifications: !!base.notifications,
+    customerNote: base.customerNote || '',
+    addressNote: base.addressNote || '',
   }
 
   if (hasWmId) {
