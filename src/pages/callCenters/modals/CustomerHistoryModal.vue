@@ -1364,75 +1364,193 @@ const repeatOrder = async (orderId) => {
   const order = orders.value.find((o) => o._id === orderId)
   if (!order) return
 
+  const menuStore = useMenuStore()
+  const orderStore = useOrderStore()
+
   // 1. Process Menu Items
-  const items = (order.menuItems || []).map((menuItem) => {
+  // We iterate history items, but we rebuild the cart item using the FRESH item from store
+  const items = (order.menuItems || []).map((histItem) => {
+    // histItem._id is the Menu Item ID (because fetchOrders merges store item properties)
+    const freshItem = menuStore.unFilteredMenuItems.find((mi) => mi._id === histItem._id)
+    
+    // If item no longer exists in store, we might skip it or handle it. 
+    // Here we skip gracefully or fall back? 
+    // If detailedItems in fetchOrders succeeded, freshItem *should* exist. 
+    // If it doesn't, we probably shouldn't add it to cart as it's discontinued.
+    if (!freshItem) return null
+
+    // Map historical option selection to fresh option data
+    // We need to know WHICH options were selected. 
+    // histItem.articlesOptionsGroup has the 'selected' flag from fetchOrders logic.
+    const histOptionMap = new Map() // OptionID -> quantity
+    if (histItem.articlesOptionsGroup) {
+         histItem.articlesOptionsGroup.forEach(g => {
+             (g.articlesOptions || []).forEach(opt => {
+                 if (opt.selected) {
+                     histOptionMap.set(opt._id, opt.quantity || 1)
+                 }
+             })
+         })
+    }
+
+    const freshSelectedOptions = (freshItem.articlesOptionsGroup || [])
+      .map((group) => {
+        const selected = (group.articlesOptions || [])
+          .filter((opt) => histOptionMap.has(opt._id)) // Only pick options that were selected in history
+          .map((opt) => ({
+            ...opt,
+            optionId: opt._id,
+            optionName: opt.name,
+            price: parseFloat(opt.price) || 0, // USE FRESH PRICE
+            type: opt.type,
+            quantity: histOptionMap.get(opt._id) || 1, // Use historical quantity
+          }))
+
+        if (!selected.length) return null
+        return {
+          groupId: group._id,
+          groupName: group.name,
+          categoryId: freshItem.categories && freshItem.categories.length > 0
+              ? freshItem.categories[0].id
+              : null,
+          menuItemId: freshItem._id,
+          selected,
+        }
+      })
+      .filter(Boolean)
+
     return {
       orderId,
-      itemId: menuItem._id,
-      itemName: menuItem.menuItem,
-      basePrice: parseFloat(menuItem.price) || 0,
-      totalPrice: 0,
-      imageUrl: menuItem.imageUrl || '',
-      promotionCode: menuItem.promotionCode || '',
+      itemId: freshItem._id,
+      itemName: freshItem.name,
+      basePrice: parseFloat(freshItem.price) || 0, // USE FRESH BASE PRICE
+      totalPrice: 0, // Will be recalc by store
+      imageUrl: freshItem.imageUrl || '',
+      promotionCode: freshItem.promotionCode || '',
       isRepeatedOrder: true,
-      quantity: menuItem.quantity,
-      isFree: !!menuItem.isFree,
-      selectedOptions: (menuItem.articlesOptionsGroup || [])
-        .map((group) => {
-          const selected = (group.articlesOptions || [])
-            .filter((opt) => opt && opt.selected)
-            .map((opt) => ({
-              ...opt,
-              optionId: opt._id,
-              optionName: opt.name,
-              price: parseFloat(opt.price) || 0,
-              type: opt.type,
-              quantity: opt.quantity || 1,
-            }))
-          if (!selected.length) return null
-          return {
-            groupId: group._id,
-            groupName: group.name,
-            categoryId:
-              menuItem.categories && menuItem.categories.length > 0
-                ? menuItem.categories[0].id
-                : null,
-            menuItemId: menuItem._id,
-            selected,
-          }
-        })
-        .filter(Boolean),
+      quantity: histItem.quantity,
+      isFree: !!freshItem.isFree,
+      selectedOptions: freshSelectedOptions,
     }
-  })
+  }).filter(Boolean)
 
   // 2. Process Offers
+  // Similar logic: find fresh offer definition from orderStore.offers
   const offersItems = (order.offerDetails || [])
-    .map((offer) => {
-      // The 'structuredOffer' was built in fetchOrders
-      if (offer.structuredOffer && offer.structuredOffer.selections) {
-        let selectionTotal = 0
-        offer.structuredOffer.selections.forEach((item) => {
-          item.addedItems.forEach((addedItem) => {
-            selectionTotal += (Number(addedItem.basePrice) || 0) * (Number(addedItem.quantity) || 1)
-            ;(addedItem.selectedOptions || []).forEach((group) => {
-              (group.selected || []).forEach((selection) => {
-                selectionTotal += (Number(selection.price) || 0) * (Number(selection.quantity) || 1)
-              })
-            })
+    .map((histOffer) => {
+      // Find fresh offer
+      const freshOfferDef = orderStore.offers.find((o) => o._id === histOffer.offerId)
+      if (!freshOfferDef) return null
+
+      // We need to reconstruct the selections. 
+      // histOffer.structuredOffer.selections (from fetchOrders) should effectively map to what we need, 
+      // BUT we must ensure we use fresh prices.
+      
+      // Ideally, we re-run `mapOfferDetailsToSelections` but using the FRESH prices from `freshOfferDef`.
+      // However, `mapOfferDetailsToSelections` takes the "offerDetails" response from history (which lacks prices or has old prices?) 
+      // and looks up items in `storeMenuItems`.
+      
+      // Actually, `mapOfferDetailsToSelections` (lines 1225+) ALREADY looks up `useMenuStore`.
+      // It sets `basePrice: Number(item.price || 0).toFixed(2)` where `item` comes from `offerDetailsResponse.offerItems`.
+      // `offerDetailsResponse` IS `histOffer` (the history object).
+      // So `mapOfferDetailsToSelections` uses the *historical configuration* of the offer (items list), 
+      // but it looks up `storeMenu` (fresh) to get `articlesOptionsGroup`.
+      
+      // WAIT using `mapOfferDetailsToSelections`:
+      // `const item = offerItems.find(...)` -> `offerItems` comes from `offerDetailsResponse` (History).
+      // `item.price` (History) is used? `Number(item.price || 0)`. 
+      // YES, `mapOfferDetailsToSelections` uses `item.price` from the history object!
+      // This is why offers have old prices.
+      
+      // To fix offers, we must look up the price from the FRESH `freshOfferDef` items list, not the history one.
+      
+      // Let's re-map manually for safety and freshness.
+      
+      // 1. We have `freshOfferDef`. It has `offerItems` (definition with current override prices).
+      // 2. We have `histOffer` (user's selection).
+      
+      let selectionTotal = 0
+      
+      // Get FRESH selections structure based on history choices
+      const selections = []
+      
+       // Iterate over `structuredOffer.selections` (which tells us what the user picked: quantities, options)
+      // `structuredOffer` was built by `mapOfferDetailsToSelections`.
+      if (histOffer.structuredOffer && histOffer.structuredOffer.selections) {
+          
+          histOffer.structuredOffer.selections.forEach(sel => {
+             // 'sel' corresponds to a Selection Group (e.g. "Select 2 Pizzas")
+             // We need to map the addedItems
+             
+             const freshAddedItems = []
+             
+             sel.addedItems.forEach(addedItem => {
+                 // addedItem.itemId is the menu item ID.
+                 // Find this item in the FRESH offer definition to get the override price.
+                 const freshOfferItemDef = freshOfferDef.offerItems.find(oi => oi.menuItem === addedItem.itemId)
+                 
+                 // If not in fresh offer, maybe it was removed? Skip.
+                 if (!freshOfferItemDef) return 
+                 
+                 // Fresh override price (or 0 if not overridden? check definition)
+                 const freshBasePrice = Number(freshOfferItemDef.price || 0)
+                 
+                 // Now options.
+                 // addedItem.selectedOptions has the groups/selected structure.
+                 // We need to recalculate option prices using FRESH menu item.
+                 const freshMenuItem = menuStore.unFilteredMenuItems.find(m => m._id === addedItem.itemId)
+                 if (!freshMenuItem) return
+
+                 // Re-map options with fresh prices
+                 const freshSelectedOptions = (addedItem.selectedOptions || []).map(group => {
+                     const freshGroup = freshMenuItem.articlesOptionsGroup.find(g => g._id === group.groupId)
+                     if (!freshGroup) return null
+                     
+                     const validSelections = (group.selected || []).map(s => {
+                         const freshOpt = freshGroup.articlesOptions.find(o => o._id === s.optionId)
+                         if (!freshOpt) return null
+                         return {
+                             ...s,
+                             price: parseFloat(freshOpt.price) || 0, // FRESH
+                         }
+                     }).filter(Boolean)
+                     
+                     if (!validSelections.length) return null
+                     return { ...group, selected: validSelections }
+                 }).filter(Boolean)
+
+
+                 // Calc total so we can pass it (though orderStore might recalc, better safe)
+                 let itemOptionsTotal = 0
+                 freshSelectedOptions.forEach(g => {
+                     g.selected.forEach(s => itemOptionsTotal += (s.price * s.quantity))
+                 })
+                 
+                 selectionTotal += (freshBasePrice * addedItem.quantity) + itemOptionsTotal
+
+                 freshAddedItems.push({
+                     ...addedItem,
+                     basePrice: freshBasePrice, // Updated
+                     selectedOptions: freshSelectedOptions
+                 })
+             })
+             
+             if (freshAddedItems.length) {
+                 selections.push({ ...sel, addedItems: freshAddedItems })
+             }
           })
-        })
-        
-        return {
-          ...offer.structuredOffer,
-          _id: offer.offerId,
-          offerId: offer.offerId,
-          basePrice: offer.structuredOffer.price,
-          selectionTotalPrice: selectionTotal,
-          totalPrice: Number(offer.structuredOffer.price || 0) + selectionTotal,
-          quantity: 1,
-        }
       }
-      return null
+      
+      return {
+          ...freshOfferDef, // Use fresh definition (name, basePrice of offer itself)
+          _id: freshOfferDef._id,
+          offerId: freshOfferDef._id,
+          basePrice: freshOfferDef.price, // Fresh base price of offer
+          selectionTotalPrice: selectionTotal,
+          totalPrice: Number(freshOfferDef.price || 0) + selectionTotal,
+          quantity: 1,
+          selections: selections // Our rebuilt selections
+      }
     })
     .filter(Boolean)
 

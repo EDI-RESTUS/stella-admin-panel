@@ -682,6 +682,38 @@ async function fetchCustomerDetails(setUser = false) {
           const winmaxNotFound = /not\s*found/i.test(String(wm?.message || '')) || wmList.length === 0
 
           if (!winmaxNotFound) {
+            // Winmax HAS a match → check Stella for 'deliveryNote' and merge BEFORE mapping/selecting
+            try {
+               const stellaRes = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/customers/search`, {
+                  params: {
+                     outletId: servicesStore.selectedRest,
+                     ...(phoneNumber.value && { phoneNo: phoneNumber.value }),
+                     ...(name.value && { customerName: name.value }),
+                  },
+               })
+               const hits = Array.isArray(stellaRes?.data?.data) ? stellaRes.data.data : []
+               if (hits.length > 0) {
+                  const stellaUser = hits[0] 
+                  const stellaAddrs = Array.isArray(stellaUser.address) ? stellaUser.address : []
+
+                  // Merge deliveryNote into Winmax list
+                  wmList.forEach(u => {
+                    if (u.OtherAddresses) {
+                       u.OtherAddresses.forEach(wmAddr => {
+                          const match = stellaAddrs.find(sa => 
+                             (sa.designation || '').trim().toLowerCase() === (wmAddr.Designation || '').trim().toLowerCase()
+                          )
+                          if (match && match.deliveryNote) {
+                             wmAddr.deliveryNote = match.deliveryNote
+                          }
+                       })
+                    }
+                  })
+               }
+            } catch (err) {
+               console.warn("Failed to fetch Stella details for merging notes", err)
+            }
+
             // Winmax HAS a match → use it
             if (!setUser) {
               userResults.value = wmList.map((user) => ({
@@ -691,9 +723,13 @@ async function fetchCustomerDetails(setUser = false) {
                       ...add,
                       Address: typeof add.Address === 'string' ? add.Address : '',
                       ZipCode:
-                      typeof add.Address === 'string' && add.Address.split(',').length
-                        ? add.Address.split(',')[add.Address.split(',').length - 1].trim()
-                        : '',
+                        (add.PostCode || add.postalCode || add.ZipCode)
+                          ? (add.PostCode || add.postalCode || add.ZipCode)
+                          : (add.Designation && (add.Designation.startsWith('Meet') || add.Designation.startsWith('M.P')))
+                            ? '' // Meeting points may not have a zip
+                            : (typeof add.Address === 'string' && add.Address.split(',').length > 1)
+                              ? add.Address.split(',')[add.Address.split(',').length - 1].trim()
+                              : '',
                       deliveryNote: add.deliveryNote || '', // ADD THIS
                     }))
                   : [],
@@ -1072,6 +1108,9 @@ watch(
       const postalCode = newAddress.postalCode
       const currentText = newAddress.text
       const fullAddress = newAddress.fullAddress
+
+      // Update delivery notes from the selected address
+      orderStore.deliveryNotes = newAddress.deliveryNote || ''
 
       // Always fetch fresh delivery zones to ensure latest data
       await handleDeliveryZoneFetch()
