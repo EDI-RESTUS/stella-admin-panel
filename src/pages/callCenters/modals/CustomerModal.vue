@@ -43,10 +43,17 @@
                   ref="addressItems"
                   :ref="(el) => (addressItems.value[index] = el)"
                   :class="[
-                    'flex items-center justify-between mt-1 px-4 py-2 rounded border text-gray-500',
-                    editAddress === index ? 'bg-yellow-100 border-yellow-500' : 'bg-[#f8f9fa]',
+                    'flex items-center justify-between mt-1 px-4 py-2 rounded border text-gray-500 cursor-pointer',
+                    editAddress === index ? 'bg-yellow-100 border-yellow-500' : (isSelectionMode && selectedAddressObj === addr ? 'bg-blue-50 border-blue-200' : 'bg-[#f8f9fa]'),
                   ]"
+                  @click="isSelectionMode ? (selectedAddressObj = addr) : null"
                 >
+                  <!-- Selection Radio (manual implementation) -->
+                  <div v-if="isSelectionMode" class="mr-3 flex items-center">
+                    <CircleDot v-if="selectedAddressObj === addr" class="w-5 h-5 text-blue-600" />
+                    <Circle v-else class="w-5 h-5 text-gray-400" />
+                  </div>
+
                   <div v-if="addr.designation && addr.designation.startsWith('Meet')">
                     <span>
                       <strong>{{ addr.designation }}</strong>
@@ -63,7 +70,7 @@
                   </div>
 
                   <!-- Action Buttons -->
-                  <div class="flex gap-1">
+                  <div class="flex gap-1 ml-auto">
                     <!-- Edit Button -->
                     <VaButton
                       preset="secondary"
@@ -236,7 +243,7 @@
           class="text-white text-sm font-semibold"
           @click="handleSubmit"
         >
-          {{ isEdit ? 'Save' : 'Add Customer' }}
+          {{ isSelectionMode ? 'Select Address' : (isEdit ? 'Save' : 'Add Customer') }}
         </VaButton>
       </div>
     </div>
@@ -248,10 +255,11 @@ import { ref, watch, reactive, computed, nextTick, onMounted, onBeforeUnmount } 
 import { useToast } from 'vuestic-ui'
 import axios from 'axios'
 import { useServiceStore } from '@/stores/services.ts'
+import { Circle, CircleDot } from 'lucide-vue-next'
 
 const { init } = useToast()
 const addressNote = ref('')
-const emits = defineEmits(['cancel', 'setUser', 'close'])
+const emits = defineEmits(['cancel', 'setUser', 'close', 'selectAddress'])
 const orderStore = useOrderStore()
 
 const props = defineProps<{
@@ -260,6 +268,7 @@ const props = defineProps<{
   userNumber: string
   outlet: Record<string, any>
   forceUpdateId?: string | null
+  isSelectionMode?: boolean
 }>()
 
 const addressListRef = ref(null)
@@ -289,6 +298,7 @@ const streetList = ref<any[]>([])
 const address = ref<any[]>([])
 const isSubmitting = ref(false)
 const editAddress = ref(-1)
+const selectedAddressObj = ref<any>(null) // Track selected object directly
 
 watch(showCustomerModal, (val) => {
   if (!val) {
@@ -427,8 +437,19 @@ async function addAddress() {
   }
   if (editAddress.value !== -1) {
     address.value[editAddress.value] = payload
+    // If in selection mode, keep the selection if we just edited the selected one
+    if (props.isSelectionMode && selectedAddressObj.value === address.value[editAddress.value]) {
+       // already selected, logic holds
+    } else if (props.isSelectionMode) {
+        // Option: auto-select the edited one? Usually yes.
+        selectedAddressObj.value = address.value[editAddress.value]
+    }
   } else {
     address.value.push(payload)
+    // Auto-select the newly added address if in selection mode
+    if (props.isSelectionMode) {
+        selectedAddressObj.value = payload
+    }
   }
   // Set the order’s delivery notes for this session only (not persisted in customer profile)
  if (addressNote.value?.trim()) {
@@ -706,6 +727,19 @@ async function handleSubmit() {
   isSubmitting.value = true
   try {
     await addOrUpdateCustomerDetails()
+    
+    // If in selection mode, emit the selected address now (using the potentially updated list)
+    // If in selection mode, emit the selected address now
+    if (props.isSelectionMode) {
+        if (selectedAddressObj.value) {
+            emits('selectAddress', selectedAddressObj.value)
+        } else {
+             init({ color: 'warning', message: 'Please select an address.' })
+             isSubmitting.value = false
+             return
+        }
+    }
+
     // close modal on success
     showCustomerModal.value = false
   } catch (e: any) {

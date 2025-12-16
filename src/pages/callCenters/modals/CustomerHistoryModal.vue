@@ -114,8 +114,8 @@
       </div>
     </h3>
 
-    <div v-if="isLoading" class="flex justify-center items-center py-8">
-      <VaSpinner size="large" color="primary" />
+    <div v-if="isLoading" class="flex justify-center items-center py-8 min-h-[200px] text-gray-400">
+      <Loader2 class="w-10 h-10 animate-spin text-blue-500" />
     </div>
 
     <!-- No Orders -->
@@ -152,7 +152,13 @@
               <span class="text-xs text-gray-500"
                 >{{ formatDateTime(order.createdAt) }} •
                 <template v-if="order.orderFor === 'future'">
-                  {{ formatDateTime(order.orderDateTime) }}
+                  <span 
+                    class="text-blue-600 hover:text-blue-800 cursor-pointer underline decoration-dotted font-medium transition-colors"
+                    title="Click to reschedule"
+                    @click.stop="openReschedule(order)"
+                  >
+                    {{ formatDateTime(order.orderDateTime) }}
+                  </span>
                 </template>
                 <template v-else>
                   {{ getPromisedTime(order.createdAt, order.orderType) }}
@@ -290,6 +296,23 @@
               @click.stop="openConfirm('cancel', order._id)"
             >
               <X class="w-4 h-4" /> Cancel Order
+            </span>
+
+            <!-- Switch Order Type -->
+            <span
+              v-if="
+                !isCancelled(order, index) &&
+                (
+                  (index === 0 && ['kds','preparing','onrack', 'in progress'].includes(String(orderStatuses || '').toLowerCase())) ||
+                  order.status === 'In Progress'
+                )
+              "
+              size="small"
+              class="flex items-center gap-1 rounded-full text-white px-3 py-2 font-semibold text-xs cursor-pointer bg-blue-600 hover:bg-blue-700 transition-colors"
+              @click.stop="openConfirm('switchType', order._id)"
+            >
+              <ArrowRightLeft class="w-4 h-4" />
+              {{ order.orderType === 'Delivery' ? 'Switch to TA' : 'Switch to Del' }}
             </span>
 
           </div>
@@ -588,6 +611,8 @@
                   ? 'edit the selected Items'
                   : confirmAction === 'remove'
                     ? 'remove the selected Items'
+                    : confirmAction === 'switchType'
+                      ? 'switch order type'
                     : ''
         }}</span
       >
@@ -634,16 +659,63 @@
     @updated="handleComplaintUpdated"
     @removed="handleComplaintRemoved"
   />
+  
+  <CustomerModal
+    v-if="showAddressModal"
+    :selected-user="addressModalCustomer"
+    :user-name="addressModalCustomer?.Name || ''"
+    :user-number="addressModalCustomer?.Phone || ''"
+    :outlet="outlet"
+    :is-selection-mode="true"
+    @selectAddress="handleAddressSelection"
+    @close="showAddressModal = false"
+    @cancel="showAddressModal = false"
+  />
+
+  <!-- Reschedule Modal -->
+  <VaModal
+    v-model="showRescheduleModal"
+    size="small"
+    hide-default-actions
+  >
+    <div class="p-4">
+      <h3 class="text-lg font-bold mb-4">Reschedule Future Order</h3>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">New Date & Time</label>
+        <input 
+          type="datetime-local" 
+          v-model="rescheduleDateTime" 
+          class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+        />
+      </div>
+      <div class="flex justify-end gap-3 mt-6">
+        <button 
+          class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+          @click="showRescheduleModal = false"
+        >
+          Cancel
+        </button>
+        <button 
+          class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          :disabled="!rescheduleDateTime"
+          @click="saveReschedule"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  </VaModal>
 </template>
 <script setup>
 import { ref, onMounted, reactive, computed } from 'vue'
-import { CopyPlus, NotepadText, TriangleAlert, X, Plus, CheckCircle, Loader2, XCircle } from 'lucide-vue-next'
+import { CopyPlus, NotepadText, TriangleAlert, X, Plus, CheckCircle, Loader2, XCircle, ArrowRightLeft } from 'lucide-vue-next'
 import axios from 'axios'
 import { useUsersStore } from '@/stores/users.ts'
 import { useMenuStore } from '@/stores/getMenu'
 import { useOrderStore } from '@/stores/order-store.ts'
 import HistoryAddNoteModal from './HistoryAddNoteModal.vue'
 import HistoryComplaintModal from './HistoryComplaintModal.vue'
+import CustomerModal from './CustomerModal.vue'
 import { useToast } from 'vuestic-ui'
 import { useServiceStore } from '@/stores/services.ts'
 
@@ -667,6 +739,15 @@ const showComplaintModal = ref(false)
 const selectedOrderId = ref(null)
 const noteToEdit = ref(null)
 const complaintToEdit = ref(null)
+
+const showAddressModal = ref(false)
+const addressModalCustomer = ref(null)
+const pendingSwitchOrderId = ref(null)
+
+// Reschedule state
+const showRescheduleModal = ref(false)
+const pendingRescheduleOrderId = ref(null)
+const rescheduleDateTime = ref('')
 
 const orders = ref([])
 const users = ref([])
@@ -761,6 +842,7 @@ const confirmYes = () => {
     case 'repeat': repeatOrder(confirmOrderId.value); break
     case 'add':    addItemsToOrder(confirmOrderId.value); break
     case 'cancel': cancelOrder(confirmOrderId.value); break
+    case 'switchType': switchOrderType(confirmOrderId.value); break
   }
   isConfirmOpen.value = false
 }
@@ -1586,6 +1668,146 @@ const addItemsToOrder = (orderId) => {
   init({ message: 'Order set to edit mode. Add new items.', color: 'success' })
 }
 
+const switchOrderType = async (orderId) => {
+  const order = orders.value.find((o) => o._id === orderId)
+  if (!order) return
+
+  const isDelivery = order.orderType === 'Delivery'
+  const newType = isDelivery ? 'Takeaway' : 'Delivery'
+  const action = 'add'
+
+  let payload = {
+    orderTypeChange: {
+      to: newType,
+    },
+  }
+
+  if (!isDelivery) {
+    // Switching TO Delivery -> Open Modal for Address Selection
+    pendingSwitchOrderId.value = orderId
+    // Ensure we pass a customer object compatible with CustomerModal
+    // It expects a 'selectedUser' prop (Record<string,string>) with Name, Phone, OtherAddresses
+    addressModalCustomer.value = props.customer
+    showAddressModal.value = true
+    return
+  }
+
+  isLoading.value = true // Buffer: immediate feedback
+  try {
+     await applyOrderEdit(orderId, action, order.tableNumber, payload)
+     fetchOrders()
+  } catch(e) { /* handled primarily by applyOrderEdit toast but we ensure fetch runs or state resets */ }
+}
+
+const handleAddressSelection = async (addr) => {
+  if (!pendingSwitchOrderId.value) return
+  
+  isLoading.value = true // Buffer: immediate feedback
+  
+  const order = orders.value.find((o) => o._id === pendingSwitchOrderId.value)
+  if (!order) return
+
+  // addr comes from CustomerModal address list item
+  // format: { designation, floor, aptNo, streetName, streetNo, district, city, postCode, deliveryNote }
+  
+  const streetPart = [addr.streetName, addr.streetNo].filter(val => val && String(val).trim()).join(' ')
+  const locationPart = [addr.district, addr.city].filter(val => val && String(val).trim()).join(', ')
+  const buildingPart = [addr.aptNo ? `Apt ${addr.aptNo}` : '', addr.floor ? `Floor ${addr.floor}` : ''].filter(val => val && String(val).trim()).join(', ')
+
+  const fullParts = [buildingPart, streetPart, locationPart, addr.postCode].filter(val => val && String(val).trim())
+  const fullAddress = fullParts.join(', ')
+
+  const zip = addr.postCode || addr.postalCode || ''
+  const designation = addr.designation || ''
+  
+  // Calculate Delivery Fee based on Zone
+  let fee = props.deliveryFee || 0 // Default fallback
+  
+  if (props.deliveryZoneOptions && props.deliveryZoneOptions.length) {
+    // 1. Try Postal Code Match
+    let zone = props.deliveryZoneOptions.find(z => 
+      z.postalCodes && z.postalCodes.some(pc => String(pc).trim() === String(zip).trim())
+    )
+    
+    // 2. Try Meeting Point Match if not found and looks like MP
+    if (!zone && (designation.includes('Meeting') || designation.includes('M.P'))) {
+       // Simple match by designation inclusion
+       zone = props.deliveryZoneOptions.find(z => 
+         z.meetingPoints && z.meetingPoints.some(mp => designation.includes(mp.designation))
+       )
+    }
+
+    if (zone && typeof zone.deliveryCharge === 'number') {
+      fee = zone.deliveryCharge
+    }
+  }
+
+  const c = props.customer || {}
+  
+  const payload = {
+    action: 'add',
+    orderTypeChange: {
+      to: 'Delivery',
+      deliveryFee: fee,
+    },
+    entity: {
+      Code: c.Code,
+      Name: c.Name || c.name || c.customerName,
+      TaxPayerID: c.TaxPayerID || '',
+      Phone: c.Phone || c.MobilePhone || c.phoneNo,
+      Address: fullAddress,
+      ZipCode: zip,
+      DeliveryNote: addr.deliveryNote || '', // If backend supports it on entity/update
+    }
+  }
+
+  try {
+    await applyOrderEdit(pendingSwitchOrderId.value, 'add', order.tableNumber, payload)
+    fetchOrders()
+    showAddressModal.value = false
+    pendingSwitchOrderId.value = null
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+// ---------- Reschedule Logic ----------
+const openReschedule = (order) => {
+  pendingRescheduleOrderId.value = order._id
+  
+  if (order.orderDateTime) {
+      const d = new Date(order.orderDateTime)
+      // Format local ISO string for datetime-local input (YYYY-MM-DDTHH:mm)
+      // We adjust for timezone offset manually to get local time string
+      const offset = d.getTimezoneOffset() * 60000
+      const local = new Date(d.getTime() - offset)
+      rescheduleDateTime.value = local.toISOString().slice(0, 16)
+  } else {
+      rescheduleDateTime.value = ''
+  }
+  
+  showRescheduleModal.value = true
+}
+
+const saveReschedule = async () => {
+    if (!pendingRescheduleOrderId.value || !rescheduleDateTime.value) return
+
+    isLoading.value = true // Buffer
+    showRescheduleModal.value = false // Close immediately to show buffer on list
+    
+    try {
+        const payload = {
+            orderDateTime: new Date(rescheduleDateTime.value).toISOString()
+        }
+        await axios.patch(`${url}/orders/${pendingRescheduleOrderId.value}/schedule`, payload)
+        init({ message: 'Order rescheduled successfully', color: 'success' })
+        fetchOrders() // Logic handles isLoading toggle
+    } catch (e) {
+        const msg = e?.response?.data?.message || e?.message || 'Failed to reschedule'
+        init({ message: msg, color: 'danger' })
+        isLoading.value = false // Reset if error
+    }
+}
 </script>
 
 <style scoped>
