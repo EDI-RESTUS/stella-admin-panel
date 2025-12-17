@@ -271,7 +271,8 @@
               v-if="
                 !isCancelled(order, index) &&
                 (
-                  (index === 0 && ['kds','preparing'].includes(String(orderStatuses || '').toLowerCase())) 
+                  (index === 0 && ['kds','preparing'].includes(String(orderStatuses || '').toLowerCase())) ||
+                  order.orderFor === 'future'
                 )                
               "
               size="small"
@@ -370,26 +371,30 @@
   :class="{
     'bg-gray-50 text-black': isOfferSelected(order._id, idx),
     'hover:bg-gray-50 cursor-pointer':
-      index === 0 &&
+      (index === 0 &&
       !isCancelled(order, index) &&
-      (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack' || orderStatuses === 'In Progress'),
+      (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack' || orderStatuses === 'In Progress')) ||
+      order.orderFor === 'future',
     'opacity-60 cursor-not-allowed':
-      index !== 0 ||
+      (index !== 0 ||
       isCancelled(order, index) ||
-      !(orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack' || orderStatuses === 'In Progress'),
+      !(orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack' || orderStatuses === 'In Progress')) &&
+      order.orderFor !== 'future',
   }"
   @click="
-    index === 0 &&
+    ((index === 0 &&
     !isCancelled(order, index) &&
-    (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack'|| orderStatuses === 'In Progress') &&
+    (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack'|| orderStatuses === 'In Progress')) ||
+    order.orderFor === 'future') &&
     toggleOfferSelection(order._id, idx)
   "
 >
   <div
     v-if="
-      index !== 0 ||
+    (index !== 0 ||
       isCancelled(order, index) ||
-      !(orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack' || orderStatuses === 'In Progress')
+      !(orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack' || orderStatuses === 'In Progress')) &&
+      order.orderFor !== 'future'
     "
     class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"
   >
@@ -462,21 +467,23 @@
             :class="{
               'bg-gray-50 text-black': isItemSelected(order._id, idx),
               'hover:bg-gray-50 cursor-pointer':
-                index === 0 && (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack'),
+                (index === 0 && (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack')) || order.orderFor === 'future',
               'opacity-60 cursor-not-allowed':
-                index !== 0 ||
-                !(orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack'),
+                (index !== 0 ||
+                !(orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack')) && order.orderFor !== 'future',
             }"
             @click="
-              index === 0 &&
-                (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack') &&
+              ((index === 0 &&
+                (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack')) ||
+                order.orderFor === 'future') &&
                 toggleItemSelect(order._id, idx)
             "
           >
             <div
               v-if="
                 !orderStatuses &&
-                !(orderStatuses === 'kds' && orderStatuses === 'preparing' && orderStatuses === 'onrack')
+                !(orderStatuses === 'kds' && orderStatuses === 'preparing' && orderStatuses === 'onrack') &&
+                order.orderFor !== 'future'
               "
               class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"
             >
@@ -564,7 +571,7 @@
           <div class="flex gap-2">
             <button
               class="px-3 py-1 rounded-full bg-red-500 text-white font-semibold text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="!hasSelectedForOrder(order._id) || !['Completed', 'Cancelled'].includes(order.status)"
+              :disabled="!hasSelectedForOrder(order._id) || (!['Completed', 'Cancelled'].includes(order.status) && order.orderFor !== 'future')"
               @click="openConfirm('remove', order._id)"
             >
               Remove
@@ -572,7 +579,7 @@
 
             <button
               class="px-3 py-1 rounded-full bg-yellow-400 text-xs text-white font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="!hasSelectedForOrder(order._id) || !['Completed', 'Cancelled'].includes(order.status)"
+              :disabled="!hasSelectedForOrder(order._id) || (!['Completed', 'Cancelled'].includes(order.status) && order.orderFor !== 'future')"
               @click="openConfirm('edit', order._id)"
             >
               Edit
