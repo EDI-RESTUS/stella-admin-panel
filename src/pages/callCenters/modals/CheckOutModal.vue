@@ -922,7 +922,7 @@ const codes = normalizeCodes(props.promoCode, props.promoCodes)
       deliveryFee: props.deliveryFee,
       outletId: serviceStore.selectedRest,
       orderDateTime: new Date(props.dateSelected).toISOString(),
-      paymorderNotes: orderStore.orderNotes || '',
+
       address: sanitizeAddress(orderStore.address),
       phoneNo: orderStore.phoneNumber || '',
   ...(codes.length ? { promoCodes: codes } : {}),
