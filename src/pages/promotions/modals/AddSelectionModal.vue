@@ -238,24 +238,27 @@ const sortedList = computed(() => {
   // Get base list excluding explicitly hidden items
   const list = sourceList.value.filter((item) => item.display !== false)
 
-  // Apply search filter
-  const filteredList =
-    props.type === 'options'
-      ? list.map((group) => ({
-        ...group,
-        computedOptions: filteredAndSortedList(group.computedOptions || []),
-      }))
-      : filteredAndSortedList(list)
-
   // Sort by selection status
-  const filterSelected = props.type === 'options' ? selectedArticles.value : selectedMenuItems.value
-  const selected = filterSelected.filter((a: any) => props.pendingSelections.includes(a))
+  const currentSelectedIds = props.type === 'options' ? selectedArticles.value : selectedMenuItems.value
+  const normalizedSelectedIds = currentSelectedIds.map(String)
 
-  return filteredList.sort((a, b) => {
-    const aSelected = selected.includes(String(a._id)) ? -1 : 1
-    const bSelected = selected.includes(String(b._id)) ? -1 : 1
-    return aSelected - bSelected
-  })
+  const sortFn = (a: any, b: any) => {
+    const aSelected = normalizedSelectedIds.includes(String(a._id))
+    const bSelected = normalizedSelectedIds.includes(String(b._id))
+    if (aSelected && !bSelected) return -1
+    if (!aSelected && bSelected) return 1
+    return 0
+  }
+
+  // Apply search filter and sort
+  if (props.type === 'options') {
+    return list.map((group) => ({
+      ...group,
+      computedOptions: filteredAndSortedList(group.computedOptions || []).sort(sortFn),
+    }))
+  } else {
+    return filteredAndSortedList(list).sort(sortFn)
+  }
 })
 
 const filteredList = computed(() => {
@@ -300,7 +303,7 @@ const filteredList = computed(() => {
 })
 
 const selectedItemsCount = computed(() => {
-  return props.type === 'options' ? selectedArticles.value.filter(a => a.isChecked).length : selectedMenuItems.value.filter(a => a.isChecked).length
+  return props.type === 'options' ? selectedArticles.value.length : selectedMenuItems.value.length
 })
 
 const selectedIds = computed(() => {
@@ -317,11 +320,26 @@ const selectedIds = computed(() => {
   return uniqueIds
 })
 
+// Initialize from props
 if (props.type === 'options') {
-  selectedArticles.value = [...props.pendingSelections]
+  selectedArticles.value = [...props.pendingSelections] as string[]
 } else {
-  selectedMenuItems.value = [...props.pendingSelections]
+  selectedMenuItems.value = [...props.pendingSelections] as string[]
 }
+
+// Watch for prop changes to update local state
+watch(
+  () => props.pendingSelections,
+  (newVal) => {
+    console.log('[watch:pendingSelections] Updated:', newVal)
+    if (props.type === 'options') {
+      selectedArticles.value = [...newVal] as string[]
+    } else {
+      selectedMenuItems.value = [...newVal] as string[]
+    }
+  },
+  { deep: true, immediate: true }
+)
 
 onBeforeUnmount(() => {
   console.log('[onBeforeUnmount] Cleaning up state')
@@ -566,7 +584,7 @@ tr {
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 3px;
 }
-.h-[65vh] {
+.h-\[65vh\] {
   max-height: 70vh;
 }
 .va-checkbox .va-checkbox__square {
