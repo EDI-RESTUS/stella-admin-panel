@@ -574,16 +574,18 @@ function handlePaymentSuccess() {
 
 function setInter() {
   let iframeReturnDetected = false
+  let lastRetryTime = 0
   const startTime = Date.now()
   
   checkInterval.value = setInterval(async () => {
     const iframe = document.querySelector('iframe')
     const elapsedSeconds = (Date.now() - startTime) / 1000
+    const timeSinceLastRetry = (Date.now() - lastRetryTime) / 1000
     
-    // After 10 seconds, assume user completed payment and trigger verification
-    if (elapsedSeconds > 10 && !iframeReturnDetected) {
-      console.log('[Payment Debug] 10 seconds elapsed, triggering automatic verification...')
-      iframeReturnDetected = true
+    // After 8 seconds, try verification every 5 seconds until success
+    if (elapsedSeconds > 8 && timeSinceLastRetry > 5 && !iframeReturnDetected) {
+      console.log('[Payment Debug] Triggering automatic verification attempt...')
+      lastRetryTime = Date.now()
       
       try {
         const response = await orderStore.retryPayment(orderId.value, selectedPayment.value.paymentTypeId)
@@ -595,6 +597,7 @@ function setInter() {
           
           if (orderRes.data?.data?.status === 'Completed') {
             console.log('[Payment Debug] Payment completed via auto-retry!')
+            iframeReturnDetected = true
             resetInter()
             handlePaymentSuccess()
             return
@@ -602,7 +605,6 @@ function setInter() {
         }
       } catch (e) {
         console.error('[Payment Debug] Auto-retry failed:', e)
-        iframeReturnDetected = false // Allow retry again
       }
     }
     
