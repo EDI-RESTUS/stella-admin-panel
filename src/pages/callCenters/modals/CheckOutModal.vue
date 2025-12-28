@@ -573,28 +573,44 @@ function handlePaymentSuccess() {
 }
 
 function setInter() {
-  checkInterval.value = setInterval(() => {
+  let iframeReturnDetected = false
+  
+  checkInterval.value = setInterval(async () => {
     const iframe = document.querySelector('iframe')
     
     // Try to detect if iframe has returned from payment gateway
-    if (iframe && iframe.contentWindow) {
+    if (iframe && iframe.contentWindow && !iframeReturnDetected) {
       try {
         const currentUrl = iframe.contentWindow.location.href
         
         // IGNORE about:blank which means "not loaded yet" or "loading"
         if (currentUrl && currentUrl !== 'about:blank' && !currentUrl.startsWith('about:')) {
           // We are back on our domain! 
-          // For Saferpay, the /payments/verify endpoint should have already completed server-side
-          // verification and updated the order status. Now we just need to check and reload.
-          console.log('Iframe returned from gateway, checking final status...')
-          checkPaymentStatus(orderId.value, selectedPayment.value.paymentTypeId, true)
+          console.log('Iframe returned from gateway, triggering payment verification...')
+          iframeReturnDetected = true
+          
+          // Trigger server-side payment verification (same as retry button)
+          try {
+            const response = await orderStore.retryPayment(orderId.value, selectedPayment.value.paymentTypeId)
+            if (response.status === 200 || response.status === 201) {
+              // Check if payment is now completed
+              const orderRes = await orderStore.getOrderStatus(orderId.value)
+              if (orderRes.data?.data?.status === 'Completed') {
+                resetInter()
+                handlePaymentSuccess()
+                return
+              }
+            }
+          } catch (e) {
+            console.error('Payment verification failed:', e)
+          }
         }
       } catch (e) {
         // Cross-origin: still on gateway. Do nothing.
       }
     }
     
-    // Also poll status for non-iframe gateways (WalleePOS, etc.)
+    // Continue polling status for all payment types
     if (orderId.value && selectedPayment.value) {
       checkPaymentStatus(orderId.value, selectedPayment.value.paymentTypeId, true)
     }
