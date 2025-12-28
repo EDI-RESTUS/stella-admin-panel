@@ -574,39 +574,75 @@ function handlePaymentSuccess() {
 
 function setInter() {
   let iframeReturnDetected = false
+  const startTime = Date.now()
   
   checkInterval.value = setInterval(async () => {
     const iframe = document.querySelector('iframe')
+    const elapsedSeconds = (Date.now() - startTime) / 1000
+    
+    // After 10 seconds, assume user completed payment and trigger verification
+    if (elapsedSeconds > 10 && !iframeReturnDetected) {
+      console.log('[Payment Debug] 10 seconds elapsed, triggering automatic verification...')
+      iframeReturnDetected = true
+      
+      try {
+        const response = await orderStore.retryPayment(orderId.value, selectedPayment.value.paymentTypeId)
+        console.log('[Payment Debug] Auto-retry response:', response.status)
+        
+        if (response.status === 200 || response.status === 201) {
+          const orderRes = await orderStore.getOrderStatus(orderId.value)
+          console.log('[Payment Debug] Order status after auto-retry:', orderRes.data?.data?.status)
+          
+          if (orderRes.data?.data?.status === 'Completed') {
+            console.log('[Payment Debug] Payment completed via auto-retry!')
+            resetInter()
+            handlePaymentSuccess()
+            return
+          }
+        }
+      } catch (e) {
+        console.error('[Payment Debug] Auto-retry failed:', e)
+        iframeReturnDetected = false // Allow retry again
+      }
+    }
     
     // Try to detect if iframe has returned from payment gateway
     if (iframe && iframe.contentWindow && !iframeReturnDetected) {
       try {
         const currentUrl = iframe.contentWindow.location.href
+        console.log('[Payment Debug] Iframe URL readable:', currentUrl)
         
         // IGNORE about:blank which means "not loaded yet" or "loading"
         if (currentUrl && currentUrl !== 'about:blank' && !currentUrl.startsWith('about:')) {
           // We are back on our domain! 
-          console.log('Iframe returned from gateway, triggering payment verification...')
+          console.log('[Payment Debug] Iframe returned from gateway, triggering payment verification...')
           iframeReturnDetected = true
           
           // Trigger server-side payment verification (same as retry button)
           try {
+            console.log('[Payment Debug] Calling retryPayment for orderId:', orderId.value)
             const response = await orderStore.retryPayment(orderId.value, selectedPayment.value.paymentTypeId)
+            console.log('[Payment Debug] retryPayment response:', response.status, response.data)
+            
             if (response.status === 200 || response.status === 201) {
               // Check if payment is now completed
               const orderRes = await orderStore.getOrderStatus(orderId.value)
+              console.log('[Payment Debug] Order status:', orderRes.data?.data?.status)
+              
               if (orderRes.data?.data?.status === 'Completed') {
+                console.log('[Payment Debug] Payment completed! Triggering success handler...')
                 resetInter()
                 handlePaymentSuccess()
                 return
               }
             }
           } catch (e) {
-            console.error('Payment verification failed:', e)
+            console.error('[Payment Debug] Payment verification failed:', e)
           }
         }
       } catch (e) {
         // Cross-origin: still on gateway. Do nothing.
+        // This is expected while user is on Saferpay
       }
     }
     
