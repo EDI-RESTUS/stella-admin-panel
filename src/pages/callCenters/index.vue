@@ -124,7 +124,7 @@
           <VaCardContent>
             <OrderDetails
               :delivery-fee="deliveryFee"
-              :date-selected="dateSelected"
+              :date-selected="dateSelected ? new Date(dateSelected).toString() : ''"
               :is-delivery-zone-selected="isDeliveryZoneSelected"
               :customer-details-id="customerDetailsId"
               :order-type="orderType"

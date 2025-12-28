@@ -81,7 +81,7 @@
               <div class="item-main">
                 <div class="item-details">
                   <div class="item-qty-name">{{ item.name }}</div>
-                  <div v-if="item.selections?.length" class="item-extras">
+                  <div v-if="item.selections && item.selections.length" class="item-extras">
                     <div v-for="(selection, sIndex) in item.selections" :key="sIndex" class="selection-group">
                       <div
                         v-for="(addedItem, aIndex) in selection.addedItems"
@@ -90,7 +90,7 @@
                       >
                         <div class="extra-name font-medium text-gray-800">+ {{ addedItem.itemName }}</div>
                         <div
-                          v-if="addedItem.selectedOptions?.length"
+                          v-if="addedItem.selectedOptions && addedItem.selectedOptions.length"
                           class="pl-4 pt-1 text-xs text-gray-600 flex flex-wrap gap-1"
                         >
                           <div
@@ -127,18 +127,17 @@
                     Base price: €{{ item.price.toFixed(2) }} + €{{ item.selectionTotalPrice.toFixed(2) }} for addons
                   </div>
                 </div>
-              <div class="item-total-price">
-                <template v-if="offerPromoDisplay(item, index).affected">
-                  <span class="original-price">€{{ offerPromoDisplay(item, index).original.toFixed(2) }}</span>
-                  <span class="updated-price">€{{ offerPromoDisplay(item, index).updated.toFixed(2) }}</span>
-                </template>
-                <template v-else>
-                  <span class="font-semibold text-green-800">€{{ item.totalPrice.toFixed(2) }}</span>
-                </template>
-              </div>
-              </div>
 
-              <!-- Show selected items inside each offer -->
+                <div class="item-total-price">
+                  <template v-if="offerPromoDisplay(item, index).affected">
+                    <span class="original-price">€{{ offerPromoDisplay(item, index).original.toFixed(2) }}</span>
+                    <span class="updated-price">€{{ offerPromoDisplay(item, index).updated.toFixed(2) }}</span>
+                  </template>
+                  <template v-else>
+                    <span class="font-semibold text-green-800">€{{ item.totalPrice.toFixed(2) }}</span>
+                  </template>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -555,27 +554,22 @@ function handlePaymentSuccess() {
     color: 'success',
     message: 'Payment Success',
   })
+
   if (orderFor.value === 'current') {
-    try {
-      init({
-        color: 'success',
-        message: 'Order sent to Winmax',
-      })
-      setTimeout(() => {
-        orderStore.cartItems = []
-        window.location.reload()
-      }, 800)
-    } catch (err: any) {
-      init({
-        color: 'danger',
-        message: err.response?.data?.error || 'Error finishing order',
-      })
-      // Even if winmax fails, order is paid. We might want to reload or close.
-      setTimeout(() => {
-        window.location.reload()
-      }, 2000)
-    }
+    init({
+      color: 'success',
+      message: 'Order sent to Winmax',
+    })
   }
+
+  setTimeout(() => {
+    try {
+      orderStore.cartItems = []
+    } catch (e) {
+      console.error('Error clearing cart', e)
+    }
+    window.location.reload()
+  }, 800)
 }
 
 function setInter() {
@@ -591,11 +585,11 @@ function setInter() {
         const currentUrl = iframe.contentWindow.location.href
         // Check if we are back on our domain (or specific success/fail URL indicators)
         // If we can read currentUrl, we are likely back on same origin.
-        if (currentUrl) { 
+        // IGNORE about:blank which is accessible but means "not loaded yet" or "loading"
+        if (currentUrl && currentUrl !== 'about:blank' && !currentUrl.startsWith('about:')) { 
            // We are back!
-           checkPaymentStatus(orderId.value, selectedPayment.value.paymentTypeId)
-           resetInter()
-           apiLoading.value = false
+           checkPaymentStatus(orderId.value, selectedPayment.value.paymentTypeId, true)
+           // Do not stop polling; latency might mean status is not 'Completed' yet.
         }
       } catch (e) {
         // Cross-origin: still on gateway. Do nothing.
@@ -942,40 +936,31 @@ const codes = normalizeCodes(props.promoCode, props.promoCodes)
     }
 
     if (response.status === 201 || response.status === 200) {
-      if (!orderId.value) {
-        init({ color: 'success', message: 'Order created.' })
-        setTimeout(() => {
-            orderStore.cartItems = [] as any
-            window.location.reload()
-          }, 800)
-      }
-
+      // CASE 1: Payment Gateway (e.g. Wallee) - Expects Iframe Interaction
       if (selectedPayment.value.paymentGateway) {
+        if (!orderId.value) {
+           init({ color: 'success', message: 'Order created.' })
+        }
         orderStore.setPaymentLink(response.data.data.redirectUrl)
         orderId.value = response.data.data.requestId
         setInter()
-      } else {
-        try {
-          if (orderFor.value === 'current') {
-            //await orderStore.sendOrderToWinmax(orderResponse.value.data.data._id, orderFor.value)
-            init({
-              color: 'success',
-              message: 'Order sent to Winmax',
-            })
-          }
-          setTimeout(() => {
-            orderStore.cartItems = [] as any
-            window.location.reload()
-          }, 800)
-        } catch (err: any) {
-          init({
-            color: 'danger',
-            message: err.response.data.message,
-          })
-          orderStore.setPaymentLink('')
-          orderResponse.value = ''
-          orderId.value = ''
+      } 
+      // CASE 2: No Gateway (Cash, External Terminal) - Immediate Success
+      else {
+        init({ color: 'success', message: 'Order created.' })
+        
+        if (orderFor.value === 'current') {
+          init({ color: 'success', message: 'Order sent to Winmax' })
         }
+
+        setTimeout(() => {
+          try {
+            orderStore.cartItems = [] as any
+          } catch (e) {
+            console.error('Error clearing cart', e)
+          }
+          window.location.reload()
+        }, 800)
       }
     } else {
       throw new Error(response.data?.message || 'Something went wrong')
@@ -1094,7 +1079,7 @@ const promoOfferItemPrice = (item: any, index: number) => {
 .extra-item {
   display: flex;
   flex-direction: column;
-  align-items: start;
+  align-items: flex-start;
   padding: 3px 0;
   font-size: 14px;
 }
