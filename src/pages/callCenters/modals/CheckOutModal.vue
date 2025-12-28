@@ -749,7 +749,11 @@ async function updateOrder() {
       color: res.data.status !== 'Failed' ? 'success' : 'danger',
     })
     orderStore.editOrder = null as any
-    orderStore.cartItems = [] as any
+    try {
+      orderStore.cartItems = [] as any
+    } catch (e) {
+      console.error(e)
+    }
     window.location.reload()
     return res.data
   } catch (err: any) {
@@ -937,30 +941,27 @@ const codes = normalizeCodes(props.promoCode, props.promoCodes)
 
     if (response.status === 201 || response.status === 200) {
       // CASE 1: Payment Gateway (e.g. Wallee) - Expects Iframe Interaction
-      if (selectedPayment.value.paymentGateway) {
+        if (selectedPayment.value.paymentGateway) {
         if (!orderId.value) {
            init({ color: 'success', message: 'Order created.' })
         }
-        orderStore.setPaymentLink(response.data.data.redirectUrl)
-        orderId.value = response.data.data.requestId
-        setInter()
+        
+        // Immediate success check (e.g. test gateways or auto-capture)
+        if (response.data.data.status === 'Completed') {
+          handlePaymentSuccess()
+        } else {
+          orderStore.setPaymentLink(response.data.data.redirectUrl)
+          orderId.value = response.data.data.requestId
+          setInter()
+        }
       } 
       // CASE 2: No Gateway (Cash, External Terminal) - Immediate Success
       else {
-        init({ color: 'success', message: 'Order created.' })
-        
         if (orderFor.value === 'current') {
           init({ color: 'success', message: 'Order sent to Winmax' })
         }
-
-        setTimeout(() => {
-          try {
-            orderStore.cartItems = [] as any
-          } catch (e) {
-            console.error('Error clearing cart', e)
-          }
-          window.location.reload()
-        }, 800)
+        
+        handlePaymentSuccess()
       }
     } else {
       throw new Error(response.data?.message || 'Something went wrong')
