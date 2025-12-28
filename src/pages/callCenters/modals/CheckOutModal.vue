@@ -574,26 +574,29 @@ function handlePaymentSuccess() {
 
 function setInter() {
   checkInterval.value = setInterval(() => {
-    // Active polling for all payment types (handles WalleePOS/Terminal cases without iframe redirect)
-    if (orderId.value && selectedPayment.value) {
-      checkPaymentStatus(orderId.value, selectedPayment.value.paymentTypeId, true)
-    }
-
     const iframe = document.querySelector('iframe')
+    
+    // Try to detect if iframe has returned from payment gateway
     if (iframe && iframe.contentWindow) {
       try {
         const currentUrl = iframe.contentWindow.location.href
-        // Check if we are back on our domain (or specific success/fail URL indicators)
-        // If we can read currentUrl, we are likely back on same origin.
-        // IGNORE about:blank which is accessible but means "not loaded yet" or "loading"
-        if (currentUrl && currentUrl !== 'about:blank' && !currentUrl.startsWith('about:')) { 
-           // We are back!
-           checkPaymentStatus(orderId.value, selectedPayment.value.paymentTypeId, true)
-           // Do not stop polling; latency might mean status is not 'Completed' yet.
+        
+        // IGNORE about:blank which means "not loaded yet" or "loading"
+        if (currentUrl && currentUrl !== 'about:blank' && !currentUrl.startsWith('about:')) {
+          // We are back on our domain! 
+          // For Saferpay, the /payments/verify endpoint should have already completed server-side
+          // verification and updated the order status. Now we just need to check and reload.
+          console.log('Iframe returned from gateway, checking final status...')
+          checkPaymentStatus(orderId.value, selectedPayment.value.paymentTypeId, true)
         }
       } catch (e) {
         // Cross-origin: still on gateway. Do nothing.
       }
+    }
+    
+    // Also poll status for non-iframe gateways (WalleePOS, etc.)
+    if (orderId.value && selectedPayment.value) {
+      checkPaymentStatus(orderId.value, selectedPayment.value.paymentTypeId, true)
     }
   }, 2000)
 }
@@ -749,7 +752,11 @@ async function updateOrder() {
       color: res.data.status !== 'Failed' ? 'success' : 'danger',
     })
     orderStore.editOrder = null as any
-    orderStore.cartItems = [] as any
+    try {
+      orderStore.cartItems = [] as any
+    } catch (e) {
+      console.error(e)
+    }
     window.location.reload()
     return res.data
   } catch (err: any) {
@@ -937,30 +944,27 @@ const codes = normalizeCodes(props.promoCode, props.promoCodes)
 
     if (response.status === 201 || response.status === 200) {
       // CASE 1: Payment Gateway (e.g. Wallee) - Expects Iframe Interaction
-      if (selectedPayment.value.paymentGateway) {
+        if (selectedPayment.value.paymentGateway) {
         if (!orderId.value) {
            init({ color: 'success', message: 'Order created.' })
         }
-        orderStore.setPaymentLink(response.data.data.redirectUrl)
-        orderId.value = response.data.data.requestId
-        setInter()
+        
+        // Immediate success check (e.g. test gateways or auto-capture)
+        if (response.data.data.status === 'Completed') {
+          handlePaymentSuccess()
+        } else {
+          orderStore.setPaymentLink(response.data.data.redirectUrl)
+          orderId.value = response.data.data.requestId
+          setInter()
+        }
       } 
       // CASE 2: No Gateway (Cash, External Terminal) - Immediate Success
       else {
-        init({ color: 'success', message: 'Order created.' })
-        
         if (orderFor.value === 'current') {
           init({ color: 'success', message: 'Order sent to Winmax' })
         }
-
-        setTimeout(() => {
-          try {
-            orderStore.cartItems = [] as any
-          } catch (e) {
-            console.error('Error clearing cart', e)
-          }
-          window.location.reload()
-        }, 800)
+        
+        handlePaymentSuccess()
       }
     } else {
       throw new Error(response.data?.message || 'Something went wrong')
