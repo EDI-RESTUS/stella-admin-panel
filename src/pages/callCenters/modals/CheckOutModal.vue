@@ -192,6 +192,39 @@
               </div>
             </div>
           </div>
+
+          <!-- Cash Denomination Selector -->
+          <div v-if="selectedPayment?.name?.toLowerCase() === 'cash'" class="cash-denominations-section">
+            <h4 class="text-lg font-semibold mb-3 text-gray-700">Cash Amount Received:</h4>
+            <div class="denominations-grid">
+              <button
+                v-for="amount in cashDenominations"
+                :key="amount"
+                class="denomination-btn"
+                :class="{ 'selected': selectedCashAmount === amount }"
+                @click="selectedCashAmount = amount"
+              >
+                {{ amount.toFixed(2) }}
+              </button>
+            </div>
+
+            <div v-if="selectedCashAmount" class="change-info">
+              <div class="change-row">
+                <span>Order Total:</span>
+                <span class="font-bold">€{{ finalTotal.toFixed(2) }}</span>
+              </div>
+              <div class="change-row">
+                <span>Cash Received:</span>
+                <span class="font-bold">€{{ selectedCashAmount.toFixed(2) }}</span>
+              </div>
+              <div class="change-row total-change">
+                <span>Change to Give:</span>
+                <span class="font-bold" :class="changeAmount >= 0 ? 'text-blue-600' : 'text-red-600'">
+                  €{{ changeAmount.toFixed(2) }}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="action-container">
@@ -206,7 +239,7 @@
             </button>
             <button
               id="confirmBtn"
-              :disabled="apiLoading || !selectedPayment"
+              :disabled="apiLoading || !selectedPayment || (selectedPayment?.name?.toLowerCase() === 'cash' && (!selectedCashAmount || changeAmount < 0))"
               class="btn btn-primary"
               @click="orderStore.editOrder ? updateOrder() : createOrder()"
             >
@@ -283,6 +316,22 @@ const userDetails = computed(() => userStore.userDetails)
 const checkInterval: any = ref('')
 const paymentTypes: any = ref([])
 const orderFor = computed(() => orderStore.orderFor)
+
+// Cash payment state
+const selectedCashAmount = ref<number | null>(null)
+const cashDenominations = [5.00, 10.00, 20.00, 50.00, 100.00, 200.00]
+
+const finalTotal = computed(() => {
+  if (promoTotal.value) {
+    return promoTotal.value.updatedTotal
+  }
+  return totalAmount.value + props.deliveryFee
+})
+
+const changeAmount = computed(() => {
+  if (!selectedCashAmount.value) return 0
+  return selectedCashAmount.value - finalTotal.value
+})
 
 const etaTime = computed(() => {
   const now = new Date()
@@ -1456,4 +1505,71 @@ const promoOfferItemPrice = (item: any, index: number) => {
 :root .va-modal__message {
   margin-bottom: 0px !important;
 }
+
+/* Cash Denominations Section */
+.cash-denominations-section {
+  margin-top: 24px;
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 2px solid #e5e7eb;
+}
+
+.denominations-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.denomination-btn {
+  padding: 16px 12px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  background: white;
+  font-size: 18px;
+  font-weight: 700;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.denomination-btn:hover {
+  border-color: #2d5d2a;
+  background: #f0f7f0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(45, 93, 42, 0.15);
+}
+
+.denomination-btn.selected {
+  border-color: #2d5d2a;
+  background: linear-gradient(135deg, #2d5d2a 0%, #1f4a1d 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(45, 93, 42, 0.3);
+}
+
+.change-info {
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.change-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 15px;
+  color: #374151;
+}
+
+.change-row.total-change {
+  border-top: 2px solid #e5e7eb;
+  margin-top: 8px;
+  padding-top: 12px;
+  font-size: 16px;
+}
+
 </style>
