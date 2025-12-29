@@ -1,5 +1,10 @@
 <template>
-  <svg class="va-icon-menu-collapsed" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" :fill="computedColor">
+  <svg
+    class="va-icon-menu-collapsed"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    :fill="computedColor"
+  >
     <g fill="slate" fill-rule="evenodd">
       <!-- Top line -->
       <rect x="3" y="5" width="18" height="2" rx="1" />

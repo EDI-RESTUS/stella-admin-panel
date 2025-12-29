@@ -81,7 +81,7 @@
               <div class="item-main">
                 <div class="item-details">
                   <div class="item-qty-name">{{ item.name }}</div>
-                  <div v-if="item.selections?.length" class="item-extras">
+                  <div v-if="item.selections && item.selections.length" class="item-extras">
                     <div v-for="(selection, sIndex) in item.selections" :key="sIndex" class="selection-group">
                       <div
                         v-for="(addedItem, aIndex) in selection.addedItems"
@@ -90,7 +90,7 @@
                       >
                         <div class="extra-name font-medium text-gray-800">+ {{ addedItem.itemName }}</div>
                         <div
-                          v-if="addedItem.selectedOptions?.length"
+                          v-if="addedItem.selectedOptions && addedItem.selectedOptions.length"
                           class="pl-4 pt-1 text-xs text-gray-600 flex flex-wrap gap-1"
                         >
                           <div
@@ -127,18 +127,17 @@
                     Base price: €{{ item.price.toFixed(2) }} + €{{ item.selectionTotalPrice.toFixed(2) }} for addons
                   </div>
                 </div>
-              <div class="item-total-price">
-                <template v-if="offerPromoDisplay(item).affected">
-                  <span class="original-price">€{{ offerPromoDisplay(item).original.toFixed(2) }}</span>
-                  <span class="updated-price">€{{ offerPromoDisplay(item).updated.toFixed(2) }}</span>
-                </template>
-                <template v-else>
-                  <span class="font-semibold text-green-800">€{{ item.totalPrice.toFixed(2) }}</span>
-                </template>
-              </div>
-              </div>
 
-              <!-- Show selected items inside each offer -->
+                <div class="item-total-price">
+                  <template v-if="offerPromoDisplay(item, index).affected">
+                    <span class="original-price">€{{ offerPromoDisplay(item, index).original.toFixed(2) }}</span>
+                    <span class="updated-price">€{{ offerPromoDisplay(item, index).updated.toFixed(2) }}</span>
+                  </template>
+                  <template v-else>
+                    <span class="font-semibold text-green-800">€{{ item.totalPrice.toFixed(2) }}</span>
+                  </template>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -169,7 +168,10 @@
         </div>
       </div>
       <!-- Payment Section -->
-      <div v-if="!redirectUrl" class="md:col-span-2 flex flex-col bg-white">
+      <div v-if="!redirectUrl" class="md:col-span-2 flex flex-col bg-white relative">
+        <div v-if="apiLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-white/50">
+          <div class="loading-spinner !w-16 !h-16 border-4 !border-gray-300 !border-t-gray-600"></div>
+        </div>
         <div class="header-container">
           <h3 class="va-h3">{{ etaTime }}</h3>
         </div>
@@ -193,26 +195,60 @@
         </div>
 
         <div class="action-container">
-          <button
-            id="confirmBtn"
-            :disabled="apiLoading || !selectedPayment"
-            class="btn btn-primary"
-            @click="orderStore.editOrder ? updateOrder() : createOrder()"
-          >
-            <span v-if="!apiLoading" id="btnText">
-              {{ orderId && selectedPayment?.name.includes('Card') ? 'Retry Payment' : 'Payment' }}
-            </span>
-            <div v-if="apiLoading" id="loadingSpinner" class="loading-spinner animate-spin"></div>
-          </button>
+          <div class="flex gap-2 w-full justify-center">
+            <button
+              v-if="orderId"
+              class="btn btn-flat-danger mr-2"
+              :disabled="apiLoading"
+              @click="cancelOrder()"
+            >
+              Cancel Order
+            </button>
+            <button
+              id="confirmBtn"
+              :disabled="apiLoading || !selectedPayment"
+              class="btn btn-primary"
+              @click="orderStore.editOrder ? updateOrder() : createOrder()"
+            >
+              <span v-if="!apiLoading" id="btnText">
+                {{ orderId && selectedPayment?.name.includes('Card') ? 'Retry Payment' : 'Payment' }}
+              </span>
+              <div v-if="apiLoading" id="loadingSpinner" class="loading-spinner animate-spin"></div>
+            </button>
+          </div>
         </div>
       </div>
-      <div v-else class="col-span-2 flex items-center bg-white">
-        <iframe :src="redirectUrl" width="100%" height="100%" />
+      <div v-else class="col-span-2 flex flex-col bg-white h-full">
+        <div class="flex-grow relative">
+          <iframe :src="redirectUrl" width="100%" height="100%" class="border-none" />
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
+            <div class="loading-spinner !w-16 !h-16 border-4 !border-gray-300 !border-t-gray-600"></div>
+          </div>
+        </div>
+        <div class="p-4 border-t border-gray-200 flex justify-between items-center bg-gray-50">
+          <span class="text-sm text-gray-500 flex items-center gap-2">
+            <div class="loading-spinner !border-gray-300 !border-t-gray-600"></div>
+            Payment in progress...
+          </span>
+          <div class="flex gap-2">
+            <button
+              class="btn btn-flat-danger text-sm px-4 py-2"
+              @click="cancelOrder()"
+            >
+              Cancel Order
+            </button>
+            <button
+              class="btn btn-secondary text-sm px-4 py-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+              @click="manualRetry()"
+            >
+              Problems? Retry
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </VaModal>
 </template>
-
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useToast } from 'vuestic-ui'
@@ -259,11 +295,9 @@ const etaTime = computed(() => {
       : orderStore.deliveryZone?.takeawayPromiseTime
 
   const etaDate = new Date(selectedDate)
-
   etaDate.setMinutes(etaDate.getMinutes() + (promiseTime || 0))
 
   const timeString = etaDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-
   const isFutureOrder = selectedDate.getTime() > now.getTime() + 30 * 60 * 1000
 
   const zoneName = orderStore.deliveryZone?.name ? `${orderStore.deliveryZone.name} - ` : ''
@@ -292,6 +326,7 @@ const etaTime = computed(() => {
     return `${zoneName}${props.orderType === 'delivery' ? 'Delivery - ETA' : 'Takeaway - Ready at'} ${timeString}`
   }
 })
+
 
 const getTotalPrice = computed(() => {
   const total = totalAmount.value + props.deliveryFee
@@ -342,26 +377,7 @@ watch(
   },
   { immediate: true },
 )
-function setInter() {
-  checkInterval.value = setInterval(() => {
-    const iframe = document.querySelector('iframe')
-    if (iframe && iframe.contentWindow) {
-      try {
-        const currentUrl = iframe.contentWindow.location.href
-        if (currentUrl.includes('loader')) {
-          checkPaymentStatus(orderId.value, selectedPayment.value.paymentTypeId)
-          resetInter()
-          apiLoading.value = false
-        }
-      } catch (e) {
-        // Handle cross-origin errors silently
-      }
-    }
-  }, 2000)
-}
-function resetInter() {
-  clearInterval(checkInterval.value)
-}
+
 const subtotal = computed(() => {
   return (
     orderStore.cartItems.reduce((acc, item) => acc + item.totalPrice, 0) +
@@ -461,44 +477,235 @@ function linePromoCart(item: any, idx: number) {
 }
 /** ------------------------------------------------------------------------------ */
 
-async function checkPaymentStatus(requestId: string, paymentId: string) {
-  const response = await orderStore.checkPaymentStatus(requestId, paymentId)
-  if (response.data.data.status === 'Completed') {
-    init({
-      color: 'success',
-      message: 'Payment Success',
-    })
-    if (orderFor.value === 'current') {
-      try {
-        await orderStore.sendOrderToWinmax(requestId, orderFor.value)
-        init({
-          color: 'success',
-          message: 'Order sent to Winmax',
-        })
-        setTimeout(() => {
-          orderStore.cartItems = []
-          window.location.reload()
-        }, 800)
-      } catch (err: any) {
-        init({
-          color: 'danger',
-          message: err.response.data.error,
-        })
-        orderStore.setPaymentLink('')
-        orderResponse.value = ''
-        orderId.value = ''
+async function checkPaymentStatus(requestId: string, paymentId: string, isPolling = false) {
+  // 1. Try standard payment verification (existing flow) - SKIP IF POLLING
+  if (!isPolling) {
+    try {
+      const response = await orderStore.checkPaymentStatus(requestId, paymentId)
+      console.log('Payment Verify Response:', response)
+
+      const responseData = response.data?.data || response.data || {}
+      console.log('Payment Verify Data:', responseData)
+
+      // Explicit WalleePOS handling: Close and clean data without reload
+      const gateway = responseData.gateway || ''
+      const isWallee = /wallee/i.test(gateway)
+      const isDeviceSuccess = responseData.raw?.kind === 'deviceSuccess'
+      
+      if ((isWallee || isDeviceSuccess) && responseData.status === 'Completed') {
+        console.log('WalleePOS/Device Success Detected - Triggering Success Handler')
+        handlePaymentSuccess()
+        return
       }
+
+      if (responseData.status === 'Completed') {
+        handlePaymentSuccess()
+        return
+      }
+    } catch (e) {
+      // ignore error, proceed to check order status directly
     }
-  } else {
-    init({
-      color: 'danger',
-      message: response.data.message,
-    })
+  }
+
+  // 2. Fallback: check order status directly (new flow)
+  try {
+    // Prefer the original order ID if available (orderId.value might be payment request ID)
+    const actualOrderId = orderResponse.value?.data?.data?._id || requestId
+    const orderRes = await orderStore.getOrderStatus(actualOrderId)
+    const responseData = orderRes.data?.data || orderRes.data || {}
+    const status = responseData.status // "Completed" | "In Progress" | "Cancelled"
+
+    // Explicit WalleePOS handling for GET response
+    const gateway = responseData.gateway || ''
+    const isWallee = /wallee/i.test(gateway)
+    const isDeviceSuccess = responseData.raw?.kind === 'deviceSuccess'
+
+    if ((isWallee || isDeviceSuccess) && status === 'Completed') {
+      console.log('WalleePOS/Device Success Detected (GET) - Triggering Success Handler')
+      handlePaymentSuccess()
+      return
+    }
+
+    if (status === 'Completed') {
+      handlePaymentSuccess()
+    } else if (status === 'In Progress') {
+      if (isPolling) return
+      // Payment flow finished (iframe returned) but status is still In Progress => Failed/Unpaid
+      init({
+        color: 'danger',
+        message: 'Payment not completed. Please retry or cancel.',
+      })
+      orderStore.setPaymentLink('') // Hide iframe
+      // UI will show "Retry Payment" because orderId exists
+    } else if (status === 'Cancelled') {
+      init({ color: 'warning', message: 'Order was cancelled.' })
+      orderStore.setPaymentLink('')
+      emits('cancel')
+    }
+  } catch (err: any) {
+    console.error('Status check failed', err)
+    init({ color: 'danger', message: 'Could not verify payment status.' })
     orderStore.setPaymentLink('')
   }
 }
 
+function handlePaymentSuccess() {
+  init({
+    color: 'success',
+    message: 'Payment Success',
+  })
+
+  if (orderFor.value === 'current') {
+    init({
+      color: 'success',
+      message: 'Order sent to Winmax',
+    })
+  }
+
+  setTimeout(() => {
+    try {
+      orderStore.cartItems = []
+    } catch (e) {
+      console.error('Error clearing cart', e)
+    }
+    window.location.reload()
+  }, 800)
+}
+
+function setInter() {
+  let iframeReturnDetected = false
+  let lastRetryTime = 0
+  const startTime = Date.now()
+  
+  checkInterval.value = setInterval(async () => {
+    const iframe = document.querySelector('iframe')
+    const elapsedSeconds = (Date.now() - startTime) / 1000
+    const timeSinceLastRetry = (Date.now() - lastRetryTime) / 1000
+    
+    // After 8 seconds, try verification every 5 seconds until success
+    if (elapsedSeconds > 8 && timeSinceLastRetry > 5 && !iframeReturnDetected) {
+      console.log('[Payment Debug] Triggering automatic verification attempt...')
+      lastRetryTime = Date.now()
+      
+      try {
+        const response = await orderStore.retryPayment(orderId.value, selectedPayment.value.paymentTypeId)
+        console.log('[Payment Debug] Auto-retry response:', response.status)
+        
+        if (response.status === 200 || response.status === 201) {
+          const orderRes = await orderStore.getOrderStatus(orderId.value)
+          console.log('[Payment Debug] Order status after auto-retry:', orderRes.data?.data?.status)
+          
+          if (orderRes.data?.data?.status === 'Completed') {
+            console.log('[Payment Debug] Payment completed via auto-retry!')
+            iframeReturnDetected = true
+            resetInter()
+            handlePaymentSuccess()
+            return
+          }
+        }
+      } catch (e) {
+        console.error('[Payment Debug] Auto-retry failed:', e)
+      }
+    }
+    
+    // Try to detect if iframe has returned from payment gateway
+    if (iframe && iframe.contentWindow && !iframeReturnDetected) {
+      try {
+        const currentUrl = iframe.contentWindow.location.href
+        console.log('[Payment Debug] Iframe URL readable:', currentUrl)
+        
+        // IGNORE about:blank which means "not loaded yet" or "loading"
+        if (currentUrl && currentUrl !== 'about:blank' && !currentUrl.startsWith('about:')) {
+          // We are back on our domain! 
+          console.log('[Payment Debug] Iframe returned from gateway, triggering payment verification...')
+          iframeReturnDetected = true
+          
+          // Trigger server-side payment verification (same as retry button)
+          try {
+            console.log('[Payment Debug] Calling retryPayment for orderId:', orderId.value)
+            const response = await orderStore.retryPayment(orderId.value, selectedPayment.value.paymentTypeId)
+            console.log('[Payment Debug] retryPayment response:', response.status, response.data)
+            
+            if (response.status === 200 || response.status === 201) {
+              // Check if payment is now completed
+              const orderRes = await orderStore.getOrderStatus(orderId.value)
+              console.log('[Payment Debug] Order status:', orderRes.data?.data?.status)
+              
+              if (orderRes.data?.data?.status === 'Completed') {
+                console.log('[Payment Debug] Payment completed! Triggering success handler...')
+                resetInter()
+                handlePaymentSuccess()
+                return
+              }
+            }
+          } catch (e) {
+            console.error('[Payment Debug] Payment verification failed:', e)
+          }
+        }
+      } catch (e) {
+        // Cross-origin: still on gateway. Do nothing.
+        // This is expected while user is on Saferpay
+      }
+    }
+    
+    // Continue polling status for all payment types
+    if (orderId.value && selectedPayment.value) {
+      checkPaymentStatus(orderId.value, selectedPayment.value.paymentTypeId, true)
+    }
+  }, 2000)
+}
+
+function resetInter() {
+  clearInterval(checkInterval.value)
+}
+
+async function cancelOrder() {
+  if (!orderId.value) return
+  try {
+    apiLoading.value = true
+    // Use new cancel endpoint
+    await orderStore.cancelOrder(orderId.value)
+    
+    init({ color: 'info', message: 'Order cancelled' })
+    
+    // Reset everything by reloading, similar to success flow
+    setTimeout(() => {
+      orderStore.cartItems = []
+      window.location.reload()
+    }, 800)
+  } catch (e) {
+    console.error(e)
+    init({ color: 'danger', message: 'Failed to cancel order' })
+  } finally {
+    apiLoading.value = false
+  }
+}
+
+async function manualRetry() {
+  // Check status one last time in case it actually went through
+  try {
+    apiLoading.value = true
+    const orderRes = await orderStore.getOrderStatus(orderId.value)
+    const status = orderRes.data.data.status
+
+    if (status === 'Completed') {
+      handlePaymentSuccess()
+      return
+    } else {
+      // If In Progress or Cancelled, just reset the view so they can try again
+      init({ color: 'warning', message: 'Payment not confirmed. You can try again.' })
+      orderStore.setPaymentLink('')
+    }
+  } catch (e) {
+    // If check fails, just let them retry
+    orderStore.setPaymentLink('')
+  } finally {
+    apiLoading.value = false
+  }
+}
+
 async function updateOrder() {
+  apiLoading.value = true
   const url = import.meta.env.VITE_API_BASE_URL
   const userStore = useUsersStore()
   const existingMenuItems: any[] = []
@@ -515,62 +722,60 @@ async function updateOrder() {
     }
   })
 
-  if (existingMenuItems.length) {
-    await Promise.all(
-      existingMenuItems.map((item) => {
-        const data = {
-          menuItems: [
-            {
-              menuItem: item,
-              quantity: 1,
-              options: (orderStore.editOrder.menuItems.find((m: any) => m._id === item)?.options || []).map(
-                (op: any) => ({
-                  option: typeof op.option === 'string' ? op.option : String(op.option?._id),
-                  quantity: Number(op.quantity ?? 1),
-                }),
-              ),
-            },
-          ],
-        }
-        return applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, data)
-      }),
-    )
-  }
-
-  if (existingOffers.length) {
-    await Promise.all(
-      existingOffers.map((offer: any) => {
-        const data = {
-          offerId: offer.offerId,
-          offerMenuItems: [],
-        }
-        return applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, data)
-      }),
-    )
-  }
-
-  const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
-    offerId: offer.offerId,
-    menuItems: offer.selections.flatMap((selection: any) =>
-      selection.addedItems.map((item: any) => ({
-        menuItem: item.itemId,
-        quantity: item.quantity || 1,
-        options:
-          item.selectedOptions?.flatMap((group: any) =>
-            group.selected.map((option: any) => ({
-              option: option.optionId,
-              quantity: option.quantity,
-            })),
-          ) || [],
-      })),
-    ),
-  }))
-
   try {
+    if (existingMenuItems.length) {
+      await Promise.all(
+        existingMenuItems.map((item) => {
+          const data = {
+            menuItems: [
+              {
+                menuItem: item,
+                quantity: 1,
+                options: (orderStore.editOrder.menuItems.find((m: any) => m._id === item)?.options || []).map(
+                  (op: any) => ({
+                    option: typeof op.option === 'string' ? op.option : String(op.option?._id),
+                    quantity: Number(op.quantity ?? 1),
+                  }),
+                ),
+              },
+            ],
+          }
+          return applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, data)
+        }),
+      )
+    }
+
+    // --- CHANGED: batch & dedupe offer deletes into ONE call ---
+    if (existingOffers.length) {
+      const uniq = Array.from(new Map(existingOffers.map((o: any) => [o.offerId, o])).values())
+      const payload = {
+        offerMenuItems: uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 })),
+      }
+      await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, payload)
+    }
+    // --- END CHANGE ---
+
+    const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
+      offerId: offer.offerId,
+      menuItems: offer.selections.flatMap((selection: any) =>
+        selection.addedItems.map((item: any) => ({
+          menuItem: item.itemId,
+          quantity: item.quantity || 1,
+          options:
+            item.selectedOptions?.flatMap((group: any) =>
+              group.selected.map((option: any) => ({
+                option: option.optionId,
+                quantity: option.quantity,
+              })),
+            ) || [],
+        })),
+      ),
+    }))
+
     const res = await axios.post(
       `${url}/order-edits/${orderStore.editOrder._id}/apply`,
       {
-        action: 'edit',
+        action: 'add',
         tableNumber: orderStore.editOrder.tableNumber,
 
         menuItems: orderStore.cartItems.map((e: any) => {
@@ -601,12 +806,17 @@ async function updateOrder() {
       color: res.data.status !== 'Failed' ? 'success' : 'danger',
     })
     orderStore.editOrder = null as any
-    orderStore.cartItems = [] as any
+    try {
+      orderStore.cartItems = [] as any
+    } catch (e) {
+      console.error(e)
+    }
     window.location.reload()
     return res.data
   } catch (err: any) {
     console.error('Order edit failed:', err)
     init({ message: err.response.data.message, color: 'danger' })
+    apiLoading.value = false
     throw err
   }
 }
@@ -684,8 +894,8 @@ function cartItemPromoDisplay(item: any, idx: number) {
 }
 
 // Offer display: use promoOfferItemPrice(item) when it returns something different
-function offerPromoDisplay(item: any) {
-  const updatedMaybe = promoOfferItemPrice(item)
+function offerPromoDisplay(item: any, index: number) {
+  const updatedMaybe = promoOfferItemPrice(item, index)
   const original = Number(item.totalPrice ?? 0)
   const updated  = updatedMaybe != null ? Number(updatedMaybe) : original
   const affected = updatedMaybe != null && !moneyEq(original, updated)
@@ -697,6 +907,28 @@ const offersAfterPromos = computed(() => {
   const n = Number(v?.updatedOffersTotal || 0)
   return Number(n.toFixed(2))
 })
+function normalizeCodes(singleStr, codesArr) {
+  // Prefer provided array if non-empty
+  let codes = Array.isArray(codesArr) && codesArr.length ? codesArr.slice() : []
+
+  // Otherwise, parse the string: "P50, XL+1" -> ["P50","XL+1"]
+  if (!codes.length && singleStr) {
+    codes = singleStr
+      .split(/[\s,;\n\r]+/g)
+      .map(s => s.trim())
+      .filter(Boolean)
+  }
+
+  // De-dupe case-insensitively
+  const seen = new Set()
+  const out = []
+  for (const c of codes) {
+    const k = c.toLowerCase()
+    if (!seen.has(k)) { seen.add(k); out.push(c) }
+  }
+  return out
+}
+
 
 async function createOrder() {
   apiLoading.value = true
@@ -730,6 +962,7 @@ async function createOrder() {
       })),
     ),
   }))
+const codes = normalizeCodes(props.promoCode, props.promoCodes)
 
   try {
     const payload = {
@@ -744,16 +977,17 @@ async function createOrder() {
       deliveryFee: props.deliveryFee,
       outletId: serviceStore.selectedRest,
       orderDateTime: new Date(props.dateSelected).toISOString(),
-      paymorderNotes: orderStore.orderNotes || '',
+
       address: sanitizeAddress(orderStore.address),
-      promoCode: (props.promoCodes?.length === 1 ? props.promoCodes[0] : props.promoCode) || '',
-      promoCodes: props.promoCodes ?? [],   
+      phoneNo: orderStore.phoneNumber || '',
+  ...(codes.length ? { promoCodes: codes } : {}),
+  ...(codes.length === 1 ? { promoCode: codes[0] } : {}),
     }
 
 
     let response: any = ''
     if (orderId.value) {
-      response = await orderStore.retryPayment(orderId.value)
+      response = await orderStore.retryPayment(orderId.value, selectedPayment.value?.paymentTypeId)
     } else {
       orderResponse.value = await orderStore.createOrder(payload)
       response = await orderStore.createPayment({
@@ -763,36 +997,28 @@ async function createOrder() {
     }
 
     if (response.status === 201 || response.status === 200) {
-      if (!orderId.value) {
-        init({ color: 'success', message: 'Order created.' })
-      }
-
-      if (selectedPayment.value.paymentGateway) {
-        orderStore.setPaymentLink(response.data.data.redirectUrl)
-        orderId.value = response.data.data.requestId
-        setInter()
-      } else {
-        try {
-          if (orderFor.value === 'current') {
-            await orderStore.sendOrderToWinmax(orderResponse.value.data.data._id, orderFor.value)
-            init({
-              color: 'success',
-              message: 'Order sent to Winmax',
-            })
-          }
-          setTimeout(() => {
-            orderStore.cartItems = [] as any
-            window.location.reload()
-          }, 800)
-        } catch (err: any) {
-          init({
-            color: 'danger',
-            message: err.response.data.message,
-          })
-          orderStore.setPaymentLink('')
-          orderResponse.value = ''
-          orderId.value = ''
+      // CASE 1: Payment Gateway (e.g. Wallee) - Expects Iframe Interaction
+        if (selectedPayment.value.paymentGateway) {
+        if (!orderId.value) {
+           init({ color: 'success', message: 'Order created.' })
         }
+        
+        // Immediate success check (e.g. test gateways or auto-capture)
+        if (response.data.data.status === 'Completed') {
+          handlePaymentSuccess()
+        } else {
+          orderStore.setPaymentLink(response.data.data.redirectUrl)
+          orderId.value = response.data.data.requestId
+          setInter()
+        }
+      } 
+      // CASE 2: No Gateway (Cash, External Terminal) - Immediate Success
+      else {
+        if (orderFor.value === 'current') {
+          init({ color: 'success', message: 'Order sent to Winmax' })
+        }
+        
+        handlePaymentSuccess()
       }
     } else {
       throw new Error(response.data?.message || 'Something went wrong')
@@ -813,22 +1039,34 @@ async function createOrder() {
   }
 }
 
-const promoOfferItemPrice = (item: any) => {
-  if (!promoTotal.value || !item) return null
+const promoOfferItemPrice = (item: any, index: number) => {
+  const v = promoTotal.value
+  if (!v || !v.offerDetails || !v.offerDetails.length || !item) return null
 
-  const promoOffers = promoTotal.value.offerDetails || []
+  const offerId = item.offerId || (item.fullItem && item.fullItem.offerId)
+  if (!offerId) return null
 
-  const offerId = (item as any).offerId || (item as any).fullItem?.offerId
+  // All validator entries for this offer type
+  const matches = v.offerDetails.filter((o: any) => o.offerId === offerId)
+  if (!matches.length) return null
 
-  const promo = promoOffers.filter((a: any) => a.offerId === offerId)
-  // Get the minimum totalPrice from the list of promo
-  const miniMumPrice = Math.min(...orderStore.offerItems.map((p: any) => Number(p.totalPrice)))
-  if (!promo.length) return null
-  const updated = Number(promo[0].totalPrice)
-  if ((item as any).totalPrice === miniMumPrice) {
-    return Number(updated.toFixed(2))
+  // Determine which occurrence THIS UI item is among same-offer items
+  let seen = 0
+  let occ = 0
+  for (let i = 0; i < orderStore.offerItems.length; i++) {
+    const it = orderStore.offerItems[i]
+    const itOfferId = it.offerId || (it.fullItem && it.fullItem.offerId)
+    if (itOfferId === offerId) {
+      if (i === index) { occ = seen; break }
+      seen++
+    }
   }
-  return null
+
+  // Pick corresponding validator entry (fallback to last if fewer entries)
+  const picked = matches[Math.min(occ, matches.length - 1)]
+  const updated = Number((picked && picked.totalPrice) ? picked.totalPrice : 0)
+
+  return Number(updated.toFixed(2))
 }
 </script>
 
@@ -899,7 +1137,7 @@ const promoOfferItemPrice = (item: any) => {
 .extra-item {
   display: flex;
   flex-direction: column;
-  align-items: start;
+  align-items: flex-start;
   padding: 3px 0;
   font-size: 14px;
 }

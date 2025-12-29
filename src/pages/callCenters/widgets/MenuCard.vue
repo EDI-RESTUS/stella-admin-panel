@@ -14,6 +14,7 @@
       :item="itemWithArticlesOptionsGroups"
       :menu-item-id="item._id"
       :category-id="categoryId"
+      :fetch-configurations="[]"
       @cancel="closeMenuModal"
     />
   </div>

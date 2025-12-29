@@ -324,8 +324,11 @@ watch(
       const selected = []
       defaults.forEach((optionId) => {
         const option = group.options.find((o) => o._id === optionId)
-        if (option && (!selectedOptions.value.length || option.type.toLowerCase() !== 'article')) {
-          console.log('inside', option)
+        // Fix: Allow selecting default articles even if other options are already selected.
+        // We check if this specific group already has a selection to avoid duplicates if re-running.
+        const groupAlreadySelected = selectedOptions.value.some(s => s.groupId === group._id)
+        
+        if (option && (!groupAlreadySelected || option.type.toLowerCase() !== 'article')) {
           selected.push({
             optionId: option._id,
             name: option.name,
@@ -336,6 +339,7 @@ watch(
         }
       })
 
+      // Only trigger configuration fetch if this is the first article being selected (to avoid loops or conflicts)
       if (!selectedOptions.value.length && selected.find((a) => a.type.toLowerCase() === 'article')) {
         getArticlesConfiguration(group._id, selected.find((a) => a.type.toLowerCase() === 'article').optionId)
       }

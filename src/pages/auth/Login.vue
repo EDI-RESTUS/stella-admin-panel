@@ -1,107 +1,135 @@
 <template>
-  <VaForm ref="form" @submit.prevent="submit">
-    <h1 class="font-semibold text-4xl mb-4">Log in</h1>
-    <VaInput
-      v-model="formData.email"
-      :rules="[validators.required, validators.email]"
-      class="mb-4"
-      label="Email"
-      type="email"
-    />
-    <VaValue v-slot="isPasswordVisible" :default-value="false">
-      <VaInput
-        v-model="formData.password"
-        :rules="[validators.required]"
-        :type="isPasswordVisible.value ? 'text' : 'password'"
-        class="mb-4"
-        label="Password"
-        @clickAppendInner.stop="isPasswordVisible.value = !isPasswordVisible.value"
-      >
-        <template #appendInner>
-          <VaIcon
-            :name="isPasswordVisible.value ? 'mso-visibility_off' : 'mso-visibility'"
-            class="cursor-pointer"
-            color="secondary"
+  <div
+    class="relative z-10 w-full space-y-6 p-6 rounded-xl shadow-2xl backdrop-blur-md border dark:bg-slate-800/50 dark:border-slate-700/50 bg-white border-slate-200"
+  >
+    <!-- Title -->
+    <div class="flex justify-center">
+      <h2 class="text-2xl font-bold dark:text-slate-100 text-slate-900">Stella</h2>
+    </div>
+
+    <!-- Login form -->
+    <form class="space-y-4" @submit.prevent="submit">
+      <div class="space-y-3 rounded-md">
+        <!-- Email -->
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <User class="h-5 w-5 text-slate-400" />
+          </div>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            v-model="formData.email"
+            class="appearance-none block w-full pl-10 px-3 py-2 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 focus:z-10 sm:text-sm"
+            placeholder="Email"
           />
-        </template>
-      </VaInput>
-    </VaValue>
+        </div>
 
-    <div class="auth-layout__options flex flex-col sm:flex-row items-start sm:items-center justify-between">
-      <VaCheckbox v-model="formData.keepLoggedIn" class="mb-2 sm:mb-0" label="Keep me signed in on this device" />
-      <RouterLink :to="{ name: 'recover-password' }" class="mt-2 sm:mt-0 sm:ml-1 font-semibold text-primary">
-        Forgot password?
-      </RouterLink>
-    </div>
+        <!-- Password -->
+        <div class="relative">
+          <!-- Left icon -->
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <KeyRound class="h-5 w-5 text-slate-400" />
+          </div>
 
-    <div class="flex justify-center mt-4">
-      <VaButton class="w-full" @click="submit"> Login</VaButton>
-    </div>
-  </VaForm>
+          <!-- Password input -->
+          <input
+            id="password"
+            name="password"
+            :type="showPassword ? 'text' : 'password'"
+            required
+            v-model="formData.password"
+            class="appearance-none block w-full pl-10 pr-10 px-3 py-2 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 focus:z-10 sm:text-sm"
+            placeholder="Password"
+          />
+
+          <!-- Toggle show/hide -->
+          <button
+            type="button"
+            @click="showPassword = !showPassword"
+            class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
+            aria-label="Toggle password visibility"
+          >
+            <Eye v-if="!showPassword" class="h-5 w-5" />
+            <EyeOff v-else class="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Error message -->
+      <div v-if="error" class="text-red-500 text-sm text-center">{{ error }}</div>
+
+      <!-- Submit -->
+      <div>
+        <button
+          type="submit"
+          class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-purple-700/60 hover:bg-purple-700/80 transition-colors duration-200"
+        >
+          Sign in
+        </button>
+      </div>
+    </form>
+  </div>
 </template>
 
-<script lang="ts" setup>
-import { reactive } from 'vue'
+<script setup lang="ts">
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useForm, useToast } from 'vuestic-ui'
-import { validators } from '../../services/utils'
-import axios from 'axios'
-const { validate } = useForm('form')
-const { push } = useRouter()
-const { init } = useToast()
-import { useUsersStore } from '../../stores/users'
+import { useToast } from 'vuestic-ui'
+import { useUsersStore } from '@/stores/users'
 import { useServiceStore } from '@/stores/services'
-const serviceStore = useServiceStore()
-const userStore = useUsersStore()
+import axios from 'axios'
+import { User, KeyRound, Eye, EyeOff } from 'lucide-vue-next'
 
+const router = useRouter()
+const { init } = useToast()
+const userStore = useUsersStore()
+const serviceStore = useServiceStore()
 serviceStore.resetRest()
+
 const formData = reactive({
   email: '',
   password: '',
-  keepLoggedIn: false,
 })
 
-const submit = () => {
-  if (validate()) {
-    const url: any = import.meta.env.VITE_API_BASE_URL
-    axios
-      .post(`${url}/auth/signin`, {
-        email: formData.email,
-        password: formData.password,
-      })
-      .then((response) => {
-        userStore.setUserDetails(response.data.user)
-        init({ message: "You've successfully logged in", color: 'success' })
-        if (response.data.user.role !== 'super-admin') {
-          if (response.data.user.outlets && response.data.user.outlets.length) {
-            window.sessionStorage.setItem('token', response.data.accessToken)
-            window.sessionStorage.setItem('user', response.data.user.id)
-            window.sessionStorage.setItem('role', response.data.user.role)
-            serviceStore.setRest(response.data.user.outlets[0])
-            window.sessionStorage.setItem('selectedRest', response.data.user.outlets[0])
-            if (response.data.user.role.includes('caller')) {
-              push({
-                name: 'callCenters',
-              })
-            } else {
-              push({
-                name: 'articles',
-              })
-            }
-          } else {
-            init({ message: err.response.data.message, color: 'danger' })
-          }
-        } else {
-          window.sessionStorage.setItem('token', response.data.accessToken)
-          window.sessionStorage.setItem('role', response.data.user.role)
-          window.sessionStorage.setItem('user', response.data.user.id)
-          push({ name: 'list' })
-        }
-      })
-      .catch((err) => {
-        console.log(err)
-        init({ message: err.response.data.message, color: 'danger' })
-      })
+const error = ref('')
+const showPassword = ref(false)
+
+async function submit() {
+  error.value = ''
+  if (!formData.email || !formData.password) {
+    error.value = 'Email and password are required.'
+    return
+  }
+
+  try {
+    const url = import.meta.env.VITE_API_BASE_URL
+    const res = await axios.post(`${url}/auth/signin`, formData)
+
+    userStore.setUserDetails(res.data.user)
+    init({ message: "You've successfully logged in", color: 'success' })
+
+    window.sessionStorage.setItem('token', res.data.accessToken)
+    window.sessionStorage.setItem('user', res.data.user.id)
+    window.sessionStorage.setItem('role', res.data.user.role)
+
+    if (res.data.user.role !== 'super-admin') {
+      if (res.data.user.outlets?.length) {
+        serviceStore.setRest(res.data.user.outlets[0])
+        window.sessionStorage.setItem('selectedRest', res.data.user.outlets[0])
+        const nextRoute = res.data.user.role.includes('caller') ? 'callCenters' : 'articles'
+        router.push({ name: nextRoute })
+      } else {
+        init({ message: 'No outlet assigned', color: 'danger' })
+      }
+    } else {
+      router.push({ name: 'list' })
+    }
+  } catch (err: any) {
+    console.error(err)
+    error.value = err?.response?.data?.message || 'Login failed'
+    init({ message: error.value, color: 'danger' })
   }
 }
 </script>

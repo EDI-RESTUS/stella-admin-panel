@@ -14,13 +14,24 @@
 
     <VaForm ref="form" @submit.prevent="submit()">
       <div class="grid grid-cols-2 md:grid-cols-1 gap-3 justify-between">
-        <VaInput v-model="formData.name" label="Name" placeholder="Name" type="text" :rules="[validators.required]" />
+        <!-- Name -->
+        <VaInput
+          v-model="formData.name"
+          label="Name"
+          placeholder="Name"
+          type="text"
+          :rules="[validators.required]"
+        />
+
+        <!-- Payment Gateway -->
         <VaSelect
           v-model="formData.paymentGateway"
           value-by="value"
           label="Payment Gateway"
           :options="paymentGateway"
         />
+
+        <!-- Payment Gateway Config Inputs -->
         <div v-if="formData.paymentGateway" class="grid md:grid-cols-1 gap-3">
           <div
             v-for="e in paymentOptions.find((a) => a.paymentMethodName === formData.paymentGateway)?.inputConfig || []"
@@ -36,7 +47,16 @@
             </VaInput>
           </div>
         </div>
-        <VaInput v-model="formData.paymentTypeId" label="Payment Type ID" placeholder="Payment Type ID" type="text" />
+
+        <!-- Payment Type ID -->
+        <VaInput
+          v-model="formData.paymentTypeId"
+          label="Payment Type ID"
+          placeholder="Payment Type ID"
+          type="text"
+        />
+
+        <!-- Options -->
         <div class="grid md:grid-cols-4 gap-3">
           <VaCheckbox v-model="formData.dineIn" label="Dine-in" />
           <VaCheckbox v-model="formData.delivery" label="Delivery" />
@@ -45,10 +65,25 @@
         </div>
       </div>
 
-      <div class="flex justify-end mt-3">
+      <!-- Submit Button -->
+      <div class="flex justify-end mt-3 gap-2">
+        <VaButton
+          v-if="isUpdating && formData.paymentGateway === 'WalleePOS'"
+          color="secondary"
+          @click="showWalleeConfig = true"
+        >
+          Configure Wallee
+        </VaButton>
         <VaButton type="submit" :disabled="isSubmitDisabled">{{ isUpdating ? 'Update' : 'Add' }}</VaButton>
       </div>
     </VaForm>
+
+    <WalleeConfigModal
+      v-if="showWalleeConfig"
+      :outlet-id="servicesStore.selectedRest"
+      :payment-type-id="formData.paymentTypeId"
+      @cancel="showWalleeConfig = false"
+    />
   </VaModal>
 </template>
 
@@ -58,6 +93,8 @@ import axios from 'axios'
 import { validators } from '@/services/utils'
 import { useForm, useToast } from 'vuestic-ui'
 import { useServiceStore } from '@/stores/services'
+import WalleeConfigModal from './WalleeConfigModal.vue'
+
 const emits = defineEmits(['cancel'])
 const props = defineProps({
   selectedPayment: {
@@ -69,6 +106,9 @@ const props = defineProps({
 const { validate } = useForm('form')
 const { init } = useToast()
 const servicesStore = useServiceStore()
+const showWalleeConfig = ref(false)
+
+// Form data
 const formData = ref({
   _id: '',
   name: '',
@@ -82,45 +122,61 @@ const formData = ref({
 
 const isUpdating = computed(() => !!Object.keys(props.selectedPayment).length)
 
+// Payment options
 const paymentGateway = ref([])
 const paymentOptions = ref([])
 
+// Fetch payment configuration
 const getPaymentconfig = () => {
   const url: any = import.meta.env.VITE_API_BASE_URL
   axios.get(`${url}/payments-config`).then((response) => {
-    paymentGateway.value = response.data.data.types.map((e) => {
-      return { text: e, value: e }
-    })
+    // Populate gateways
+    paymentGateway.value = response.data.data.types.map((e) => ({ text: e, value: e }))
 
-    paymentOptions.value = response.data.data.config.map((e) => {
-      return {
-        ...e,
-        inputConfig: e.inputConfig.map((config) => {
-          return {
-            ...config,
-            value: config.default || '',
-          }
-        }),
-      }
-    })
+    // Populate gateway configs
+    paymentOptions.value = response.data.data.config.map((e) => ({
+      ...e,
+      inputConfig: e.inputConfig.map((config) => ({ ...config, value: config.default || '' })),
+    }))
 
-    if (props.selectedPayment) {
+    // --- Manual Wallee Injection ---
+    if (!paymentGateway.value.find((p) => p.value === 'WalleePOS')) {
+      paymentGateway.value.push({ text: 'WalleePOS', value: 'WalleePOS' })
+    }
+
+    if (!paymentOptions.value.find((p) => p.paymentMethodName === 'WalleePOS')) {
+      paymentOptions.value.push({
+        paymentMethodName: 'WalleePOS',
+        inputConfig: [
+          { name: 'TERMINAL_IP', label: 'Terminal IP', type: 'text', required: true, value: '' },
+          { name: 'TERMINAL_PORT', label: 'Terminal Port', type: 'number', required: true, value: 50000 },
+          { name: 'POS_ID', label: 'POS ID', type: 'text', required: true, value: '' },
+          { name: 'CURRENCY', label: 'Currency', type: 'text', required: true, value: 'EUR' },
+        ],
+      })
+    }
+    // -------------------------------
+
+    // If updating, load selected payment
+    if (props.selectedPayment && props.selectedPayment._id) {
       axios
-        .get(`${import.meta.env.VITE_API_BASE_URL}/payments/${props.selectedPayment._id}`)
+        .get(`${url}/payments/${props.selectedPayment._id}`)
         .then((response) => {
           formData.value = response.data.data
-          paymentOptions.value
-            .find((a) => a.paymentMethodName === formData.value.paymentGateway)
-            ?.inputConfig.forEach((e) => {
-              e.value = response.data.data.paymentGatewayConfig[e.name] || ''
-            })
+          const selected = paymentOptions.value.find(
+            (a) => a.paymentMethodName === formData.value.paymentGateway
+          )
+          selected?.inputConfig.forEach((e) => {
+            e.value = response.data.data.paymentGatewayConfig?.[e.name] || ''
+          })
         })
         .catch((error) => {
-          init({ message: error.response.data.message, color: 'danger' })
+          init({ message: error.response?.data?.message || 'Error loading payment', color: 'danger' })
         })
     }
   })
 }
+getPaymentconfig()
 
 const isSubmitDisabled = computed(() => {
   if (!formData.value.name?.trim()) return true
@@ -139,15 +195,26 @@ const submit = async () => {
     }
 
     let data = JSON.parse(JSON.stringify(formData.value))
-    data = {
-      ...data,
-      paymentGatewayConfig: selectedGateway
-        ? Object.fromEntries(selectedGateway.inputConfig.map((input) => [input.name, input.value]))
-        : {},
+
+    // Build paymentGatewayConfig only if gateway selected
+    const getConfig = (gateway) => {
+      if (!gateway) return {}
+      return Object.fromEntries(
+        gateway.inputConfig.map((input) => {
+          const val = input.value
+          // Cast to number if type is number
+          return [input.name, input.type === 'number' ? Number(val) : val]
+        })
+      )
     }
 
-    data.outletId = servicesStore.selectedRest
+    data = {
+      ...data,
+      outletId: servicesStore.selectedRest,
+      paymentGatewayConfig: getConfig(selectedGateway),
+    }
 
+    // Remove unnecessary fields
     delete data.createdAt
     delete data.updatedAt
     delete data.__v
@@ -174,6 +241,7 @@ const submit = async () => {
 
 getPaymentconfig()
 </script>
+
 <style scoped>
 .required-asterisk {
   color: red;

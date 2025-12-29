@@ -50,9 +50,9 @@
           </section>
 
           <!-- Value Discount -->
-          <section v-if="formData.promotionType === 'Value Discount' && !isUpdating">
+          <section v-if="formData.promotionType === 'Value Discount'">
             <h2 class="text-md font-semibold mb-2">Value Discount Configuration</h2>
-            <div class="grid md:grid-cols-2 gap-4">
+            <div class="grid md:grid-cols-3 gap-4">
               <VaInput
                 v-model="formData.discountValue"
                 label="Discount Value"
@@ -70,6 +70,14 @@
                 required-mark
                 placeholder="Where to apply"
               />
+              <VaSelect
+    v-model="formData.affectItems"
+    :options="affectItemsOptions"
+    label="Affect Type"
+    required-mark
+    placeholder="Single/Multiple Items"
+    :disabled="formData.affect !== 'Selected Items' || !['Value Discount', 'Percentage Discount'].includes(formData.promotionType)"
+/>
             </div>
             <div v-if="formData.affect === 'Selected Items'" class="flex gap-2 mt-2">
               <VaButton @click="openArticlesModal">Articles</VaButton>
@@ -78,9 +86,9 @@
           </section>
 
           <!-- Percentage Discount -->
-          <section v-if="formData.promotionType === 'Percentage Discount' && !isUpdating">
+          <section v-if="formData.promotionType === 'Percentage Discount'">
             <h2 class="text-md font-semibold mb-2">Percentage Discount Configuration</h2>
-            <div class="grid md:grid-cols-2 gap-4">
+            <div class="grid md:grid-cols-3 gap-4">
               <VaInput
                 v-model="formData.discountPercentage"
                 label="Discount %"
@@ -98,6 +106,14 @@
                 required-mark
                 placeholder="Where to apply"
               />
+              <VaSelect
+    v-model="formData.affectItems"
+    :options="affectItemsOptions"
+    label="Affect Type"
+    required-mark
+    placeholder="Single/Multiple Items"
+    :disabled="formData.affect !== 'Selected Items' || !['Value Discount', 'Percentage Discount'].includes(formData.promotionType)"
+/>
             </div>
             <div v-if="formData.affect === 'Selected Items'" class="flex gap-2 mt-2">
               <VaButton @click="openArticlesModal">Articles</VaButton>
@@ -106,7 +122,7 @@
           </section>
 
           <!-- Fixed Price -->
-          <section v-if="formData.promotionType === 'Fixed Price' && !isUpdating">
+          <section v-if="formData.promotionType === 'Fixed Price'">
             <h2 class="text-md font-semibold mb-2">Fixed Price Configuration</h2>
 
             <div class="grid md:grid-cols-2 gap-4 items-end">
@@ -131,13 +147,13 @@
           </section>
 
           <!-- Free Delivery -->
-          <section v-if="formData.promotionType === 'Free Delivery' && !isUpdating">
+          <section v-if="formData.promotionType === 'Free Delivery'">
             <h2 class="text-md font-semibold mb-2">Free Delivery Configuration</h2>
             <VaAlert color="primary">Order Type will be automatically set to Delivery.</VaAlert>
           </section>
 
           <!-- Take X Pay Y -->
-          <section v-if="formData.promotionType === 'Take X pay Y' && !isUpdating">
+          <section v-if="formData.promotionType === 'Take X pay Y'">
             <h2 class="text-md font-semibold mb-2">Take X pay Y Configuration</h2>
             <div class="grid md:grid-cols-4 gap-4 items-end">
               <VaInput
@@ -206,27 +222,19 @@
           <!-- Validity & Availability -->
           <section>
             <h2 class="text-md font-semibold mb-2">Validity & Availability</h2>
-            <div class="grid md:grid-cols-4 gap-3 mb-3">
+            <div class="grid md:grid-cols-5 gap-3 mb-3">
               <VaInput v-model="formData.startDate" label="Start Date" type="date" required-mark />
               <VaInput v-model="formData.endDate" label="End Date" type="date" required-mark />
               <VaInput v-model="formData.startTime" label="Time From" type="time" required-mark />
               <VaInput v-model="formData.endTime" label="Time To" type="time" required-mark />
-            </div>
-            <div class="grid md:grid-cols-2 gap-2">
-              <VaSelect
-                v-model="formData.days"
-                label="Available Days"
-                placeholder="Select days"
-                multiple
-                required-mark
-                :options="daysOfWeek"
+              <VaSelect v-model="formData.days" label="Available Days" placeholder="Select days" multiple required-mark :options="daysOfWeek"
               />
             </div>
           </section>
 
           <!-- Other Configuration -->
           <section>
-            <h2 class="text-md font-semibold mb-2">Other Configuration</h2>
+            <h2 class="text-md font-semibold mb-2">Other Configurations</h2>
             <div class="grid md:grid-cols-3 gap-4">
               <VaSelect
                 v-model="formData.orderType"
@@ -253,6 +261,7 @@
             </div>
             <div class="flex items-center gap-6 mt-3">
               <VaCheckbox v-model="formData.availableAtCC" label="Available at CC" />
+              <VaCheckbox v-model="formData.availableAtWeb" label="Available at Web" />
               <VaCheckbox v-model="formData.affectOffers" label="Affect Offers" />
             </div>
           </section>
@@ -261,7 +270,7 @@
 
       <!-- FOOTER -->
       <template #footer>
-        <div class="flex justify-end gap-2 p-4 border-t">
+        <div class="flex justify-end gap-2 p-4">
           <VaButton color="secondary" @click="onCancel">Cancel</VaButton>
           <VaButton color="primary" @click="submit">
             {{ isUpdating ? 'Update' : 'Add' }}
@@ -274,7 +283,7 @@
     <AddSelectionModal
       v-if="isMenuItemsModalOpen"
       :is-visible="isMenuItemsModalOpen"
-      :promotion-id="formData._id"
+      :promotion-id="''"
       :outlet-id="servicesStore.selectedRest"
       :pending-selections="promotionsArticles"
       :type="'menuItems'"
@@ -287,7 +296,7 @@
     <AddSelectionModal
       v-if="isOptionsModalOpen"
       :is-visible="isOptionsModalOpen"
-      :promotion-id="formData._id"
+      :promotion-id="''"
       :outlet-id="servicesStore.selectedRest"
       :pending-selections="promotionOptions"
       :type="'options'"
@@ -299,7 +308,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, toRef, onMounted, nextTick } from 'vue'
+import { ref, watch, computed, toRef, onMounted, nextTick, PropType } from 'vue'
 import axios from 'axios'
 import { useForm, useToast } from 'vuestic-ui'
 import { validators } from '@/services/utils'
@@ -308,7 +317,13 @@ import FileUpload from '@/components/file-uploader/FileUpload.vue'
 import { createPromotion, updatePromotion, getPromotionById, getMenuItemsByOutlet } from '../services/promotionService'
 import AddSelectionModal from './AddSelectionModal.vue'
 
-const emits = defineEmits(['update:isVisible', 'submitted', 'open-selection-modal'])
+const emits = defineEmits(['update:isVisible', 'submitted', 'open-selection-modal', 'getPromotions'])
+
+const toInputDate = (val: string) => {
+  if (!val) return ''
+  const d = new Date(val)
+  return isNaN(d.getTime()) ? val : d.toISOString().slice(0, 10)
+}
 
 const props = defineProps({
   isVisible: Boolean,
@@ -325,10 +340,6 @@ const props = defineProps({
     default: () => [],
   },
   isLoadingZones: Boolean,
-  pendingSelections: {
-    type: Object,
-    required: true,
-  },
 })
 
 const servicesStore = useServiceStore()
@@ -381,6 +392,11 @@ const affectMap = {
   'Selected Items': 'SELECTED_ITEMS',
 }
 
+const affectItemsMap = {
+  'Single Item': 'SINGLE',
+  'Multiple Items': 'MULTIPLE',
+}
+
 const orderTypeMap = {
   Delivery: 'DELIVERY',
   Takeaway: 'TAKEAWAY',
@@ -406,6 +422,8 @@ const reversePromotionTypeMap = Object.fromEntries(Object.entries(promotionTypeM
 
 const reverseAffectMap = Object.fromEntries(Object.entries(affectMap).map(([label, key]) => [key, label]))
 
+const reverseAffectItemsMap = Object.fromEntries(Object.entries(affectItemsMap).map(([label, key]) => [key, label]))
+
 const reverseOrderTypeMap = Object.fromEntries(Object.entries(orderTypeMap).map(([label, key]) => [key, label]))
 
 const reverseUsageTypeMap = Object.fromEntries(Object.entries(usageTypeMap).map(([label, key]) => [key, label]))
@@ -419,8 +437,9 @@ const formData = ref({
   discountPercentage: null,
   fixedPrice: null,
   affect: '',
+  affectItems: '',
   codeType: 'SINGLE',
-  codes: [],
+  codes: '',
   startFrom: 1,
   endAt: 10,
   codePrefix: '',
@@ -434,6 +453,7 @@ const formData = ref({
   orderType: [],
   deliveryZones: [],
   availableAtCC: false,
+  availableAtWeb: false,
   affectOffers: false,
   minimumOrder: null,
   takeQuantity: null,
@@ -453,6 +473,7 @@ const resetForm = () => {
     discountPercentage: null,
     fixedPrice: null,
     affect: '',
+    affectItems: '',
     codeType: 'SINGLE',
     quantity: 1,
     prefix: '',
@@ -464,12 +485,17 @@ const resetForm = () => {
     orderType: [],
     deliveryZones: [],
     availableAtCC: false,
+    availableAtWeb: false,
     affectOffers: false,
     minimumOrder: null,
     takeQuantity: null,
     payQuantity: null,
     unitPrice: null,
     assetId: '',
+    codes: '',
+    startFrom: null,
+    endAt: null,
+    codePrefix: '',
     isActive: true,
   }
 }
@@ -487,6 +513,7 @@ const promotionTypes = ['Value Discount', 'Percentage Discount', 'Fixed Price', 
 
 const usageTypes = ['Single Use', 'Unlimited']
 const affectOptions = ['Entire Order', 'Selected Items']
+const affectItemsOptions = ['Single Item', 'Multiple Items']
 const orderTypes = ['Delivery', 'Takeaway', 'Dine-in']
 
 const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -523,6 +550,18 @@ watch(
   },
 )
 
+watch(
+  () => [formData.value.affect, formData.value.promotionType],
+  ([affect, promotionType]) => {
+    if (
+      affect !== 'Selected Items' ||
+      !['Value Discount', 'Percentage Discount'].includes(promotionType)
+    ) {
+      formData.value.affectItems = ''
+    }
+  }
+)
+
 function populateFormData(promotion) {
   // Parse timeRange "HH:MM - HH:MM"
   let startTime = ''
@@ -533,6 +572,11 @@ function populateFormData(promotion) {
     endTime = end || ''
   }
 
+
+  console.log('[populateFormData] Input Promotion:', JSON.stringify(promotion, null, 2))
+  console.log('[populateFormData] menuItem raw:', promotion.menuItem)
+  console.log('[populateFormData] option raw:', promotion.option)
+
   formData.value = {
     _id: promotion._id || '',
     name: promotion.name || '',
@@ -542,6 +586,7 @@ function populateFormData(promotion) {
     discountPercentage: promotion.discountPercentage ?? promotion.discountPercentage ?? null,
     fixedPrice: promotion.fixedPrice ?? null,
     affect: reverseAffectMap[promotion.affect] || '',
+    affectItems: reverseAffectItemsMap[promotion.affectItems] || '',
     codeType: promotion.automatic ? 'AUTO' : promotion.quantity > 1 ? 'MULTI' : 'SINGLE',
     quantity: promotion.codeType === 'MULTI' ? promotion.quantity : 1,
     prefix: promotion.codeType === 'MULTI' ? promotion.prefix || '' : '',
@@ -552,18 +597,27 @@ function populateFormData(promotion) {
     days: Array.isArray(promotion.validDays) ? promotion.validDays.map((num) => numToDay[num]) : [],
     orderType: Array.isArray(promotion.orderTypes) ? promotion.orderTypes.map((type) => reverseOrderTypeMap[type]) : [],
     deliveryZones: (Array.isArray(promotion.deliveryZoneId) ? promotion.deliveryZoneId : [])
-      .map((id) => props.deliveryZones.find((z) => z.value === id))
+      .map((id: any) => props.deliveryZones.find((z: any) => z.value === id))
       .filter(Boolean),
     availableAtCC: !!promotion.availableAtCC,
+    availableAtWeb: !!promotion.availableAtWeb,
     affectOffers: !!promotion.availableWithOffers,
     minimumOrder: promotion.minimumOrder ?? null,
     takeQuantity: promotion.takeQuantity || null,
     payQuantity: promotion.payQuantity || null,
     unitPrice: promotion.txpy?.unitPrice ?? null,
     assetId: promotion.assetId || '',
-    codes: promotion.codes || [],
+    codes: (promotion.codes || []).join('\n'),
+    startFrom: null,
+    endAt: null,
+    codePrefix: '',
     isActive: promotion.isActive ?? true,
   }
+  promotionsArticles.value = (promotion.menuItem || []).map((i) => (typeof i === 'object' ? i._id : i))
+  promotionOptions.value = (promotion.option || []).map((i) => (typeof i === 'object' ? i._id : i))
+  
+  console.log('[populateFormData] Mapped promotionsArticles:', promotionsArticles.value)
+  console.log('[populateFormData] Mapped promotionOptions:', promotionOptions.value)
 }
 
 watch(
@@ -677,17 +731,15 @@ const getDeliveryZones = async () => {
   }
 }
 
-const toInputDate = (val: string) => {
-  if (!val) return ''
-  const d = new Date(val)
-  return isNaN(d.getTime()) ? val : d.toISOString().slice(0, 10)
-}
+
 const submit = async () => {
   if (!validate()) {
     return
   }
 
   const raw = { ...formData.value }
+  const pType = promotionTypeMap[raw.promotionType]
+
   const data: any = {
     name: raw.name,
     isActive: raw.isActive,
@@ -698,15 +750,12 @@ const submit = async () => {
     quantity: raw.codeType === 'MULTI' ? raw.quantity : 1,
     prefix: raw.codeType === 'MULTI' ? raw.prefix : '',
     availableAtCC: raw.availableAtCC,
+    availableAtWeb: raw.availableAtWeb,
     availableWithOffers: raw.affectOffers,
     minimumOrder: raw.minimumOrder,
-    takeQuantity: raw.takeQuantity,
-    payQuantity: raw.payQuantity,
-    txpy: {
-      unitPrice: raw.unitPrice,
-    },
-    promotionType: promotionTypeMap[raw.promotionType],
+    promotionType: pType,
     affect: affectMap[raw.affect],
+    affectItems: affectItemsMap[raw.affectItems],
     usage: usageTypeMap[raw.usageType],
     orderTypes: (raw.orderType || []).map((t) => orderTypeMap[t]),
     dateRange: {
@@ -721,19 +770,24 @@ const submit = async () => {
     deliveryZoneId: (raw.deliveryZones || [])
       .map((z) => (typeof z === 'object' ? z.value : z))
       .filter((id) => id && id !== 'string'),
-    createdBy: servicesStore.currentUser?._id || '65edc27fa8c3e330d7db0a23',
+    createdBy: (servicesStore as any).currentUser?._id || '65edc27fa8c3e330d7db0a23',
     outletId: servicesStore.selectedRest,
-    menuItem: articles.value
-      .filter((a) => a.selected)
-      .map((a) => a._id)
-      .filter((id) => id && id !== 'string'),
-    option: [],
+    menuItem: promotionsArticles.value,
+    option: promotionOptions.value,
+  }
+
+  if (pType === 'TAKE_X_PAY_Y') {
+    data.takeQuantity = raw.takeQuantity
+    data.payQuantity = raw.payQuantity
+    data.txpy = {
+      unitPrice: raw.unitPrice,
+    }
   }
 
   if (raw.codeType === 'SINGLE') {
     const codeList = Array.isArray(raw.codes)
       ? raw.codes
-      : raw.codes
+      : (raw.codes as string)
           .split('\n')
           .map((c) => c.trim())
           .filter(Boolean)
@@ -771,15 +825,10 @@ const submit = async () => {
     delete data._id
   }
 
-  // Collect selected menu items
-  const selectedMenuItems = articles.value.filter((a) => a.selected).map((a) => a._id)
 
-  data.menuItem = selectedMenuItems
 
   try {
     if (data._id) {
-      delete data.menuItem
-      delete data.option
       delete data.codes
       await updatePromotion(data._id, data)
       init({ message: 'Promotion updated successfully!', color: 'success' })

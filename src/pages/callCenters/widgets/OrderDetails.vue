@@ -48,7 +48,6 @@
           :max-rows="4"
           class="block !h-auto"
           style="width: calc(100% - 32px);"
-          @input="autoGrow"
         />
       </div>
 
@@ -240,7 +239,7 @@
             <div class="flex justify-between font-bold text-xs pt-1 border-t">
               <span v-if="orderStore.editOrder">
                 Total
-                <span class="text-green-600"> · PAID €{{ orderStore.editOrder.editOrderTotal.toFixed(2) }}</span>
+                <span class="text-green-600"> · PAID €{{ (orderStore.editOrder.editOrderTotal || 0).toFixed(2) }}</span>
               </span>
               <span v-else>Total</span>
               <span v-if="orderStore.editOrder">€{{ getTotalPrice }}</span>
@@ -269,7 +268,7 @@
             <div class="flex justify-between font-bold text-xs pt-1 border-t">
               <span v-if="orderStore.editOrder">
                 Total
-                <span class="text-green-600"> · PAID €{{ orderStore.editOrder.editOrderTotal.toFixed(2) }}</span>
+                <span class="text-green-600"> · PAID €{{ (orderStore.editOrder.editOrderTotal || 0).toFixed(2) }}</span>
               </span>
               <span v-else>Total</span>
               <span v-if="orderStore.editOrder">€{{ getTotalPrice }}</span>
@@ -344,7 +343,7 @@
 </template>
 
 <script setup>
-import { ref, computed, useTemplateRef } from 'vue'
+import { ref, computed, useTemplateRef, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useOrderStore } from '@/stores/order-store'
 import { useServiceStore } from '@/stores/services.ts'
@@ -381,6 +380,7 @@ const formattedLabel = (sel) => {
   const totalPrice = sel.price * sel.quantity
   return totalPrice > 0 ? `${sel.name} (+€${totalPrice.toFixed(2)})` : sel.name
 }
+
 function isBetween11to23(dt) {
   // 11:00 inclusive, 23:00 exclusive
   const mins = dt.getHours() * 60 + dt.getMinutes()
@@ -407,10 +407,32 @@ const promoOriginalItems = computed(() => {
 
 const promoOriginalOffers = computed(() => {
   const v = promoTotal.value
-  if (!v?.offerDetails?.length) return 0
-  const n = v.offerDetails.reduce((sum, o) => sum + Number(o.basePrice || 0), 0)
+  if (!v) return 0
+
+  // If originalTotal is present, use it to derive offers total so Subtotal matches exactly
+  if (v.originalTotal !== undefined) {
+    return Number((v.originalTotal - promoOriginalItems.value).toFixed(2))
+  }
+
+  if (!v.offerDetails?.length) return 0
+  const n = v.offerDetails.reduce((sum, o) => sum + Number(o.totalPrice || 0), 0)
   return Number(n.toFixed(2))
 })
+
+watch(
+  [cartItems, offerItems],
+  async (newVal, oldVal) => {
+    // If no promo is applied, skip
+    if (!isPromoValid.value || !promoCode.value.trim()) return
+
+    // Avoid running before state fully settles (e.g. quantity buttons)
+    await nextTick()
+
+    // Re-apply the promo (will re-call the validation API)
+    applyPromoCode()
+  },
+  { deep: true } // watch nested changes in arrays/objects
+)
 
 const itemsAfterPromos = computed(() => {
   const v = promoTotal.value
@@ -581,6 +603,7 @@ const offersItems = computed(() =>
       total: totalPrice * item.quantity,
       fullItem: { ...item, offerId: item.offerId },
       // fullItem: item,
+      __storeIndex: index,
     }
   }),
 )
@@ -693,10 +716,11 @@ const promoOfferItemPrice = (item) => {
   // Determine which occurrence THIS UI item is among same-offer items
   let seen = 0
   let occ = 0
-  for (const it of orderStore.offerItems) {
+  for (let i = 0; i < orderStore.offerItems.length; i++) {
+    const it = orderStore.offerItems[i]
     const itOfferId = it.offerId || (it.fullItem && it.fullItem.offerId)
     if (itOfferId === offerId) {
-      if (it === item) { occ = seen; break }
+      if (i === item.__storeIndex) { occ = seen; break }
       seen++
     }
   }
@@ -791,9 +815,77 @@ async function openPromotionModal() {
     init({ message: 'Invalid or expired promotion code.', color: 'danger' })
   }
 }
+function parseCodes(raw) {
+  const tokens = (raw || '')
+    .split(/[\s,;\n\r]+/g)
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  const seen = new Set()
+  const out = []
+  for (const t of tokens) {
+    const k = t.toLowerCase()
+    if (!seen.has(k)) { seen.add(k); out.push(t) }
+  }
+  return out
+}
+
+// Build payload identical to the modal (keys + types)
+function buildPromoPayloadFromState(promoCodes) {
+  const menuItems = orderStore.cartItems.map((e) => ({
+    menuItem: e.itemId,
+    quantity: e.quantity,
+    options: e.selectedOptions.flatMap((group) =>
+      group.selected.map((option) => ({
+        option: option.optionId,
+        quantity: option.quantity,
+      })),
+    ),
+  }))
+
+  const offerMenuItems = orderStore.offerItems.map((offer) => ({
+    offerId: offer.offerId,
+    menuItems: offer.selections.flatMap((selection) =>
+      selection.addedItems.map((item) => ({
+        menuItem: item.itemId,
+        quantity: item.quantity || 1,
+        options:
+          (item.selectedOptions || []).flatMap((group) =>
+            group.selected.map((option) => ({
+              option: option.optionId,
+              quantity: option.quantity,
+            })),
+          ),
+      })),
+    ),
+  }))
+
+  const single = promoCodes.length === 1 ? promoCodes[0] : null
+
+  const payload = {
+    orderFor: orderFor.value,
+    customerDetailId: props.customerDetailsId,
+    orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
+    deliveryZoneId: orderStore.deliveryZone?._id,
+    address: orderStore.address,
+    menuItems,
+    offerMenuItems,
+    orderNotes: orderStore.orderNotes || '',
+    deliveryFee: props.deliveryFee,
+    outletId: serviceStore.selectedRest,
+    orderDateTime: new Date(props.dateSelected).toISOString(),
+    paymentMode: '',
+    promoCodes: promoCodes,                 // array (no empty strings)
+    hasOtherOffers: offerMenuItems.length,  // number (not boolean)
+  }
+
+  if (single) payload.promoCode = single
+  return payload
+}
 
 async function applyPromoCode() {
-  if (!promoCode.value) {
+  const codes = parseCodes(promoCode.value)
+  if (!codes.length) {
     init({ message: 'Please enter a promotion code.', color: 'warning' })
     return
   }
@@ -810,69 +902,29 @@ async function applyPromoCode() {
     return
   }
 
-  let menuItems = []
-  menuItems = orderStore.cartItems.map((e) => {
-    return {
-      menuItem: e.itemId,
-      quantity: e.quantity,
-      options: e.selectedOptions.flatMap((group) =>
-        group.selected.map((option) => ({
-          option: option.optionId,
-          quantity: option.quantity,
-        })),
-      ),
-    }
-  })
-
-  const offerMenuItems = orderStore.offerItems.map((offer) => ({
-    offerId: offer.offerId,
-    menuItems: offer.selections.flatMap((selection) =>
-      selection.addedItems.map((item) => ({
-        menuItem: item.itemId,
-        quantity: item.quantity || 1,
-        options:
-          item.selectedOptions?.flatMap((group) =>
-            group.selected.map((option) => ({
-              option: option.optionId,
-              quantity: option.quantity,
-            })),
-          ) || [],
-      })),
-    ),
-  }))
-
   try {
-    const payload = {
-      orderFor: orderFor.value,
-      customerDetailId: props.customerDetailsId,
-      orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
-      deliveryZoneId: orderStore.deliveryZone?._id,
-      address: orderStore.address,
-      menuItems,
-      offerMenuItems,
-      orderNotes: orderStore.orderNotes || '', 
-      deliveryFee: props.deliveryFee,
-      outletId: serviceStore.selectedRest,
-      orderDateTime: new Date(props.dateSelected).toISOString(),
-      paymentMode: '',
-      promoCode: promoCode.value || '',
-      hasOtherOffers: offerMenuItems.length,
-    }
-
+    const payload = buildPromoPayloadFromState(codes)
     const response = await orderStore.validatePromoCode(payload)
 
-    if (response.data.success) {
-      init({ message: `PromoCode selected`, color: 'success' })
+    if (response.data && response.data.success) {
       orderStore.setOrderTotal(response.data.data)
       isPromoValid.value = true
+      // ✅ keep the input readable and in sync
+      promoCode.value = codes.join(', ')
+      init({ message: `PromoCode${codes.length > 1 ? 's' : ''} selected`, color: 'success' })
     } else {
       orderStore.setOrderTotal(null)
-      init({ message: `PromoCode invalid`, color: 'danger' })
+      isPromoValid.value = false
+      init({ message: (response.data && response.data.message) || 'PromoCode invalid', color: 'danger' })
     }
   } catch (err) {
-    init({ message: `PromoCode invalid`, color: 'danger' })
+    orderStore.setOrderTotal(null)
+    isPromoValid.value = false
+    init({ message: (err && err.response && err.response.data && err.response.data.message) || 'PromoCode invalid', color: 'danger' })
   }
 }
+
+
 
 function clearPromoCode() {
   promoCode.value = ''
@@ -882,6 +934,8 @@ function clearPromoCode() {
   }
   orderStore.setOrderTotal(null)
 }
+
+
 
 const getMenuOptions = async (selectedItem) => {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -910,6 +964,26 @@ const getMenuOptions = async (selectedItem) => {
     isLoading.value = false
   }
 }
+
+const isFutureTimeValid = () => {
+  if (orderFor.value !== 'future') return true // only validate future orders
+  if (!props.dateSelected) return false
+
+  const dateTime = new Date(props.dateSelected)
+  const hour = dateTime.getHours()
+  const minute = dateTime.getMinutes()
+
+  // Only validate the **time** part
+  // Valid time: 11:00 to 23:00 (inclusive)
+  if (hour < 11 || hour > 23 || (hour === 23 && minute > 0)) {
+    return false
+  }
+
+  return true
+}
+
+const futureTimeError = ref(false)
+
 
 const getOfferItems = async (selectedItem) => {
   selectedItemWithArticlesOptionsGroups.value = selectedItem

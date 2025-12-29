@@ -1,28 +1,23 @@
 <template>
   <div>
-    <div class="rounded bg-white p-4 w-full mt-4">
-      <VaTabs v-model="activeTab" grow>
-        <template #tabs>
-          <VaTab label="Option Groups" />
-          <VaTab label="Options" />
-        </template>
-        <RouterView></RouterView>
-      </VaTabs>
+    <div class="rounded bg-white w-full mt-4">
+
+      <!-- Display Tab Content -->
+      <RouterView />
     </div>
   </div>
 </template>
+
 <script>
 export default {
   name: 'ArticlesOptionsPage',
-  components: {},
-
   data() {
     return {
       activeTab: 1,
     }
   },
   watch: {
-    activeTab: function () {
+    activeTab() {
       if (this.activeTab === 0 && this.$route.name !== 'articlesOptionsGroups') {
         this.$router.push({ name: 'articlesOptionsGroups' })
       } else if (this.activeTab === 1 && this.$route.name !== 'articlesOptionsList') {
@@ -37,19 +32,34 @@ export default {
       this.activeTab = 1
     }
   },
-  methods: {},
 }
 </script>
+
 <style scoped>
-::v-deep(.va-tabs__wrapper) {
-  box-shadow: none !important;
+/* Modern pill-style tab buttons only */
+.tab-btn {
+  padding: 0.4rem 1.2rem;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-color: rgb(233, 237, 241);
+  color: #475569;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease-in-out;
+  min-width: 200px;
+  text-align: center;
+  font-size: 15px;
 }
 
-::v-deep(.va-tab__label) {
-  font-size: 17px;
+.tab-btn:hover {
+  background-color: rgba(221, 227, 235, 0.9);
+  color: #0f172a;
 }
 
-::v-deep(.va-tab--active .va-tab__label) {
-  font-size: 18px;
+.tab-btn.active {
+  background-color: #2563eb;
+  color: white;
+  border-color: #2563eb;
+  font-weight: 600;
 }
 </style>
