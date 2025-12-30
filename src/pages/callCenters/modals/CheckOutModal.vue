@@ -239,7 +239,7 @@
             </button>
             <button
               id="confirmBtn"
-              :disabled="apiLoading || !selectedPayment || (selectedPayment?.name?.toLowerCase() === 'cash' && (!selectedCashAmount || changeAmount < 0))"
+              :disabled="apiLoading || !selectedPayment"
               class="btn btn-primary"
               @click="orderStore.editOrder ? updateOrder() : createOrder()"
             >
