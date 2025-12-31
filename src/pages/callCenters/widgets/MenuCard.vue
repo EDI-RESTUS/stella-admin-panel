@@ -1,5 +1,9 @@
 <template>
-  <div class="menu-item" @click="getMenuOptions">
+  <div 
+    class="menu-item" 
+    :class="{ 'out-of-stock': isOutOfStock }"
+    @click="isOutOfStock ? null : getMenuOptions()"
+  >
     <div class="item-content" :class="{ 'no-price': !parseFloat(item.price) }">
       <div class="item-name">{{ item.name }}</div>
       <div v-if="parseFloat(item.price)" class="item-price">€{{ parseFloat(item.price).toFixed(2) }}</div>
@@ -21,7 +25,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import MenuModal from '../modals/MenuModal.vue'
 import axios from 'axios'
 import { useToast } from 'vuestic-ui'
@@ -38,6 +42,10 @@ const itemWithArticlesOptionsGroups = ref({})
 const orderStore = useOrderStore()
 
 const { init } = useToast()
+
+const isOutOfStock = computed(() => {
+  return props.item?.name?.toUpperCase().includes('OUT OF STOCK')
+})
 
 function addToBasket(item) {
   const productEntry = {
@@ -152,5 +160,16 @@ function closeMenuModal() {
   font-size: 16px;
   font-weight: 700;
   color: #2d5d2a;
+}
+
+.out-of-stock {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+.out-of-stock:hover {
+  box-shadow: none;
+  border-color: #e2e8f0;
 }
 </style>

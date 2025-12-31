@@ -78,6 +78,7 @@ const updateArticleDirectly = (payload) => {
   if (!payload.assetId) {
     delete data.assetId
   }
+  
   const url: any = import.meta.env.VITE_API_BASE_URL
   console.log('🔍 Sending PATCH request with isActive:', data.isActive, 'Full data:', data)
   axios
