@@ -100,8 +100,9 @@
                 :class="{
                   'border-gray-700 bg-[#f8f9fa] border-2': isChecked(group, option._id),
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option._id),
+                  'out-of-stock': option.name?.toUpperCase().includes('OUT OF STOCK')
                 }"
-                @click="updateSingleChoice(group, option)"
+                @click="option.name?.toUpperCase().includes('OUT OF STOCK') ? null : updateSingleChoice(group, option)"
               >
                 <div v-if="option.imageUrl" class="item-image">
                   <img
@@ -137,8 +138,9 @@
                 :class="{
                   'border-gray-700 bg-[#f8f9fa] border-2': isChecked(group, option._id),
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option._id),
+                  'out-of-stock': option.name?.toUpperCase().includes('OUT OF STOCK')
                 }"
-                @click.prevent="toggleMultipleChoiceNoQty(group, option)"
+                @click.prevent="option.name?.toUpperCase().includes('OUT OF STOCK') ? null : toggleMultipleChoiceNoQty(group, option)"
               >
                 <div v-if="option.imageUrl" class="item-image">
                   <img
@@ -172,11 +174,12 @@
                 v-if="group.multipleChoice"
                 :key="option._id"
                 class="w-[200px] h-[80px] relative flex flex-col justify-between border rounded-xl transition hover:shadow-sm cursor-pointer"
-                :class="
+                :class="[
                   getQty(group._id, option._id) > 0
                     ? 'border-gray-700 bg-[#f8f9fa] border-2'
-                    : 'border-gray-200 hover:border-gray-700 hover:border-2'
-                "
+                    : 'border-gray-200 hover:border-gray-700 hover:border-2',
+                  option.name?.toUpperCase().includes('OUT OF STOCK') ? 'out-of-stock' : ''
+                ]"
               >
                 <div class="flex items-start gap-1">
                   <div v-if="option.imageUrl" class="image-wrapper">
@@ -208,7 +211,7 @@
 
                   <button
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
-                    :disabled="getQty(group._id, option._id) === 0"
+                    :disabled="getQty(group._id, option._id) === 0 || option.name?.toUpperCase().includes('OUT OF STOCK')"
                     @click="() => updateMultipleChoice(group, option, getQty(group._id, option._id) - 1)"
                   >
                     -
@@ -218,10 +221,12 @@
                     :title="
                       getQty(group._id, option._id) >= (option.maximumChoices || group.maximumChoices || 99)
                         ? 'Max quantity reached'
+                        : option.name?.toUpperCase().includes('OUT OF STOCK')
+                        ? 'Out of stock'
                         : ''
                     "
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
-                    :disabled="getQty(group._id, option._id) >= (option.maximumChoices || group.maximumChoices || 99)"
+                    :disabled="getQty(group._id, option._id) >= (option.maximumChoices || group.maximumChoices || 99) || option.name?.toUpperCase().includes('OUT OF STOCK')"
                     @click="() => updateMultipleChoice(group, option, getQty(group._id, option._id) + 1)"
                   >
                     +
@@ -695,5 +700,16 @@ onMounted(() => {
   height: 100%;
   object-fit: cover; /* fills the area without distortion */
   display: block;
+}
+
+.out-of-stock {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+.out-of-stock:hover {
+  border-color: #e9ecef !important;
+  background: white !important;
 }
 </style>

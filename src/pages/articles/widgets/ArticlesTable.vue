@@ -896,11 +896,14 @@ function openFileModal(data) {
           <div class="flex justify-center items-center">
             <label class="relative inline-block w-9 h-5 cursor-pointer">
               <input
-                v-model="rowData.isActive"
+                :checked="rowData.isActive"
                 type="checkbox"
                 class="sr-only"
                 @change="
-                  emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value })
+                  (e) => {
+                    console.log('🎯 Toggle clicked! e.target.checked =', e.target.checked, 'rowData.isActive =', rowData.isActive);
+                    emits('updateArticle', { ...rowData, isActive: e.target.checked, searchQuery: searchQuery.value, page: currentPage.value });
+                  }
                 "
               />
               <!-- Track -->

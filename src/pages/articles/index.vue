@@ -65,7 +65,7 @@ const updateArticleModal = (payload) => {
 
 const updateArticleDirectly = (payload) => {
   const item = originalItems.value.find((e) => e._id === payload._id)
-  const data = payload
+  const data = { ...payload }
   data.outletId = serviceStore.selectedRest
   delete data.createdAt
   delete data.updatedAt
@@ -76,9 +76,11 @@ const updateArticleDirectly = (payload) => {
     delete data.code
   }
   if (!payload.assetId) {
-    delete payload.assetId
+    delete data.assetId
   }
+  
   const url: any = import.meta.env.VITE_API_BASE_URL
+  console.log('🔍 Sending PATCH request with isActive:', data.isActive, 'Full data:', data)
   axios
     .patch(`${url}/menuItems/${payload._id}`, data)
     .then(() => {

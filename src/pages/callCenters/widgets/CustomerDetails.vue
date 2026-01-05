@@ -310,6 +310,7 @@
               v-model="orderStore.deliveryNotes"
               placeholder="Delivery notes e.g call on arrival, gate code, or takeaway instructions"
               autosize
+              :autofocus="false"
               :min-rows="1"
               class="block !h-auto"
               style="width: calc(100% - 32px);"
