@@ -515,10 +515,19 @@
 
               <div class="flex flex-wrap gap-1 text-xs">
                 <span
-                  v-for="addon in item.articlesOptionsGroup
-                    .flatMap((a) => a.articlesOptions)
-                    .filter((a) => a.selected) || []"
-                  :key="addon.name"
+                  v-for="addon in (() => {
+                    const seen = new Set();
+                    return item.articlesOptionsGroup
+                      .flatMap((a) => a.articlesOptions)
+                      .filter((a) => {
+                        if (!a.selected) return false;
+                        const key = a._id || a.optionId || a.name;
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                      });
+                  })()"
+                  :key="addon._id || addon.optionId || addon.name"
                   class="px-2 py-0.5 rounded-full"
                   :class="{
                     'bg-green-100 text-green-700': addon.type.toLowerCase() === 'extra',
@@ -1367,8 +1376,10 @@ const fetchOrders = async () => {
   const menuItems = useMenuStore()
   const orderStore = useOrderStore()
   try {
+    // Use MobilePhone or phoneNo as fallback since customer object may have either
+    const phone = props.customer?.MobilePhone || props.customer?.Phone || props.customer?.phoneNo || ''
     const res = await axios.get(
-      `${url}/orders/history?phone=${props.customer?.Phone}&page=1&limit=500&from=2025-01-01&status=Completed`,
+      `${url}/orders/history?phone=${phone}&page=1&limit=500&from=2025-01-01&status=Completed`,
     )
     if (res.data?.status === 'Success') {
       orders.value = res.data.data.items.map((order) => {
@@ -1422,13 +1433,28 @@ const getTheEmployeeName = (employeeId) => {
   return [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username
 }
 const getTotalPrice = (item) => {
-  const hasOpts = !!(item.articlesOptionsGroup?.flatMap((a) => a.articlesOptions).filter((a) => a.selected).length)
-  if (!hasOpts) return Number(item.price || 0).toFixed(2)
-  const extra = item.articlesOptionsGroup
-    .flatMap((a) => a.articlesOptions)
-    .filter((a) => a.selected)
-    .reduce((sum, opt) => sum + (Number(opt.price) || 0), 0)
-  return (Number(item.price || 0) + extra).toFixed(2)
+  // Use unitPrice if available (contains the correct total from API)
+  if (item.unitPrice != null && item.unitPrice > 0) {
+    return Number(item.unitPrice).toFixed(2)
+  }
+  
+  // Otherwise calculate from base price + unique options
+  const basePrice = Number(item.price || 0)
+  
+  // Deduplicate options before summing prices
+  const seen = new Set()
+  const uniqueOptions = item.articlesOptionsGroup
+    ?.flatMap((a) => a.articlesOptions)
+    .filter((a) => {
+      if (!a.selected) return false
+      const key = a._id || a.optionId || a.name
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    }) || []
+  
+  const optionsTotal = uniqueOptions.reduce((sum, opt) => sum + (Number(opt.price) || 0), 0)
+  return (basePrice + optionsTotal).toFixed(2)
 }
 
 // ---------- Period stats ----------
