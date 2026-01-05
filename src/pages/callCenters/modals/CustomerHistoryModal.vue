@@ -1161,6 +1161,17 @@ const getPromoForOrder = (order) => {
 
   // If we only have a percent, derive value from the totals
   let discountValue = discountValueRaw
+  
+  // Fix: If stored discount value matches the percentage (e.g. 10 and 10%) but subtotal math disagrees,
+  // it means the DB stored the percentage in the amount field. Recalculate it.
+  if (discountPercentRaw > 0) {
+    const calculated = (toNum(order.subtotal) * discountPercentRaw) / 100
+    // If raw value ~ percentage ID but calculated is different (allow small error margin)
+    if (Math.abs(discountValueRaw - discountPercentRaw) < 0.01 && Math.abs(discountValueRaw - calculated) > 0.05) {
+        discountValue = calculated
+    }
+  }
+
   if (discountValue <= 0 && discountPercentRaw > 0) {
     const gap = toNum(order.subtotal) + toNum(order.deliveryFee) - toNum(order.total)
     if (gap > 0) discountValue = gap
@@ -1173,7 +1184,7 @@ const getPromoForOrder = (order) => {
   const parts = []
   if (typeName) parts.push(typeName)
   if (discountValue > 0) parts.push(eur.format(discountValue))
-  if (discountPercentRaw > 0) parts.push(`${discountPercentRaw}%`)
+  if (discountPercentRaw > 0) parts.push(`${Number(discountPercentRaw).toFixed(2)}%`)
 
   if (!parts.length) return null
 
@@ -1398,18 +1409,47 @@ const fetchOrders = async () => {
 
         const detailedItems = (order.menuItems || []).map((item) => {
           const menuItem = menuItems.unFilteredMenuItems.find((mi) => mi._id === item.menuItem)
+
+          // 1. Create a pool of option quantities (normalized to per-unit if item.quantity > 1)
+          const optionCounts = new Map()
+          if (item.options && item.options.length) {
+            item.options.forEach((o) => {
+              const qty = Number(o.quantity || 1)
+              const unitQ = (item.quantity && item.quantity > 1) ? Math.floor(qty / item.quantity) : qty
+              if (unitQ > 0) {
+                optionCounts.set(o.option, (optionCounts.get(o.option) || 0) + unitQ)
+              }
+            })
+          }
+
+          const mappedGroups = (menuItem?.articlesOptionsGroup || []).map((group) => {
+            const limit = group.singleChoice ? 1 : (group.maximumChoices || Infinity)
+            let selectedTotalQty = 0
+
+            const options = (group.articlesOptions || []).map((opt) => {
+              const optId = opt._id
+              const available = optionCounts.get(optId) || 0
+
+              // How many we can take without exceeding group limit
+              const remainingLimit = limit - selectedTotalQty
+              const take = Math.min(available, remainingLimit)
+
+              if (take > 0) {
+                optionCounts.set(optId, available - take)
+                selectedTotalQty += take
+                const historyDetails = (item.options || []).find((o) => o.option === optId)
+                return { ...opt, ...historyDetails, selected: true, quantity: take }
+              }
+              return { ...opt, selected: false }
+            })
+            return { ...group, articlesOptions: options }
+          })
+
           return {
             ...item,
             menuItem: menuItem ? menuItem.name : 'Unknown Item',
             ...menuItem,
-            articlesOptionsGroup: (menuItem?.articlesOptionsGroup || []).map((group) => ({
-              ...group,
-              articlesOptions:
-                (group.articlesOptions || []).map((opt) => {
-                  const optionDetails = (item.options || []).find((o) => o.option === opt._id)
-                  return { ...opt, ...optionDetails, selected: !!optionDetails }
-                }),
-            })),
+            articlesOptionsGroup: mappedGroups,
           }
         })
 
@@ -1510,18 +1550,38 @@ const repeatOrder = async (orderId) => {
          })
     }
 
-    const freshSelectedOptions = (freshItem.articlesOptionsGroup || [])
-      .map((group) => {
+    const freshSelectedOptions = (freshItem.articlesOptionsGroup || []).map((group) => {
+        const limit = group.singleChoice ? 1 : (group.maximumChoices || Infinity)
+        let groupSelectedQty = 0
+
         const selected = (group.articlesOptions || [])
-          .filter((opt) => histOptionMap.has(opt._id)) // Only pick options that were selected in history
-          .map((opt) => ({
-            ...opt,
-            optionId: opt._id,
-            optionName: opt.name,
-            price: parseFloat(opt.price) || 0, // USE FRESH PRICE
-            type: opt.type,
-            quantity: histOptionMap.get(opt._id) || 1, // Use historical quantity
-          }))
+          .map((opt) => {
+             // Check if this option is in our historical map
+             if (!histOptionMap.has(opt._id)) return null
+
+             const available = histOptionMap.get(opt._id)
+             if (available <= 0) return null
+
+             // Calculate how many we can take for this group
+             const remainingLimit = limit - groupSelectedQty
+             const take = Math.min(available, remainingLimit)
+
+             if (take <= 0) return null
+
+             // Consume from map
+             histOptionMap.set(opt._id, available - take)
+             groupSelectedQty += take
+
+             return {
+                ...opt,
+                optionId: opt._id,
+                optionName: opt.name,
+                price: parseFloat(opt.price) || 0, // USE FRESH PRICE
+                type: opt.type,
+                quantity: take, // Use consumed quantity
+             }
+          })
+          .filter(Boolean)
 
         if (!selected.length) return null
         return {
