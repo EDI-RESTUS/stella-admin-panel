@@ -395,6 +395,17 @@ watch(phoneNumber, (val) => {
   orderStore.setPhoneNumber(val)
 })
 
+// Nuclear option: forcefully prevent notes from being set in takeaway mode
+watch(
+  () => orderStore.deliveryNotes,
+  (newVal) => {
+    if (selectedTab.value === 'takeaway' && newVal) {
+      // Immediately clear notes if they're set in takeaway mode
+      orderStore.deliveryNotes = ''
+    }
+  }
+)
+
 watch(selectedAddress, (val) => {
   // Only update notes for delivery, not takeaway
   if (selectedTab.value === 'delivery' && val && val.deliveryNote) {
@@ -897,11 +908,20 @@ function selectUser(user) {
         : [],
   }
 
+
   userResults.value = []
     prefillNotesFromUser(selectedUser.value)
 
   // Auto-select location if phone number is 1-15
   autoSelectLocationForShortPhone()
+
+  // Forcefully clear notes in takeaway mode after all watchers have run
+  if (selectedTab.value === 'takeaway') {
+    // Use nextTick to ensure this runs after all reactive updates
+    setTimeout(() => {
+      orderStore.deliveryNotes = ''
+    }, 0)
+  }
 }
 
 // Auto-select location when phone number is 1-15 based on customer name
@@ -1122,7 +1142,8 @@ const filteredAddresses = computed(() => {
 watch(
   () => selectedZoneDetails.value,
   (newVal, oldVal) => {
-    if (newVal && oldVal && !selectedAddress.value) {
+    // Only auto-select address for delivery, not takeaway
+    if (newVal && oldVal && !selectedAddress.value && selectedTab.value === 'delivery') {
       selectedAddress.value = filteredAddresses.value.length ? filteredAddresses.value[0] : ''
     }
   },
@@ -1153,6 +1174,11 @@ watch(
     serviceZoneId.value = ''
     selectedZoneDetails.value = null
     selectedAddress.value = null
+
+    // Clear delivery notes when switching to takeaway mode
+    if (selectedTab.value === 'takeaway') {
+      orderStore.deliveryNotes = ''
+    }
 
     if (selectedUser.value) {
       handleDeliveryZoneFetch()
