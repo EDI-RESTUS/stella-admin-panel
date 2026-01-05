@@ -396,10 +396,9 @@ watch(phoneNumber, (val) => {
 })
 
 watch(selectedAddress, (val) => {
-  if (val && val.deliveryNote) {
+  // Only update notes for delivery, not takeaway
+  if (selectedTab.value === 'delivery' && val && val.deliveryNote) {
     orderStore.deliveryNotes = val.deliveryNote
-  } else {
-    orderStore.deliveryNotes = ''
   }
 })
 
@@ -447,6 +446,7 @@ function clearCustomerDetails() {
   serviceZoneId.value = ''
   selectedZoneDetails.value = null
   showDeliveryDropdown.value = false
+  orderStore.deliveryNotes = ''
   emits('setCustomerDetailsId', '')
   emits('setDeliveryZone', false)
   emits('setOrderType', '')
@@ -1169,8 +1169,10 @@ watch(
       const currentText = newAddress.text
       const fullAddress = newAddress.fullAddress
 
-      // Update delivery notes from the selected address
-      orderStore.deliveryNotes = newAddress.deliveryNote || ''
+      // Update delivery notes from the selected address (only for delivery, not takeaway)
+      if (selectedTab.value === 'delivery') {
+        orderStore.deliveryNotes = newAddress.deliveryNote || ''
+      }
 
       // Always fetch fresh delivery zones to ensure latest data
       await handleDeliveryZoneFetch()
@@ -1273,6 +1275,7 @@ watch(
     selectedDate.value = new Date()
     showCustomerModal.value = false
     deliveryZoneOptions.value = []
+    orderStore.deliveryNotes = ''
   },
 )
 
