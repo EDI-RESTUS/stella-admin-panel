@@ -1002,6 +1002,11 @@ async function handleDeliveryZoneFetch() {
   }
 }
 function prefillNotesFromUser(user) {
+  // Only autofill notes for delivery orders, not takeaway
+  if (selectedTab.value === 'takeaway') {
+    return
+  }
+  
   const note = String(user?.customerNote || '').trim()
   if (note && !String(orderStore.deliveryNotes || '').trim()) {
     orderStore.deliveryNotes = note
