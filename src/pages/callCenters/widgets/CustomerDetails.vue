@@ -331,6 +331,7 @@
     <ConfirmRemoveCustomerDetails
       v-model="showConfirmRemove"
       @confirm="onConfirmRemove"
+      @confirm-clear-all="onConfirmClearAll"
       @close="closeConfirmRemoveModal"
     />
     <CustomerHistoryModal
@@ -466,6 +467,19 @@ function clearCustomerDetails() {
 function onConfirmRemove() {
   clearCustomerDetails()
 }
+
+function onConfirmClearAll() {
+  // Clear customer details
+  clearCustomerDetails()
+  
+  // Clear cart items and related store data
+  orderStore.cartItems = []
+  orderStore.offerItems = []
+  orderStore.cartTotal = null
+  orderStore.editOrder = null
+  orderStore.validation = null
+}
+
 function closeConfirmRemoveModal() {
   showConfirmRemove.value = false
 }

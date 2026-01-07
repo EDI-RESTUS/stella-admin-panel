@@ -15,6 +15,7 @@
       <div class="flex justify-end gap-2">
         <VaButton size="small" @click="emit('update:modelValue', false)">Cancel</VaButton>
         <VaButton color="danger" size="small" @click="onYes">Yes</VaButton>
+        <VaButton color="danger" preset="secondary" border-color="danger" size="small" @click="onYesClearAll">Yes, clear all</VaButton>
       </div>
     </template>
   </VaModal>
@@ -24,10 +25,15 @@
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
 })
-const emit = defineEmits(['update:modelValue', 'confirm'])
+const emit = defineEmits(['update:modelValue', 'confirm', 'confirm-clear-all'])
 
 function onYes() {
-  emit('confirm') // tell parent to clear
+  emit('confirm') // tell parent to clear customer only
+  emit('update:modelValue', false) // close modal
+}
+
+function onYesClearAll() {
+  emit('confirm-clear-all') // tell parent to clear customer AND items
   emit('update:modelValue', false) // close modal
 }
 </script>

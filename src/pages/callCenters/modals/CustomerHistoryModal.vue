@@ -1394,17 +1394,30 @@ const fetchOrders = async () => {
     )
     if (res.data?.status === 'Success') {
       orders.value = res.data.data.items.map((order) => {
+        // Calculate order-level discount percentage
+        const p = order.promotion || {}
+        const discountPercentRaw = toNum(first(order.discountPercentage, p.discountPercent))
+
         const detailedOfferItems = (order.offerDetails || [])
           .map((offer) => {
             const offerItem = orderStore.offers.find((a) => a._id === offer.offerId)
             if (!offerItem) return ''
             const mappedData = mapOfferDetailsToSelections(offer, offerItem)
-            return { orderOffer: offer, offerData: mappedData }
+
+            // Apply discount to offers if needed
+            let overrideUnitPrice = 0
+            if (discountPercentRaw > 0) {
+              const originalTotal = mappedData.totalPrice || 0
+              overrideUnitPrice = (originalTotal * (1 - discountPercentRaw / 100))
+            }
+
+            return { orderOffer: offer, offerData: mappedData, overrideUnitPrice }
           })
           .filter(Boolean)
           .map((offer) => ({
             ...offer.orderOffer,
             structuredOffer: { ...offer.offerData },
+            overrideUnitPrice: offer.overrideUnitPrice > 0 ? Number(offer.overrideUnitPrice).toFixed(2) : null
           }))
 
         const detailedItems = (order.menuItems || []).map((item) => {
@@ -1445,12 +1458,24 @@ const fetchOrders = async () => {
             return { ...group, articlesOptions: options }
           })
 
-          return {
+          const enrichedItem = {
             ...item,
             menuItem: menuItem ? menuItem.name : 'Unknown Item',
             ...menuItem,
             articlesOptionsGroup: mappedGroups,
+            // Ensure we don't accidentally bring in a stale overrideUnitPrice from store
+            overrideUnitPrice: null,
           }
+
+          // Calculate discounted price for this item
+          if (discountPercentRaw > 0) {
+            // Calculate local total (Original)
+            const originalTotal = Number(getTotalPrice(enrichedItem))
+            const discounted = originalTotal * (1 - discountPercentRaw / 100)
+            enrichedItem.overrideUnitPrice = discounted.toFixed(2)
+          }
+
+          return enrichedItem
         })
 
         return { ...order, menuItems: detailedItems, offerDetails: detailedOfferItems }
