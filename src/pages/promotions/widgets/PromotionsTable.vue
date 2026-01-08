@@ -30,7 +30,7 @@ const filterMode = ref(2)
 const searchQuery = ref('')
 const totalVisibleCount = computed(() => filteredItems.value.length)
 const visibleColumns = computed(() => {
-  return columns.filter(col => columnVisibility.value[col.key])
+  return columns.filter((col) => columnVisibility.value[col.key])
 })
 
 /** Map IDs in menuItem to full menu item objects */
@@ -51,9 +51,13 @@ const columnVisibility = ref({
   isActive: true,
   actions: true,
 })
-watch(columnVisibility, (val) => {
-  localStorage.setItem('promotionTableColumns', JSON.stringify(val))
-}, { deep: true })
+watch(
+  columnVisibility,
+  (val) => {
+    localStorage.setItem('promotionTableColumns', JSON.stringify(val))
+  },
+  { deep: true },
+)
 
 onMounted(() => {
   const saved = localStorage.getItem('promotionTableColumns')
@@ -71,15 +75,12 @@ function cycleFilterMode() {
 const filteredItems = computed(() => {
   const query = searchQuery.value.toLowerCase()
   return items.value
-    .filter(item => {
-      if (filterMode.value === 2) return item.isActive      // Active only
-      if (filterMode.value === 0) return !item.isActive     // Inactive only
-      return true                                           // All
+    .filter((item) => {
+      if (filterMode.value === 2) return item.isActive // Active only
+      if (filterMode.value === 0) return !item.isActive // Inactive only
+      return true // All
     })
-    .filter(item =>
-      item.name?.toLowerCase().includes(query) ||
-      item.code?.toLowerCase().includes(query)
-    )
+    .filter((item) => item.name?.toLowerCase().includes(query) || item.code?.toLowerCase().includes(query))
     .sort((a, b) => {
       const now = new Date().getTime()
       const endA = new Date(a.endDate).getTime()
@@ -260,12 +261,11 @@ async function updateData(rowData) {
     isActive: rowData.isActive,
     availableAtCC: rowData.availableAtCC,
     availableAtWeb: rowData.availableAtWeb,
-    
   }
 
   try {
     await updatePromotion(rowData._id, changedFields)
-    init({ message: "Updated successfully", color: 'success' })
+    init({ message: 'Updated successfully', color: 'success' })
     emits('getPromotions')
   } catch (err) {
     console.error('[updateData] Update error:', err?.response?.data || err)
@@ -356,64 +356,74 @@ function downloadCodeList(codes: string[], promotionName: string) {
         <div class="flex items-center gap-2 flex-shrink-0">
           <h1 class="text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight">Promotions</h1>
           <div
-            class="h-9 flex items-center px-3 text-sm font-medium rounded-xl 
-           bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+            class="h-9 flex items-center px-3 text-sm font-medium rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+          >
             {{ totalVisibleCount }}
           </div>
         </div>
 
         <!-- Search Bar -->
         <div
-          class="relative flex-1 min-w-[150px] max-w-[300px] w-full sm:w-[240px] md:w-[300px] bg-white/60 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-200">
+          class="relative flex-1 min-w-[150px] max-w-[300px] w-full sm:w-[240px] md:w-[300px] bg-white/60 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
+        >
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
-          <input v-model="searchQuery" type="text" placeholder="Search by Name or Code"
-            class="w-full pl-9 pr-3 py-2 text-sm bg-transparent focus:outline-none text-slate-700 dark:text-slate-200 rounded-xl truncate" />
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search by Name or Code"
+            class="w-full pl-9 pr-3 py-2 text-sm bg-transparent focus:outline-none text-slate-700 dark:text-slate-200 rounded-xl truncate"
+          />
         </div>
       </div>
 
       <!-- Right: Buttons -->
       <div class="flex flex-wrap gap-2 justify-end items-center flex-shrink-0">
-
         <!-- Active Only -->
         <div class="flex items-center gap-2">
-  <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Active Only</span>
-  <label class="relative inline-block w-9 h-5 cursor-pointer" @click="cycleFilterMode">
-    <!-- Track -->
-    <span
-      class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
-      :class="{
-        'bg-red-500': filterMode === 0,
-        'bg-slate-300': filterMode === 1,
-        'bg-emerald-500': filterMode === 2
-      }"
-    ></span>
-    <!-- Thumb -->
-    <span
-      class="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out"
-      :class="{
-        'translate-x-1': filterMode === 0,
-        'translate-x-2.5': filterMode === 1,
-        'translate-x-4': filterMode === 2
-      }"
-    ></span>
-  </label>
+          <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Active Only</span>
+          <label class="relative inline-block w-9 h-5 cursor-pointer" @click="cycleFilterMode">
+            <!-- Track -->
+            <span
+              class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
+              :class="{
+                'bg-red-500': filterMode === 0,
+                'bg-slate-300': filterMode === 1,
+                'bg-emerald-500': filterMode === 2,
+              }"
+            ></span>
+            <!-- Thumb -->
+            <span
+              class="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out"
+              :class="{
+                'translate-x-1': filterMode === 0,
+                'translate-x-2.5': filterMode === 1,
+                'translate-x-4': filterMode === 2,
+              }"
+            ></span>
+          </label>
         </div>
 
         <!-- Columns Button -->
         <div ref="columnsMenuWrapper" class="relative">
           <button
             class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-white/60 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all duration-200 active:scale-[0.97] h-10 w-10 md:w-auto md:h-auto"
-            @click="showColumnsMenu = !showColumnsMenu">
+            @click="showColumnsMenu = !showColumnsMenu"
+          >
             <Columns3 class="w-4 h-4" />
             <span class="hidden md:inline">Columns</span>
           </button>
 
           <!-- Dropdown -->
-          <div v-if="showColumnsMenu"
-            class="absolute left-0 mt-2 w-64 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/90 backdrop-blur-md shadow-2xl p-4 z-50 transition-all duration-200">
+          <div
+            v-if="showColumnsMenu"
+            class="absolute left-0 mt-2 w-64 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/90 backdrop-blur-md shadow-2xl p-4 z-50 transition-all duration-200"
+          >
             <div class="flex flex-col gap-3 max-h-[420px] overflow-auto pr-1">
-              <label v-for="col in columns" :key="col.key"
-                class="flex items-center justify-between text-sm cursor-pointer text-slate-700 dark:text-slate-200 hover:text-blue-500">
+              <label
+                v-for="col in columns"
+                :key="col.key"
+                class="flex items-center justify-between text-sm cursor-pointer text-slate-700 dark:text-slate-200 hover:text-blue-500"
+              >
                 <div class="flex items-center gap-2">
                   <input v-model="columnVisibility[col.key]" type="checkbox" class="accent-blue-500 h-4 w-4 rounded" />
                   <span class="select-none">{{ col.label }}</span>
@@ -422,12 +432,16 @@ function downloadCodeList(codes: string[], promotionName: string) {
             </div>
 
             <div class="flex justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
-              <button @click="resetColumnVisibility"
-                class="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+              <button
+                class="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                @click="resetColumnVisibility"
+              >
                 Reset
               </button>
-              <button @click="showColumnsMenu = false"
-                class="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
+              <button
+                class="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                @click="showColumnsMenu = false"
+              >
                 Done
               </button>
             </div>
@@ -437,7 +451,8 @@ function downloadCodeList(codes: string[], promotionName: string) {
         <!-- Add Promotion Button -->
         <button
           class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow-md h-10 w-10 md:w-auto md:h-auto"
-          @click="onAddClick">
+          @click="onAddClick"
+        >
           <Plus class="w-4 h-4" />
           <span class="hidden md:inline">Add Promotion</span>
         </button>
@@ -447,10 +462,16 @@ function downloadCodeList(codes: string[], promotionName: string) {
 
   <!-- TABLE -->
   <div class="flex flex-col h-[calc(100vh-12rem)]">
-    <VaDataTable :columns="visibleColumns" :items="filteredItems" :loading="$props.loading" :style="{
-      '--va-data-table-thead-background': '#f8fafc',
-      '--va-data-table-thead-color': '#64748b',
-    }" sticky-header>
+    <VaDataTable
+      :columns="visibleColumns"
+      :items="filteredItems"
+      :loading="$props.loading"
+      :style="{
+        '--va-data-table-thead-background': '#f8fafc',
+        '--va-data-table-thead-color': '#64748b',
+      }"
+      sticky-header
+    >
       <!-- DATE -->
       <template #cell(startDate)="{ rowData }">
         <div class="flex justify-center items-center">
@@ -463,24 +484,27 @@ function downloadCodeList(codes: string[], promotionName: string) {
       <!-- TIME -->
       <template #cell(timeRange)="{ rowData }">
         <div class="flex justify-center items-center">
-          {{ rowData.timeRange }}</div>
+          {{ rowData.timeRange }}
+        </div>
       </template>
 
       <!-- TYPE -->
       <template #cell(promotionType)="{ rowData }">
         <span
-  class="flex justify-center items-center inline-block text-sm px-3 py-1 rounded-xl"
-  :class="getPromotionTypeClass(rowData.promotionType)">
-  {{ getPrettyPromotionType(rowData.promotionType) }}
-</span>
+          class="flex justify-center items-center inline-block text-sm px-3 py-1 rounded-xl"
+          :class="getPromotionTypeClass(rowData.promotionType)"
+        >
+          {{ getPrettyPromotionType(rowData.promotionType) }}
+        </span>
       </template>
 
       <!-- VALUE -->
       <template #cell(price)="{ rowData }">
         <div class="flex justify-center items-center">
           <template v-if="rowData.promotionType === 'FIXED_PRICE'">€{{ rowData.fixedPrice }}</template>
-          <template v-else-if="rowData.promotionType === 'VALUE_DISCOUNT'">€ {{ Number(rowData.discountValue).toFixed(2)
-            }}</template>
+          <template v-else-if="rowData.promotionType === 'VALUE_DISCOUNT'"
+            >€ {{ Number(rowData.discountValue).toFixed(2) }}</template
+          >
           <template v-else-if="rowData.promotionType === 'PERCENTAGE_DISCOUNT'">
             {{ rowData.discountPercentage }} %
           </template>
@@ -499,8 +523,12 @@ function downloadCodeList(codes: string[], promotionName: string) {
             <span class="code-pill code-single uppercase">
               {{ rowData.codes?.[0] || '—' }}
             </span>
-            <button v-if="rowData.codes?.[0]" @click="copyCodeToClipboard(rowData.codes[0])"
-              class="text-slate-400 hover:text-slate-500 hover:scale-105 transition" title="Copy code">
+            <button
+              v-if="rowData.codes?.[0]"
+              class="text-slate-400 hover:text-slate-500 hover:scale-105 transition"
+              title="Copy code"
+              @click="copyCodeToClipboard(rowData.codes[0])"
+            >
               <Copy class="w-4 h-4" />
             </button>
           </div>
@@ -512,12 +540,20 @@ function downloadCodeList(codes: string[], promotionName: string) {
             <span class="code-pill code-multi">
               {{ (rowData.totalCount || 0) - (rowData.usageCount || 0) }} / {{ rowData.totalCount || 0 }}
             </span>
-            <button v-if="rowData.codes?.length" @click="openMultiCodePopup(rowData.codes)"
-              class="text-slate-400 hover:text-slate-500 hover:scale-105 transition" title="View code list">
+            <button
+              v-if="rowData.codes?.length"
+              class="text-slate-400 hover:text-slate-500 hover:scale-105 transition"
+              title="View code list"
+              @click="openMultiCodePopup(rowData.codes)"
+            >
               <List class="w-4 h-4" />
             </button>
-            <button v-if="rowData.codes?.length" @click="downloadCodeList(rowData.codes, rowData.name)"
-              class="text-slate-400 hover:text-slate-500 hover:scale-105 transition" title="Download code list">
+            <button
+              v-if="rowData.codes?.length"
+              class="text-slate-400 hover:text-slate-500 hover:scale-105 transition"
+              title="Download code list"
+              @click="downloadCodeList(rowData.codes, rowData.name)"
+            >
               <Download class="w-4 h-4" />
             </button>
           </div>
@@ -538,17 +574,22 @@ function downloadCodeList(codes: string[], promotionName: string) {
       <template #cell(availableAtCC)="{ rowData }">
         <div class="flex justify-center items-center">
           <label class="relative inline-block w-9 h-5 cursor-pointer">
-            <input type="checkbox"
-       :checked="rowData.availableAtCC"
-       class="sr-only"
-       @change="updateData({ ...rowData, availableAtCC: $event.target.checked })" />
+            <input
+              type="checkbox"
+              :checked="rowData.availableAtCC"
+              class="sr-only"
+              @change="updateData({ ...rowData, availableAtCC: $event.target.checked })"
+            />
             <!-- Track -->
-            <span class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
-              :class="rowData.availableAtCC ? 'bg-blue-500' : 'bg-slate-300'"></span>
+            <span
+              class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
+              :class="rowData.availableAtCC ? 'bg-blue-500' : 'bg-slate-300'"
+            ></span>
             <!-- Thumb -->
             <span
               class="absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out"
-              :class="rowData.availableAtCC ? 'translate-x-4' : 'translate-x-1'"></span>
+              :class="rowData.availableAtCC ? 'translate-x-4' : 'translate-x-1'"
+            ></span>
           </label>
         </div>
       </template>
@@ -557,17 +598,22 @@ function downloadCodeList(codes: string[], promotionName: string) {
       <template #cell(availableAtWeb)="{ rowData }">
         <div class="flex justify-center items-center">
           <label class="relative inline-block w-9 h-5 cursor-pointer">
-            <input type="checkbox"
-       :checked="rowData.availableAtWeb"
-       class="sr-only"
-       @change="updateData({ ...rowData, availableAtWeb: $event.target.checked })" />
+            <input
+              type="checkbox"
+              :checked="rowData.availableAtWeb"
+              class="sr-only"
+              @change="updateData({ ...rowData, availableAtWeb: $event.target.checked })"
+            />
             <!-- Track -->
-            <span class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
-              :class="rowData.availableAtWeb ? 'bg-blue-500' : 'bg-slate-300'"></span>
+            <span
+              class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
+              :class="rowData.availableAtWeb ? 'bg-blue-500' : 'bg-slate-300'"
+            ></span>
             <!-- Thumb -->
             <span
               class="absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out"
-              :class="rowData.availableAtWeb ? 'translate-x-4' : 'translate-x-1'"></span>
+              :class="rowData.availableAtWeb ? 'translate-x-4' : 'translate-x-1'"
+            ></span>
           </label>
         </div>
       </template>
@@ -575,8 +621,10 @@ function downloadCodeList(codes: string[], promotionName: string) {
       <!-- STATUS -->
       <template #cell(status)="{ rowData }">
         <div class="flex justify-center items-center">
-          <button class="px-3 py-1 text-sm rounded-xl font-medium transition-colors cursor-default"
-            :class="getPromotionStatus(rowData.startDate, rowData.endDate).classes">
+          <button
+            class="px-3 py-1 text-sm rounded-xl font-medium transition-colors cursor-default"
+            :class="getPromotionStatus(rowData.startDate, rowData.endDate).classes"
+          >
             {{ getPromotionStatus(rowData.startDate, rowData.endDate).text }}
           </button>
         </div>
@@ -590,8 +638,11 @@ function downloadCodeList(codes: string[], promotionName: string) {
             <p class="font-semibold">Menu Items linked:</p>
             <div v-if="getMenuItemDetails(rowData.menuItem).length">
               <ul class="list-disc pl-4">
-                <li v-for="item in getMenuItemDetails(rowData.menuItem)" :key="item._id"
-                  class="flex items-center gap-2">
+                <li
+                  v-for="item in getMenuItemDetails(rowData.menuItem)"
+                  :key="item._id"
+                  class="flex items-center gap-2"
+                >
                   <img v-if="item.imageUrl" :src="item.imageUrl" class="w-6 h-6 rounded" alt="menu item" />
                   <span>{{ item.name }}</span>
                 </li>
@@ -602,13 +653,17 @@ function downloadCodeList(codes: string[], promotionName: string) {
 
           <!-- Add Menu Item Button -->
           <div class="flex justify-end mb-4">
-            <VaButton color="primary" icon="mso-add" @click="
-              emits('openSelectionModal', {
-                promotion: rowData,
-                selection: null,
-                isEdit: false,
-              })
-              ">
+            <VaButton
+              color="primary"
+              icon="mso-add"
+              @click="
+                emits('openSelectionModal', {
+                  promotion: rowData,
+                  selection: null,
+                  isEdit: false,
+                })
+              "
+            >
               Add Menu Item
             </VaButton>
           </div>
@@ -617,18 +672,24 @@ function downloadCodeList(codes: string[], promotionName: string) {
 
       <!-- ACTIVE -->
       <template #cell(isActive)="{ rowData }">
-  <div class="flex justify-center items-center">
-    <label class="relative inline-block w-9 h-5 cursor-pointer">
-      <input type="checkbox"
-             :checked="rowData.isActive"
-             class="sr-only"
-             @change="updateData({ ...rowData, isActive: $event.target.checked })" />
-      <span class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
-            :class="rowData.isActive ? 'bg-emerald-500' : 'bg-red-500'"></span>
-      <span class="absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out"
-            :class="rowData.isActive ? 'translate-x-4' : 'translate-x-1'"></span>
-    </label>
-  </div>
+        <div class="flex justify-center items-center">
+          <label class="relative inline-block w-9 h-5 cursor-pointer">
+            <input
+              type="checkbox"
+              :checked="rowData.isActive"
+              class="sr-only"
+              @change="updateData({ ...rowData, isActive: $event.target.checked })"
+            />
+            <span
+              class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
+              :class="rowData.isActive ? 'bg-emerald-500' : 'bg-red-500'"
+            ></span>
+            <span
+              class="absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out"
+              :class="rowData.isActive ? 'translate-x-4' : 'translate-x-1'"
+            ></span>
+          </label>
+        </div>
       </template>
 
       <!-- ACTIONS -->
@@ -637,19 +698,22 @@ function downloadCodeList(codes: string[], promotionName: string) {
           <!-- Edit -->
           <button
             class="flex items-center justify-center w-7 h-7 rounded-lg text-slate-600 hover:bg-slate-200 transition-colors duration-150 active:scale-95"
-            title="Edit Promotion" @click="emits('editPromotions', rowData)">
+            title="Edit Promotion"
+            @click="emits('editPromotions', rowData)"
+          >
             <Pencil class="w-3.5 h-3.5" />
           </button>
 
           <!-- Delete -->
           <button
             class="flex items-center justify-center w-7 h-7 rounded-lg text-red-600 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-700 transition-colors duration-150 active:scale-95"
-            title="Delete Promotion" @click="onButtonPromotionDelete(rowData)">
+            title="Delete Promotion"
+            @click="onButtonPromotionDelete(rowData)"
+          >
             <VaIcon name="mso-delete" class="w-4.5 h-4.5 block" />
           </button>
         </div>
       </template>
-
     </VaDataTable>
   </div>
 
@@ -658,8 +722,11 @@ function downloadCodeList(codes: string[], promotionName: string) {
       <ul class="divide-y divide-slate-200">
         <li v-for="(code, index) in selectedCodes" :key="index" class="flex items-center justify-between py-1">
           <span>{{ typeof code === 'string' ? code : code.code }}</span>
-          <button @click="copyCodeToClipboard(typeof code === 'string' ? code : code.code)"
-            class="text-slate-500 hover:text-blue-500 transition" title="Copy code">
+          <button
+            class="text-slate-500 hover:text-blue-500 transition"
+            title="Copy code"
+            @click="copyCodeToClipboard(typeof code === 'string' ? code : code.code)"
+          >
             <Copy class="w-4 h-4" />
           </button>
         </li>
@@ -674,26 +741,31 @@ function downloadCodeList(codes: string[], promotionName: string) {
     </template>
   </VaModal>
 
-
   <!-- Add Selection Modal -->
-  <AddSelectionModal v-if="isAddSelectionModalOpen" :promotion-id="promotionData._id"
-    :outlet-id="servicesStore.selectedRest" :pending-selections="promotionData.menuItem || []"
-    :is-edit-selection="isEditSelection" :promotion-selection="promotionSelection" @cancel="
+  <AddSelectionModal
+    v-if="isAddSelectionModalOpen"
+    :promotion-id="promotionData._id"
+    :outlet-id="servicesStore.selectedRest"
+    :pending-selections="promotionData.menuItem || []"
+    :is-edit-selection="isEditSelection"
+    :promotion-selection="promotionSelection"
+    @cancel="
       () => {
         isAddSelectionModalOpen = false
         promotionSelection = ''
         isEditSelection = false
         emits('getPromotions')
       }
-    " @submitted="
-        () => {
-          isAddSelectionModalOpen = false
-          promotionSelection = ''
-          isEditSelection = false
-          emits('getPromotions')
-        }
-      " />
-
+    "
+    @submitted="
+      () => {
+        isAddSelectionModalOpen = false
+        promotionSelection = ''
+        isEditSelection = false
+        emits('getPromotions')
+      }
+    "
+  />
 </template>
 
 <style lang="scss" scoped>

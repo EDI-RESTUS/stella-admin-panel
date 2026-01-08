@@ -30,9 +30,7 @@ const items = toRef(props, 'items')
       <!-- Left: Title -->
       <div class="flex flex-1 min-w-0 items-center gap-4 flex-wrap">
         <div class="flex items-center gap-2 flex-shrink-0 mt-1">
-          <h1 class="text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight">
-            Allergens
-          </h1>
+          <h1 class="text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight">Allergens</h1>
         </div>
       </div>
       <!-- Right: empty for spacing consistency -->
@@ -40,7 +38,7 @@ const items = toRef(props, 'items')
     </div>
 
     <!-- TABLE -->
-    <div class="flex flex-col h-[calc(100vh-12rem)] ">
+    <div class="flex flex-col h-[calc(100vh-12rem)]">
       <VaDataTable
         :columns="columns"
         :items="allergenOptions"
@@ -52,11 +50,7 @@ const items = toRef(props, 'items')
       >
         <template #cell(icon)="{ rowData }">
           <div class="relative group w-12 h-12 overflow-hidden rounded">
-            <img
-              :src="`/allergens/${rowData.icon}.png`"
-              alt="Allergen Icon"
-              class="w-full h-full object-cover"
-            />
+            <img :src="`/allergens/${rowData.icon}.png`" alt="Allergen Icon" class="w-full h-full object-cover" />
           </div>
         </template>
       </VaDataTable>
@@ -74,6 +68,4 @@ const items = toRef(props, 'items')
 ::v-deep(.va-data-table__table tbody tr:hover) {
   background-color: #f8fafc;
 }
-
-
 </style>

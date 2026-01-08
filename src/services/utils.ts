@@ -13,18 +13,19 @@ export const validators = {
 
 export function removeNulls(obj) {
   if (Array.isArray(obj)) {
-      return obj
-          .map(item => removeNulls(item))
-          .filter(item => item !== null && item !== undefined);
+    return obj.map((item) => removeNulls(item)).filter((item) => item !== null && item !== undefined)
   } else if (typeof obj === 'object' && obj !== null) {
-      return Object.entries(obj).reduce((acc, [key, value]) => {
-          const cleanedValue = removeNulls(value);
-          if (cleanedValue !== null && cleanedValue !== undefined &&
-              !(typeof cleanedValue === 'object' && Object.keys(cleanedValue).length === 0)) {
-              acc[key] = cleanedValue;
-          }
-          return acc;
-      }, {});
+    return Object.entries(obj).reduce((acc, [key, value]) => {
+      const cleanedValue = removeNulls(value)
+      if (
+        cleanedValue !== null &&
+        cleanedValue !== undefined &&
+        !(typeof cleanedValue === 'object' && Object.keys(cleanedValue).length === 0)
+      ) {
+        acc[key] = cleanedValue
+      }
+      return acc
+    }, {})
   }
-  return obj;
+  return obj
 }

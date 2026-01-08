@@ -17,10 +17,10 @@
           </div>
           <input
             id="email"
+            v-model="formData.email"
             name="email"
             type="email"
             required
-            v-model="formData.email"
             class="appearance-none block w-full pl-10 px-3 py-2 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 focus:z-10 sm:text-sm"
             placeholder="Email"
           />
@@ -36,10 +36,10 @@
           <!-- Password input -->
           <input
             id="password"
+            v-model="formData.password"
             name="password"
             :type="showPassword ? 'text' : 'password'"
             required
-            v-model="formData.password"
             class="appearance-none block w-full pl-10 pr-10 px-3 py-2 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 focus:z-10 sm:text-sm"
             placeholder="Password"
           />
@@ -47,9 +47,9 @@
           <!-- Toggle show/hide -->
           <button
             type="button"
-            @click="showPassword = !showPassword"
             class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
             aria-label="Toggle password visibility"
+            @click="showPassword = !showPassword"
           >
             <Eye v-if="!showPassword" class="h-5 w-5" />
             <EyeOff v-else class="h-5 w-5" />

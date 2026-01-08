@@ -100,7 +100,7 @@
                 :class="{
                   'border-gray-700 bg-[#f8f9fa] border-2': isChecked(group, option._id),
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option._id),
-                  'out-of-stock': option.name?.toUpperCase().includes('OUT OF STOCK')
+                  'out-of-stock': option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
                 @click="option.name?.toUpperCase().includes('OUT OF STOCK') ? null : updateSingleChoice(group, option)"
               >
@@ -138,9 +138,11 @@
                 :class="{
                   'border-gray-700 bg-[#f8f9fa] border-2': isChecked(group, option._id),
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option._id),
-                  'out-of-stock': option.name?.toUpperCase().includes('OUT OF STOCK')
+                  'out-of-stock': option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
-                @click.prevent="option.name?.toUpperCase().includes('OUT OF STOCK') ? null : toggleMultipleChoiceNoQty(group, option)"
+                @click.prevent="
+                  option.name?.toUpperCase().includes('OUT OF STOCK') ? null : toggleMultipleChoiceNoQty(group, option)
+                "
               >
                 <div v-if="option.imageUrl" class="item-image">
                   <img
@@ -178,7 +180,7 @@
                   getQty(group._id, option._id) > 0
                     ? 'border-gray-700 bg-[#f8f9fa] border-2'
                     : 'border-gray-200 hover:border-gray-700 hover:border-2',
-                  option.name?.toUpperCase().includes('OUT OF STOCK') ? 'out-of-stock' : ''
+                  option.name?.toUpperCase().includes('OUT OF STOCK') ? 'out-of-stock' : '',
                 ]"
               >
                 <div class="flex items-start gap-1">
@@ -211,7 +213,9 @@
 
                   <button
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
-                    :disabled="getQty(group._id, option._id) === 0 || option.name?.toUpperCase().includes('OUT OF STOCK')"
+                    :disabled="
+                      getQty(group._id, option._id) === 0 || option.name?.toUpperCase().includes('OUT OF STOCK')
+                    "
                     @click="() => updateMultipleChoice(group, option, getQty(group._id, option._id) - 1)"
                   >
                     -
@@ -222,11 +226,14 @@
                       getQty(group._id, option._id) >= (option.maximumChoices || group.maximumChoices || 99)
                         ? 'Max quantity reached'
                         : option.name?.toUpperCase().includes('OUT OF STOCK')
-                        ? 'Out of stock'
-                        : ''
+                          ? 'Out of stock'
+                          : ''
                     "
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
-                    :disabled="getQty(group._id, option._id) >= (option.maximumChoices || group.maximumChoices || 99) || option.name?.toUpperCase().includes('OUT OF STOCK')"
+                    :disabled="
+                      getQty(group._id, option._id) >= (option.maximumChoices || group.maximumChoices || 99) ||
+                      option.name?.toUpperCase().includes('OUT OF STOCK')
+                    "
                     @click="() => updateMultipleChoice(group, option, getQty(group._id, option._id) + 1)"
                   >
                     +
@@ -331,8 +338,8 @@ watch(
         const option = group.options.find((o) => o._id === optionId)
         // Fix: Allow selecting default articles even if other options are already selected.
         // We check if this specific group already has a selection to avoid duplicates if re-running.
-        const groupAlreadySelected = selectedOptions.value.some(s => s.groupId === group._id)
-        
+        const groupAlreadySelected = selectedOptions.value.some((s) => s.groupId === group._id)
+
         if (option && (!groupAlreadySelected || option.type.toLowerCase() !== 'article')) {
           selected.push({
             optionId: option._id,

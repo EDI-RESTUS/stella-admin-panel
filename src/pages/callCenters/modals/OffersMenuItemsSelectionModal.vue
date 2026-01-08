@@ -16,9 +16,9 @@
             v-for="item in menuItems.sort((a, b) => (selectedArticle && selectedArticle.id === a.id ? -1 : 1))"
             :key="item._id"
             class="pizza-card"
-            :class="{ 
+            :class="{
               selected: selectedArticle && selectedArticle.id === item.id,
-              'out-of-stock': item.name?.toUpperCase().includes('OUT OF STOCK')
+              'out-of-stock': item.name?.toUpperCase().includes('OUT OF STOCK'),
             }"
             @click.prevent="item.name?.toUpperCase().includes('OUT OF STOCK') ? null : selectArticle(item)"
           >

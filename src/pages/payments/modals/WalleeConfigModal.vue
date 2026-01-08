@@ -21,7 +21,7 @@
         <div class="flex justify-end mt-3">
           <VaButton :loading="isCreatingTerminal" @click="createTerminal">Create Terminal</VaButton>
         </div>
-        
+
         <!-- List of created terminals in this session -->
         <div v-if="createdTerminals.length" class="mt-4">
           <h4 class="font-semibold text-sm text-gray-600">Terminals Created in this Session:</h4>
@@ -88,13 +88,13 @@ const terminalForm = ref({
   ip: '',
   port: 50000,
   posId: '',
-  currency: 'EUR'
+  currency: 'EUR',
 })
 
 const mappingForm = ref({
   deliveryZoneId: '',
   walleeTerminalId: '',
-  priority: 1
+  priority: 1,
 })
 
 const isCreatingTerminal = ref(false)
@@ -117,7 +117,7 @@ const fetchTerminals = async () => {
   try {
     const url = import.meta.env.VITE_API_BASE_URL
     const res = await axios.get(`${url}/wallee/terminals`, {
-      params: { outletId: props.outletId }
+      params: { outletId: props.outletId },
     })
     existingTerminals.value = res.data?.data || []
   } catch (e) {
@@ -142,22 +142,22 @@ const createTerminal = async () => {
         TERMINAL_IP: terminalForm.value.ip,
         TERMINAL_PORT: Number(terminalForm.value.port),
         POS_ID: terminalForm.value.posId,
-        CURRENCY: terminalForm.value.currency
-      }
+        CURRENCY: terminalForm.value.currency,
+      },
     }
     const res = await axios.post(`${url}/wallee/terminals`, payload)
-    
+
     const newTerminal = res.data.data
     createdTerminals.value.push(newTerminal)
     existingTerminals.value.push(newTerminal) // Add to dropdown list too
-    
+
     // Auto-fill mapping ID if empty
     if (!mappingForm.value.walleeTerminalId) {
       mappingForm.value.walleeTerminalId = newTerminal._id
     }
-    
+
     init({ message: 'Terminal created!', color: 'success' })
-    
+
     // Reset form slightly
     terminalForm.value.name = ''
     terminalForm.value.posId = ''
@@ -182,11 +182,11 @@ const createMapping = async () => {
       deliveryZoneId: mappingForm.value.deliveryZoneId,
       paymentTypeId: props.paymentTypeId,
       walleeTerminalId: mappingForm.value.walleeTerminalId,
-      priority: Number(mappingForm.value.priority)
+      priority: Number(mappingForm.value.priority),
     }
     await axios.post(`${url}/wallee/zone-mappings`, payload)
     init({ message: 'Zone mapped successfully!', color: 'success' })
-    
+
     // Reset mapping form
     mappingForm.value.deliveryZoneId = ''
     mappingForm.value.walleeTerminalId = ''
@@ -200,16 +200,16 @@ const createMapping = async () => {
 // --- COMPUTED ---
 const deliveryZoneOptions = computed(() => {
   const sorted = [...deliveryZones.value].sort((a, b) => Number(a.serviceZoneId) - Number(b.serviceZoneId))
-  return sorted.map(z => ({ 
-    label: `${z.serviceZoneId || '?'} - ${z.name}`, 
-    value: z._id 
+  return sorted.map((z) => ({
+    label: `${z.serviceZoneId || '?'} - ${z.name}`,
+    value: z._id,
   }))
 })
 
 const terminalOptions = computed(() => {
-  return existingTerminals.value.map(t => ({
+  return existingTerminals.value.map((t) => ({
     label: `${t.name} (${t.config?.POS_ID || 'No POS ID'})`,
-    value: t._id
+    value: t._id,
   }))
 })
 

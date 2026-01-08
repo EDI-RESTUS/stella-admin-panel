@@ -151,9 +151,9 @@ const getfamilies = async () => {
         isChecked: true,
         SubFamilies: Object.keys(family).includes('SubFamilies')
           ? family.SubFamilies.map((SubFamily) => ({
-            ...SubFamily,
-            isChecked: true,
-          }))
+              ...SubFamily,
+              isChecked: true,
+            }))
           : [],
       }
     })
