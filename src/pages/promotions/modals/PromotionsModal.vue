@@ -71,13 +71,16 @@
                 placeholder="Where to apply"
               />
               <VaSelect
-    v-model="formData.affectItems"
-    :options="affectItemsOptions"
-    label="Affect Type"
-    required-mark
-    placeholder="Single/Multiple Items"
-    :disabled="formData.affect !== 'Selected Items' || !['Value Discount', 'Percentage Discount'].includes(formData.promotionType)"
-/>
+                v-model="formData.affectItems"
+                :options="affectItemsOptions"
+                label="Affect Type"
+                required-mark
+                placeholder="Single/Multiple Items"
+                :disabled="
+                  formData.affect !== 'Selected Items' ||
+                  !['Value Discount', 'Percentage Discount'].includes(formData.promotionType)
+                "
+              />
             </div>
             <div v-if="formData.affect === 'Selected Items'" class="flex gap-2 mt-2">
               <VaButton @click="openArticlesModal">Articles</VaButton>
@@ -107,13 +110,16 @@
                 placeholder="Where to apply"
               />
               <VaSelect
-    v-model="formData.affectItems"
-    :options="affectItemsOptions"
-    label="Affect Type"
-    required-mark
-    placeholder="Single/Multiple Items"
-    :disabled="formData.affect !== 'Selected Items' || !['Value Discount', 'Percentage Discount'].includes(formData.promotionType)"
-/>
+                v-model="formData.affectItems"
+                :options="affectItemsOptions"
+                label="Affect Type"
+                required-mark
+                placeholder="Single/Multiple Items"
+                :disabled="
+                  formData.affect !== 'Selected Items' ||
+                  !['Value Discount', 'Percentage Discount'].includes(formData.promotionType)
+                "
+              />
             </div>
             <div v-if="formData.affect === 'Selected Items'" class="flex gap-2 mt-2">
               <VaButton @click="openArticlesModal">Articles</VaButton>
@@ -227,7 +233,13 @@
               <VaInput v-model="formData.endDate" label="End Date" type="date" required-mark />
               <VaInput v-model="formData.startTime" label="Time From" type="time" required-mark />
               <VaInput v-model="formData.endTime" label="Time To" type="time" required-mark />
-              <VaSelect v-model="formData.days" label="Available Days" placeholder="Select days" multiple required-mark :options="daysOfWeek"
+              <VaSelect
+                v-model="formData.days"
+                label="Available Days"
+                placeholder="Select days"
+                multiple
+                required-mark
+                :options="daysOfWeek"
               />
             </div>
           </section>
@@ -553,13 +565,10 @@ watch(
 watch(
   () => [formData.value.affect, formData.value.promotionType],
   ([affect, promotionType]) => {
-    if (
-      affect !== 'Selected Items' ||
-      !['Value Discount', 'Percentage Discount'].includes(promotionType)
-    ) {
+    if (affect !== 'Selected Items' || !['Value Discount', 'Percentage Discount'].includes(promotionType)) {
       formData.value.affectItems = ''
     }
-  }
+  },
 )
 
 function populateFormData(promotion) {
@@ -571,7 +580,6 @@ function populateFormData(promotion) {
     startTime = start || ''
     endTime = end || ''
   }
-
 
   console.log('[populateFormData] Input Promotion:', JSON.stringify(promotion, null, 2))
   console.log('[populateFormData] menuItem raw:', promotion.menuItem)
@@ -615,7 +623,7 @@ function populateFormData(promotion) {
   }
   promotionsArticles.value = (promotion.menuItem || []).map((i) => (typeof i === 'object' ? i._id : i))
   promotionOptions.value = (promotion.option || []).map((i) => (typeof i === 'object' ? i._id : i))
-  
+
   console.log('[populateFormData] Mapped promotionsArticles:', promotionsArticles.value)
   console.log('[populateFormData] Mapped promotionOptions:', promotionOptions.value)
 }
@@ -731,7 +739,6 @@ const getDeliveryZones = async () => {
   }
 }
 
-
 const submit = async () => {
   if (!validate()) {
     return
@@ -824,8 +831,6 @@ const submit = async () => {
   } else {
     delete data._id
   }
-
-
 
   try {
     if (data._id) {

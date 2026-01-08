@@ -58,6 +58,7 @@ async function updateData(rowData) {
     ccToTable: rowData.ccToTable,
     webFromTable: rowData.webFromTable,
     webToTable: rowData.webToTable,
+    availability: rowData.availability,
   }
   await axios
     .patch(`${url}/deliveryZones/${rowData._id}`, data)
@@ -301,7 +302,28 @@ const items = toRef(props, 'items')
         </div>
       </template>
       <template #cell(ccFromTable)="{ rowData }">
-        <div class="table-cell-content">
+        <div class="table-cell-content flex items-center gap-1">
+          <div v-if="rowData.availability" class="flex flex-col gap-1">
+            <div class="flex items-center" title="Delivery">
+              <span class="text-[10px] text-gray-500 mr-1">D</span>
+              <VaCheckbox
+                v-if="rowData.availability.delivery"
+                v-model="rowData.availability.delivery.cc"
+                size="small"
+                @update:modelValue="updateData(rowData)"
+              />
+            </div>
+            <div class="flex items-center" title="Takeaway">
+              <span class="text-[10px] text-gray-500 mr-1">T</span>
+              <VaCheckbox
+                v-if="rowData.availability.takeaway"
+                v-model="rowData.availability.takeaway.cc"
+                size="small"
+                @update:modelValue="updateData(rowData)"
+              />
+            </div>
+          </div>
+
           <template v-if="rowData.editCC">
             <input
               v-model="rowData.ccFromTable"
@@ -323,12 +345,34 @@ const items = toRef(props, 'items')
               {{ rowData.ccError }}
             </div>
           </template>
-          <div v-else @click="rowData.editCC = true">{{ rowData.ccFromTable }} - {{ rowData.ccToTable }}</div>
+          <div v-else class="ml-2 cursor-pointer" @click="rowData.editCC = true">
+            {{ rowData.ccFromTable }} - {{ rowData.ccToTable }}
+          </div>
         </div>
       </template>
 
       <template #cell(webFromTable)="{ rowData }">
-        <div class="table-cell-content">
+        <div class="table-cell-content flex items-center gap-1">
+          <div v-if="rowData.availability" class="flex flex-col gap-1">
+            <div class="flex items-center" title="Delivery">
+              <span class="text-[10px] text-gray-500 mr-1">D</span>
+              <VaCheckbox
+                v-if="rowData.availability.delivery"
+                v-model="rowData.availability.delivery.web"
+                size="small"
+                @update:modelValue="updateData(rowData)"
+              />
+            </div>
+            <div class="flex items-center" title="Takeaway">
+              <span class="text-[10px] text-gray-500 mr-1">T</span>
+              <VaCheckbox
+                v-if="rowData.availability.takeaway"
+                v-model="rowData.availability.takeaway.web"
+                size="small"
+                @update:modelValue="updateData(rowData)"
+              />
+            </div>
+          </div>
           <template v-if="rowData.editWeb">
             <input
               v-model="rowData.webFromTable"
@@ -349,7 +393,9 @@ const items = toRef(props, 'items')
               {{ rowData.webError }}
             </div>
           </template>
-          <div v-else @click="rowData.editWeb = true">{{ rowData.webFromTable }} - {{ rowData.webToTable }}</div>
+          <div v-else class="ml-2 cursor-pointer" @click="rowData.editWeb = true">
+            {{ rowData.webFromTable }} - {{ rowData.webToTable }}
+          </div>
         </div>
       </template>
 

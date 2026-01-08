@@ -47,7 +47,7 @@
           :min-rows="1"
           :max-rows="4"
           class="block !h-auto"
-          style="width: calc(100% - 32px);"
+          style="width: calc(100% - 32px)"
         />
       </div>
 
@@ -115,8 +115,10 @@
 
               <!-- Base Info -->
               <p class="text-[11px] text-gray-500 mt-1 italic">
-                Base: €{{ item.basePrice.toFixed(2) }} + €{{ item.selectionTotalPrice.toFixed(2) }} =
-                €{{ item.unitTotal.toFixed(2) }} each
+                Base: €{{ item.basePrice.toFixed(2) }} + €{{ item.selectionTotalPrice.toFixed(2) }} = €{{
+                  item.unitTotal.toFixed(2)
+                }}
+                each
               </p>
             </div>
 
@@ -200,8 +202,10 @@
               </div>
 
               <p class="text-[11px] text-gray-500 mt-1 italic">
-                Base: €{{ item.basePrice.toFixed(2) }} + €{{ item.selectionTotalPrice.toFixed(2) }} =
-                €{{ item.unitTotal.toFixed(2) }} each
+                Base: €{{ item.basePrice.toFixed(2) }} + €{{ item.selectionTotalPrice.toFixed(2) }} = €{{
+                  item.unitTotal.toFixed(2)
+                }}
+                each
               </p>
             </div>
             <!-- Offer line total -->
@@ -278,21 +282,30 @@
         </div>
 
         <div class="px-4 pb-4">
-          <VaButton
-            :disabled="
-              !customerDetailsId ||
-              !orderType ||
-              (orderType === 'delivery' && !props.isDeliveryZoneSelected) ||
-              (items.length === 0 && offersItems.length === 0)
-            "
-            class="w-full rounded-md"
-            color="success"
-            :style="{ '--va-background-color': outlet.primaryColor }"
-            size="medium"
-            @click="openCheckoutModal"
-          >
-            Checkout Order
-          </VaButton>
+          <div class="w-full relative">
+            <!-- Overlay for disabled state to allow clicks for error message (optional, but requested 'pop up') -->
+            <div 
+               v-if="isServiceRestricted"
+               class="absolute inset-0 z-10 cursor-not-allowed"
+               @click="showRestrictedMessage"
+            ></div>
+            <VaButton
+              :disabled="
+                !customerDetailsId ||
+                !orderType ||
+                (orderType === 'delivery' && !props.isDeliveryZoneSelected) ||
+                (items.length === 0 && offersItems.length === 0) ||
+                isServiceRestricted
+              "
+              class="w-full rounded-md"
+              color="success"
+              :style="{ '--va-background-color': outlet.primaryColor }"
+              size="medium"
+              @click="openCheckoutModal"
+            >
+              Checkout Order
+            </VaButton>
+          </div>
         </div>
       </div>
     </template>
@@ -337,7 +350,7 @@
       :customer-details-id="customerDetailsId"
       @cancel="closePromotionModal"
       @selectCode="onCodeSelected"
-      @select-codes="onCodesSelected"
+      @selectCodes="onCodesSelected"
     />
   </div>
 </template>
@@ -398,10 +411,7 @@ const isFutureTimeAllowed = computed(() => {
 const promoOriginalItems = computed(() => {
   const v = promoTotal.value
   if (!v?.menuItems) return 0
-  const n = v.menuItems.reduce(
-    (sum, it) => sum + Number(it.originalPrice || 0) + Number(it.optionsPrice || 0),
-    0,
-  )
+  const n = v.menuItems.reduce((sum, it) => sum + Number(it.originalPrice || 0) + Number(it.optionsPrice || 0), 0)
   return Number(n.toFixed(2))
 })
 
@@ -431,7 +441,7 @@ watch(
     // Re-apply the promo (will re-call the validation API)
     applyPromoCode()
   },
-  { deep: true } // watch nested changes in arrays/objects
+  { deep: true }, // watch nested changes in arrays/objects
 )
 
 const itemsAfterPromos = computed(() => {
@@ -456,12 +466,37 @@ function onCodeSelected(code) {
   showPromotionModal.value = false
 }
 
-function onCodesSelected(codes) { // NEW - JS only
+function onCodesSelected(codes) {
+  // NEW - JS only
   appliedPromoCodes.value = codes
   // keep single field for back-compat UIs / summaries
   promoCode.value = codes.length === 1 ? codes[0] : ''
   isPromoValid.value = codes.length > 0
   showPromotionModal.value = false
+}
+
+// Check if the current service is restricted for the selected zone
+const isServiceRestricted = computed(() => {
+  const zone = orderStore.deliveryZone
+  if (!zone) return false // fallback to other checks
+
+  const type = props.orderType // 'delivery' or 'takeaway'
+  if (!type) return false
+
+  // Check availability for 'cc' channel
+  const availability = zone.availability?.[type]?.cc
+
+  // If explicitly false, it is restricted
+  return availability === false
+})
+
+function showRestrictedMessage() {
+  const type = props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'
+  init({
+    color: 'danger',
+    message: `${type} not available for this Zone`,
+    closeable: true,
+  })
 }
 
 function openCheckoutModal() {
@@ -628,7 +663,6 @@ const promoTotal = computed(() => {
 
 const orderFor = computed(() => orderStore.orderFor)
 
-
 const promoUnitsMap = computed(() => {
   const map = new Map()
   const resp = promoTotal.value
@@ -650,7 +684,6 @@ const promoUnitsMap = computed(() => {
   }
   return map
 })
-
 
 function linePromo(item) {
   if (!promoTotal.value) {
@@ -720,14 +753,17 @@ const promoOfferItemPrice = (item) => {
     const it = orderStore.offerItems[i]
     const itOfferId = it.offerId || (it.fullItem && it.fullItem.offerId)
     if (itOfferId === offerId) {
-      if (i === item.__storeIndex) { occ = seen; break }
+      if (i === item.__storeIndex) {
+        occ = seen
+        break
+      }
       seen++
     }
   }
 
   // Pick corresponding validator entry (fallback to last if fewer entries)
   const picked = matches[Math.min(occ, matches.length - 1)]
-  const updated = Number((picked && picked.totalPrice) ? picked.totalPrice : 0)
+  const updated = Number(picked && picked.totalPrice ? picked.totalPrice : 0)
 
   return Number(updated.toFixed(2))
 }
@@ -748,7 +784,7 @@ function menuItemPromo(item) {
   // fallbacks keep UI stable when promo data is missing
   const lp = promoTotal.value ? linePromo(item) : null
   const original = Number(lp?.lineOriginal ?? item.total ?? 0)
-  const updated  = Number(lp?.lineUpdated  ?? item.total ?? 0)
+  const updated = Number(lp?.lineUpdated ?? item.total ?? 0)
 
   // treat as affected only if the number actually changed
   const affected = Math.abs(updated - original) > 0.005
@@ -825,7 +861,10 @@ function parseCodes(raw) {
   const out = []
   for (const t of tokens) {
     const k = t.toLowerCase()
-    if (!seen.has(k)) { seen.add(k); out.push(t) }
+    if (!seen.has(k)) {
+      seen.add(k)
+      out.push(t)
+    }
   }
   return out
 }
@@ -849,13 +888,12 @@ function buildPromoPayloadFromState(promoCodes) {
       selection.addedItems.map((item) => ({
         menuItem: item.itemId,
         quantity: item.quantity || 1,
-        options:
-          (item.selectedOptions || []).flatMap((group) =>
-            group.selected.map((option) => ({
-              option: option.optionId,
-              quantity: option.quantity,
-            })),
-          ),
+        options: (item.selectedOptions || []).flatMap((group) =>
+          group.selected.map((option) => ({
+            option: option.optionId,
+            quantity: option.quantity,
+          })),
+        ),
       })),
     ),
   }))
@@ -875,8 +913,8 @@ function buildPromoPayloadFromState(promoCodes) {
     outletId: serviceStore.selectedRest,
     orderDateTime: new Date(props.dateSelected).toISOString(),
     paymentMode: '',
-    promoCodes: promoCodes,                 // array (no empty strings)
-    hasOtherOffers: offerMenuItems.length,  // number (not boolean)
+    promoCodes: promoCodes, // array (no empty strings)
+    hasOtherOffers: offerMenuItems.length, // number (not boolean)
   }
 
   if (single) payload.promoCode = single
@@ -920,11 +958,12 @@ async function applyPromoCode() {
   } catch (err) {
     orderStore.setOrderTotal(null)
     isPromoValid.value = false
-    init({ message: (err && err.response && err.response.data && err.response.data.message) || 'PromoCode invalid', color: 'danger' })
+    init({
+      message: (err && err.response && err.response.data && err.response.data.message) || 'PromoCode invalid',
+      color: 'danger',
+    })
   }
 }
-
-
 
 function clearPromoCode() {
   promoCode.value = ''
@@ -934,8 +973,6 @@ function clearPromoCode() {
   }
   orderStore.setOrderTotal(null)
 }
-
-
 
 const getMenuOptions = async (selectedItem) => {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -983,7 +1020,6 @@ const isFutureTimeValid = () => {
 }
 
 const futureTimeError = ref(false)
-
 
 const getOfferItems = async (selectedItem) => {
   selectedItemWithArticlesOptionsGroups.value = selectedItem

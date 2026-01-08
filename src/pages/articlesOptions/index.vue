@@ -1,7 +1,6 @@
 <template>
   <div>
     <div class="rounded bg-white w-full mt-4">
-
       <!-- Display Tab Content -->
       <RouterView />
     </div>

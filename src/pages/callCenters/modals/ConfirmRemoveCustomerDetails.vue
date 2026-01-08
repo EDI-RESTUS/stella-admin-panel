@@ -15,7 +15,9 @@
       <div class="flex justify-end gap-2">
         <VaButton size="small" @click="emit('update:modelValue', false)">Cancel</VaButton>
         <VaButton color="danger" size="small" @click="onYes">Yes</VaButton>
-        <VaButton color="danger" preset="secondary" border-color="danger" size="small" @click="onYesClearAll">Yes, clear all</VaButton>
+        <VaButton color="danger" preset="secondary" border-color="danger" size="small" @click="onYesClearAll"
+          >Yes, clear all</VaButton
+        >
       </div>
     </template>
   </VaModal>

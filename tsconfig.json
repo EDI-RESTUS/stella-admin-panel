@@ -23,6 +23,5 @@
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "vite.config.ts", "node_modules/vuestic-ui"],
-  "exclude": ["node_modules/**/*"],
-
+  "exclude": ["node_modules/**/*"]
 }

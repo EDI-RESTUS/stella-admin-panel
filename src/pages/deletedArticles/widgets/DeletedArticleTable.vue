@@ -100,9 +100,7 @@ if (servicesStore.selectedRest) {
       <!-- Left: Title -->
       <div class="flex flex-1 min-w-0 items-center gap-4 flex-wrap">
         <div class="flex items-center gap-2 flex-shrink-0 mt-1">
-          <h1 class="text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight">
-            Deleted Articles
-          </h1>
+          <h1 class="text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight">Deleted Articles</h1>
         </div>
       </div>
       <!-- Right: empty for spacing consistency -->
@@ -110,7 +108,7 @@ if (servicesStore.selectedRest) {
     </div>
 
     <!-- TABLE -->
-    <div class="flex flex-col h-[calc(100vh-12rem)] ">
+    <div class="flex flex-col h-[calc(100vh-12rem)]">
       <VaDataTable
         :columns="columns"
         :items="items"
@@ -159,6 +157,4 @@ if (servicesStore.selectedRest) {
 ::v-deep(.va-data-table__table tbody tr:hover) {
   background-color: #f8fafc;
 }
-
-
 </style>

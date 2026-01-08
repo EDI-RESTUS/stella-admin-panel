@@ -15,7 +15,7 @@ export const useOrderStore = defineStore('order', {
     phoneNumber: '',
     orderFor: 'current',
     orderNotes: '',
-    deliveryNotes: "",
+    deliveryNotes: '',
 
     // ADDED — holds /orders/validate-promo response for UI breakdown (incl. updatedOffersTotal)
     validation: null as null | {
@@ -45,12 +45,15 @@ export const useOrderStore = defineStore('order', {
       }>
       updatedOffersTotal: number
       affectsOffers: boolean
-
     },
     editContext: null as null | {
       orderId: string
       tableNumber: number
-      originalMenuItems: Array<{ menuItem: string; quantity: number; options?: Array<{ option: string; quantity?: number }> }>
+      originalMenuItems: Array<{
+        menuItem: string
+        quantity: number
+        options?: Array<{ option: string; quantity?: number }>
+      }>
       originalOffersToDelete: Array<{ offerId: string; quantity: number }>
     },
   }),
@@ -61,34 +64,28 @@ export const useOrderStore = defineStore('order', {
     originalItemsTotal: (s) =>
       s.validation
         ? Number(
-          s.validation.menuItems
-            .reduce((sum, it) => sum + Number(it.originalPrice) + Number(it.optionsPrice || 0), 0)
-            .toFixed(2),
-        )
+            s.validation.menuItems
+              .reduce((sum, it) => sum + Number(it.originalPrice) + Number(it.optionsPrice || 0), 0)
+              .toFixed(2),
+          )
         : 0,
 
     // Offers (before promos) = sum of basePrice in offerDetails
     originalOffersTotal: (s) =>
       s.validation?.offerDetails?.length
-        ? Number(
-          s.validation.offerDetails.reduce((sum, o) => sum + Number(o.basePrice || 0), 0).toFixed(2),
-        )
+        ? Number(s.validation.offerDetails.reduce((sum, o) => sum + Number(o.basePrice || 0), 0).toFixed(2))
         : 0,
 
     // Items after promos = sum of updatedPrice
     itemsAfterPromos: (s) =>
       s.validation
-        ? Number(
-          s.validation.menuItems.reduce((sum, it) => sum + Number(it.updatedPrice || 0), 0).toFixed(2),
-        )
+        ? Number(s.validation.menuItems.reduce((sum, it) => sum + Number(it.updatedPrice || 0), 0).toFixed(2))
         : 0,
 
     // Offers after promos = backend aggregate updatedOffersTotal
-    offersAfterPromos: (s) =>
-      s.validation ? Number((s.validation.updatedOffersTotal || 0).toFixed(2)) : 0,
+    offersAfterPromos: (s) => (s.validation ? Number((s.validation.updatedOffersTotal || 0).toFixed(2)) : 0),
 
-    deliveryFeeValidated: (s) =>
-      s.validation ? Number((s.validation.deliveryFee || 0).toFixed(2)) : 0,
+    deliveryFeeValidated: (s) => (s.validation ? Number((s.validation.deliveryFee || 0).toFixed(2)) : 0),
 
     // Cross-getter access must use method syntax + `this`
     originalTotal(): number {
@@ -129,7 +126,7 @@ export const useOrderStore = defineStore('order', {
       this.orderNotes = payload
     },
     setDeliveryNotes(v: string) {
-      this.deliveryNotes = v ?? ""
+      this.deliveryNotes = v ?? ''
     },
     setPaymentLink(payload) {
       this.redirectUrl = payload
@@ -242,18 +239,25 @@ export const useOrderStore = defineStore('order', {
     },
 
     // --- additions inside `actions: { ... }` ---
-    setEditContext(ctx: any) { this.editContext = ctx },
-    clearEditContext() { this.editContext = null },
+    setEditContext(ctx: any) {
+      this.editContext = ctx
+    },
+    clearEditContext() {
+      this.editContext = null
+    },
 
-    async applyOrderEditApi(orderId: string, args: {
-      action: "add" | "delete" | "entity" | "cancel",
-      payload?: any,
-      tableNumber?: number | string,
-      posUser?: string,
-      posPass?: string,
-      cancelReasonId?: number | string,
-      kiosk?: boolean, // optional: route switch
-    }) {
+    async applyOrderEditApi(
+      orderId: string,
+      args: {
+        action: 'add' | 'delete' | 'entity' | 'cancel'
+        payload?: any
+        tableNumber?: number | string
+        posUser?: string
+        posPass?: string
+        cancelReasonId?: number | string
+        kiosk?: boolean // optional: route switch
+      },
+    ) {
       const url = import.meta.env.VITE_API_BASE_URL
       const qp = new URLSearchParams()
       if (args.tableNumber != null) qp.set('tableNumber', String(args.tableNumber))
@@ -267,16 +271,24 @@ export const useOrderStore = defineStore('order', {
     },
 
     // Build API-ready lines from cartItems (robust id pickers)
-    buildMenuPayloadFromCart(): Array<{ menuItem: string; quantity: number; options: Array<{ option: string; quantity: number }> }> {
+    buildMenuPayloadFromCart(): Array<{
+      menuItem: string
+      quantity: number
+      options: Array<{ option: string; quantity: number }>
+    }> {
       const idOf = (x: any) => x?.menuItem?._id || x?.menuItem?.id || x?.menuItem || x?._id || x?.id || x
       const optId = (o: any) => o?.option?._id || o?.option?.id || o?.optionId || o?._id || o?.id || o?.option
       const lines: any[] = []
       for (const it of this.cartItems || []) {
         const options: Array<{ option: string; quantity: number }> = []
         // tolerate both flat `selectedOptions` and `options`
-        const groups = Array.isArray(it.selectedOptions) ? it.selectedOptions : (Array.isArray(it.options) ? it.options : [])
+        const groups = Array.isArray(it.selectedOptions)
+          ? it.selectedOptions
+          : Array.isArray(it.options)
+            ? it.options
+            : []
         for (const g of groups || []) {
-          const sels = Array.isArray(g.selected) ? g.selected : (Array.isArray(g.selections) ? g.selections : [])
+          const sels = Array.isArray(g.selected) ? g.selected : Array.isArray(g.selections) ? g.selections : []
           for (const s of sels || []) {
             const oid = optId(s)
             const q = Number(s?.quantity ?? 1) || 1
@@ -291,7 +303,10 @@ export const useOrderStore = defineStore('order', {
     },
 
     // Build API-ready offers payload from store.offerItems
-    buildOffersPayloadFromStore(): Array<{ offerId: string; menuItems: Array<{ menuItem: string; quantity: number; options: Array<{ option: string; quantity: number }> }> }> {
+    buildOffersPayloadFromStore(): Array<{
+      offerId: string
+      menuItems: Array<{ menuItem: string; quantity: number; options: Array<{ option: string; quantity: number }> }>
+    }> {
       const idOf = (x: any) => x?._id || x?.id || x
       const optId = (o: any) => o?.option?._id || o?.option?.id || o?.optionId || o?._id || o?.id || o?.option
       const out: any[] = []
@@ -303,9 +318,13 @@ export const useOrderStore = defineStore('order', {
           const mid = String(idOf(mi?.menuItem || mi))
           const qty = Number(mi?.quantity ?? 1) || 1
           const options: any[] = []
-          const groups = Array.isArray(mi.selectedOptions) ? mi.selectedOptions : (Array.isArray(mi.options) ? mi.options : [])
+          const groups = Array.isArray(mi.selectedOptions)
+            ? mi.selectedOptions
+            : Array.isArray(mi.options)
+              ? mi.options
+              : []
           for (const g of groups || []) {
-            const sels = Array.isArray(g.selected) ? g.selected : (Array.isArray(g.selections) ? g.selections : [])
+            const sels = Array.isArray(g.selected) ? g.selected : Array.isArray(g.selections) ? g.selections : []
             for (const s of sels || []) {
               const oid = optId(s)
               const q = Number(s?.quantity ?? 1) || 1
@@ -321,7 +340,10 @@ export const useOrderStore = defineStore('order', {
 
     // Canonical key for diff on a single line
     _lineKey(l: { menuItem: string; quantity: number; options?: Array<{ option: string; quantity?: number }> }) {
-      const opt = (l.options || []).map(o => `${String(o.option)}:${Number(o.quantity ?? 1) || 1}`).sort().join('|')
+      const opt = (l.options || [])
+        .map((o) => `${String(o.option)}:${Number(o.quantity ?? 1) || 1}`)
+        .sort()
+        .join('|')
       return `${l.menuItem}__${opt || 'noopts'}`
     },
 
@@ -338,8 +360,10 @@ export const useOrderStore = defineStore('order', {
         }
         return m
       }
-      const A = cnt(oldArr), B = cnt(newArr)
-      const toDelete: any[] = [], toAdd: any[] = []
+      const A = cnt(oldArr),
+        B = cnt(newArr)
+      const toDelete: any[] = [],
+        toAdd: any[] = []
 
       // keys in old → if decreased, delete the diff
       for (const [key, rec] of A.entries()) {
@@ -361,8 +385,18 @@ export const useOrderStore = defineStore('order', {
      * - add new/changed menu lines
      * - add current offers (full blocks with items+options)
      */
-    async applyEditByReplace({ posUser, posPass, tableNumber, cancelReasonId, kiosk = false }: {
-      posUser?: string, posPass?: string, tableNumber?: number | string, cancelReasonId?: number | string, kiosk?: boolean
+    async applyEditByReplace({
+      posUser,
+      posPass,
+      tableNumber,
+      cancelReasonId,
+      kiosk = false,
+    }: {
+      posUser?: string
+      posPass?: string
+      tableNumber?: number | string
+      cancelReasonId?: number | string
+      kiosk?: boolean
     }) {
       if (!this.editContext) throw new Error('No edit context set')
       const orderId = this.editContext.orderId
@@ -377,15 +411,28 @@ export const useOrderStore = defineStore('order', {
         await this.applyOrderEditApi(orderId, {
           action: 'delete',
           payload: { menuItems: toDelete },
-          tableNumber: tbl, posUser, posPass, cancelReasonId, kiosk,
+          tableNumber: tbl,
+          posUser,
+          posPass,
+          cancelReasonId,
+          kiosk,
         })
       }
 
       if ((this.editContext.originalOffersToDelete || []).length) {
         await this.applyOrderEditApi(orderId, {
           action: 'delete',
-          payload: { offerMenuItems: this.editContext.originalOffersToDelete.map(o => ({ offerId: o.offerId, quantity: Number(o.quantity || 1) })) },
-          tableNumber: tbl, posUser, posPass, cancelReasonId, kiosk,
+          payload: {
+            offerMenuItems: this.editContext.originalOffersToDelete.map((o) => ({
+              offerId: o.offerId,
+              quantity: Number(o.quantity || 1),
+            })),
+          },
+          tableNumber: tbl,
+          posUser,
+          posPass,
+          cancelReasonId,
+          kiosk,
         })
       }
 
@@ -393,7 +440,10 @@ export const useOrderStore = defineStore('order', {
         await this.applyOrderEditApi(orderId, {
           action: 'add',
           payload: { menuItems: toAdd },
-          tableNumber: tbl, posUser, posPass, kiosk,
+          tableNumber: tbl,
+          posUser,
+          posPass,
+          kiosk,
         })
       }
 
@@ -402,7 +452,10 @@ export const useOrderStore = defineStore('order', {
         await this.applyOrderEditApi(orderId, {
           action: 'add',
           payload: { offerMenuItems: currentOffers },
-          tableNumber: tbl, posUser, posPass, kiosk,
+          tableNumber: tbl,
+          posUser,
+          posPass,
+          kiosk,
         })
       }
 
@@ -411,6 +464,5 @@ export const useOrderStore = defineStore('order', {
       this.resetEditOrder()
       return true
     },
-
   },
 })

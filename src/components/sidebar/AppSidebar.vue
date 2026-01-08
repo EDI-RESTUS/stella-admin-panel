@@ -7,7 +7,6 @@
     class="flex flex-col justify-between"
   >
     <VaAccordion class="mt-5 pl-5 flex-1 overflow-y-auto">
-
       <!-- Call Center -->
       <div v-if="userRole !== 'editor'" class="flex flex-col gap-y-1 mb-2">
         <span
@@ -18,14 +17,14 @@
           <VaIcon :name="callCenterOpen ? 'expand_less' : 'expand_more'" />
         </span>
 
-        <transition name="fade">
+        <Transition name="fade">
           <div v-if="callCenterOpen" class="flex flex-col gap-y-1">
             <RouterLink
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'callCenters'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/callCenters"
             >
@@ -33,7 +32,7 @@
               Call Center
             </RouterLink>
           </div>
-        </transition>
+        </Transition>
       </div>
 
       <!-- Menu -->
@@ -46,14 +45,14 @@
           <VaIcon :name="menuOpen ? 'expand_less' : 'expand_more'" />
         </span>
 
-        <transition name="fade">
+        <Transition name="fade">
           <div v-if="menuOpen" class="flex flex-col gap-y-1">
             <RouterLink
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'organizeMenu'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/organizeMenu"
             >
@@ -66,7 +65,7 @@
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'categories'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/categories"
             >
@@ -79,7 +78,7 @@
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'articles'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/articles"
             >
@@ -92,7 +91,7 @@
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 ['articlesOptionsGroups', 'articlesOptionsList'].includes($route.name)
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/articlesOptions/groups"
             >
@@ -105,7 +104,7 @@
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'offers'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/offers"
             >
@@ -118,7 +117,7 @@
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'promotions'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/promotions"
             >
@@ -131,7 +130,7 @@
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'allergens'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/allergens"
             >
@@ -144,7 +143,7 @@
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'deletedArticles'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/deletedArticles"
             >
@@ -152,44 +151,41 @@
               Deleted Articles
             </RouterLink>
           </div>
-        </transition>
+        </Transition>
       </div>
 
       <!-- Loyalty -->
       <div v-if="userRole.includes('admin')" class="flex flex-col gap-y-1 mb-2">
         <span
-  class="flex items-center justify-between font-bold text-slate-800 uppercase tracking-wide text-xs cursor-pointer py-1 rounded-lg transition relative -ml-2 mr-2 pl-2 pr-2 hover:bg-slate-50"
-  @click="loyaltyOpen = !loyaltyOpen"
->
-  <!-- Left accent visible only when expanded -->
-  <span
-    v-if="loyaltyOpen"
-    class="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg bg-g-600"
-  ></span>
+          class="flex items-center justify-between font-bold text-slate-800 uppercase tracking-wide text-xs cursor-pointer py-1 rounded-lg transition relative -ml-2 mr-2 pl-2 pr-2 hover:bg-slate-50"
+          @click="loyaltyOpen = !loyaltyOpen"
+        >
+          <!-- Left accent visible only when expanded -->
+          <span v-if="loyaltyOpen" class="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg bg-g-600"></span>
 
-  Loyalty
-  <VaIcon :name="loyaltyOpen ? 'expand_less' : 'expand_more'" />
-</span>
+          Loyalty
+          <VaIcon :name="loyaltyOpen ? 'expand_less' : 'expand_more'" />
+        </span>
 
-
-        <transition name="fade">
+        <Transition name="fade">
           <div v-if="loyaltyOpen" class="flex flex-col gap-y-1">
             <span
-  class="flex items-center py-1 rounded-lg mr-2 pl-2 -ml-2 text-slate-400 cursor-not-allowed"
-  title="Coming Soon"
->
-  <VaIcon name="mso-account_circle" class="mr-2" />
-  Members
-</span>
+              class="flex items-center py-1 rounded-lg mr-2 pl-2 -ml-2 text-slate-400 cursor-not-allowed"
+              title="Coming Soon"
+            >
+              <VaIcon name="mso-account_circle" class="mr-2" />
+              Members
+            </span>
 
-
-            <span class="flex items-center py-1 rounded-lg mr-2 pl-2 -ml-2 text-slate-400 cursor-not-allowed"
-  title="Coming Soon">
+            <span
+              class="flex items-center py-1 rounded-lg mr-2 pl-2 -ml-2 text-slate-400 cursor-not-allowed"
+              title="Coming Soon"
+            >
               <VaIcon name="redeem" class="mr-2" />
               Settings
             </span>
           </div>
-        </transition>
+        </Transition>
       </div>
 
       <!-- Configuration -->
@@ -202,14 +198,14 @@
           <VaIcon :name="configOpen ? 'expand_less' : 'expand_more'" />
         </span>
 
-        <transition name="fade">
+        <Transition name="fade">
           <div v-if="configOpen" class="flex flex-col gap-y-1">
             <span
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2 cursor-pointer',
                 $route.name === 'update-outlet'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               @click="goToOutlet"
             >
@@ -248,7 +244,7 @@
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'deliveryZone'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/deliveryZone"
             >
@@ -261,7 +257,7 @@
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'payments'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/payments"
             >
@@ -285,7 +281,7 @@
               Languages
             </span>
           </div>
-        </transition>
+        </Transition>
       </div>
 
       <!-- Admin -->
@@ -298,14 +294,14 @@
           <VaIcon :name="adminOpen ? 'expand_less' : 'expand_more'" />
         </span>
 
-        <transition name="fade">
+        <Transition name="fade">
           <div v-if="adminOpen" class="flex flex-col gap-y-1">
             <RouterLink
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'list' || $route.name === 'admin-update-outlet'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/outlets/list"
             >
@@ -318,7 +314,7 @@
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'stellaUsers'
                   ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
               to="/stellaUsers"
             >
@@ -326,14 +322,11 @@
               Users
             </RouterLink>
           </div>
-        </transition>
+        </Transition>
       </div>
-
     </VaAccordion>
 
-    <div class="px-4 py-1 text-[11px] text-slate-500 text-center">
-      Stella 1.139
-    </div>
+    <div class="px-4 py-1 text-[11px] text-slate-500 text-center">Stella 1.139</div>
   </VaSidebar>
 </template>
 
