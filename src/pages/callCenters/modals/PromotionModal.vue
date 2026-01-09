@@ -23,11 +23,7 @@
                 <strong>{{ promo.name }}</strong> - {{ code }}
               </span>
               <div class="flex items-center gap-2">
-                <VaIcon
-                  v-if="isSelected(code)"
-                  name="check"
-                  class="text-white"
-                />
+                <VaIcon v-if="isSelected(code)" name="check" class="text-white" />
                 <VaIcon
                   name="copy"
                   class="cursor-pointer opacity-80 hover:opacity-100"
@@ -166,8 +162,8 @@ function buildPayload({ promoCodes }) {
     outletId: serviceStore.selectedRest,
     orderDateTime: new Date(props.dateSelected).toISOString(),
     paymentMode: '',
-    promoCode: single,           // <= keep for older API paths
-    promoCodes,                  // <= NEW multi-code field
+    promoCode: single, // <= keep for older API paths
+    promoCodes, // <= NEW multi-code field
     hasOtherOffers: offerMenuItems.length,
   }
 }
@@ -181,7 +177,8 @@ async function applySelectedCodes(hideToast = false) {
     const response = await orderStore.validatePromoCode(payload)
 
     if (response.data?.success) {
-      if (!hideToast) init({ message: `Promotion${selectedCodes.value.length > 1 ? 's' : ''} applied`, color: 'success' })
+      if (!hideToast)
+        init({ message: `Promotion${selectedCodes.value.length > 1 ? 's' : ''} applied`, color: 'success' })
       orderStore.setOrderTotal(response.data.data)
 
       // Emit both for compatibility; parent can listen to either

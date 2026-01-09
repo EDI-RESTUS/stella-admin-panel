@@ -102,6 +102,16 @@
           text-by="name"
           value-by="paymentTypeId"
         />
+
+        <VaSelect
+          v-model="formData.allowedDeliveryZoneIds"
+          :disabled="!formData.outlets.length"
+          label="Allowed Delivery Zones"
+          :options="deliveryZones"
+          :multiple="true"
+          text-by="name"
+          value-by="_id"
+        />
       </div>
     </VaForm>
 
@@ -136,6 +146,7 @@ const { init } = useToast()
 
 const servicesStore = useServiceStore()
 const paymentTypes = ref([])
+const deliveryZones = ref([])
 const formData = ref({
   firstName: '',
   username: '',
@@ -150,6 +161,7 @@ const formData = ref({
   updating: '',
   outlets: [],
   paymentType: [],
+  allowedDeliveryZoneIds: [],
 })
 
 const outlets = ref([])
@@ -175,10 +187,28 @@ const getPaymentOptions = (outletId) => {
   })
 }
 
+const getDeliveryZones = (outletId) => {
+  const url = import.meta.env.VITE_API_BASE_URL
+  axios
+    .get(`${url}/deliveryZones/${outletId}`)
+    .then((response) => {
+      deliveryZones.value = response.data.data
+    })
+    .catch(() => {
+      deliveryZones.value = []
+    })
+}
+
 watch(
   () => formData.value.outlets,
   () => {
-    if (formData.value.outlets.length) getPaymentOptions(formData.value.outlets[0])
+    if (formData.value.outlets.length) {
+      getPaymentOptions(formData.value.outlets[0])
+      getDeliveryZones(formData.value.outlets[0])
+    } else {
+      paymentTypes.value = []
+      deliveryZones.value = []
+    }
   },
 )
 
@@ -191,9 +221,15 @@ if (props.selectedUser) {
   const user = JSON.parse(JSON.stringify(props.selectedUser))
   user.outlets = user.outlets?.map((e) => e._id) || []
   user.posCreds = user.posCreds || { posId: '', posPassword: '' }
+  user.allowedDeliveryZoneIds = user.allowedDeliveryZoneIds || []
   formData.value = {
     ...formData.value,
     ...user,
+  }
+  // Initialize fetching based on existing outlet
+  if (user.outlets.length) {
+    getPaymentOptions(user.outlets[0])
+    getDeliveryZones(user.outlets[0])
   }
 }
 

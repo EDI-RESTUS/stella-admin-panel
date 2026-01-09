@@ -410,7 +410,6 @@
               <VaInput v-model="restaurantData.orderNotes" label="Order Notes" class="w-full" />
 
               <VaInput v-model="restaurantData.DeliveryNotes" label="Delivery Notes" class="w-full" />
-
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 gap-4 w-full mt-4">
@@ -815,7 +814,7 @@ export default {
         drinkArticle: false,
         drinkArticleNotes: '',
         orderNotes: '',
-        deliveryNotes:'',
+        deliveryNotes: '',
         dineInConfirmationMessage: '',
         deliveryConfirmationMessage: '',
         takeawayConfirmationMessage: '',

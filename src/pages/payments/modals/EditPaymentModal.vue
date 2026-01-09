@@ -15,13 +15,7 @@
     <VaForm ref="form" @submit.prevent="submit()">
       <div class="grid grid-cols-2 md:grid-cols-1 gap-3 justify-between">
         <!-- Name -->
-        <VaInput
-          v-model="formData.name"
-          label="Name"
-          placeholder="Name"
-          type="text"
-          :rules="[validators.required]"
-        />
+        <VaInput v-model="formData.name" label="Name" placeholder="Name" type="text" :rules="[validators.required]" />
 
         <!-- Payment Gateway -->
         <VaSelect
@@ -49,12 +43,7 @@
         </div>
 
         <!-- Payment Type ID -->
-        <VaInput
-          v-model="formData.paymentTypeId"
-          label="Payment Type ID"
-          placeholder="Payment Type ID"
-          type="text"
-        />
+        <VaInput v-model="formData.paymentTypeId" label="Payment Type ID" placeholder="Payment Type ID" type="text" />
 
         <!-- Options -->
         <div class="grid md:grid-cols-4 gap-3">
@@ -163,9 +152,7 @@ const getPaymentconfig = () => {
         .get(`${url}/payments/${props.selectedPayment._id}`)
         .then((response) => {
           formData.value = response.data.data
-          const selected = paymentOptions.value.find(
-            (a) => a.paymentMethodName === formData.value.paymentGateway
-          )
+          const selected = paymentOptions.value.find((a) => a.paymentMethodName === formData.value.paymentGateway)
           selected?.inputConfig.forEach((e) => {
             e.value = response.data.data.paymentGatewayConfig?.[e.name] || ''
           })
@@ -204,7 +191,7 @@ const submit = async () => {
           const val = input.value
           // Cast to number if type is number
           return [input.name, input.type === 'number' ? Number(val) : val]
-        })
+        }),
       )
     }
 

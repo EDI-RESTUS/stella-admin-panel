@@ -18,13 +18,13 @@
     <template #right>
       <div class="flex items-center">
         <VaSelect
-  v-model="selectedRest"
-  :options="restOptions"
-  placeholder="Select restaurant"
-  searchable
-  highlight-matched-text
-  class="rest-select"
-/>
+          v-model="selectedRest"
+          :options="restOptions"
+          placeholder="Select restaurant"
+          searchable
+          highlight-matched-text
+          class="rest-select"
+        />
 
         <AppNavbarActions class="app-navbar__actions" :is-mobile="isMobile" />
       </div>
@@ -155,12 +155,12 @@ watch(selectedRest, (newValue) => {
     border: 1px solid #e2e8f0 !important; /* slate-200 */
     background-color: rgba(255, 255, 255, 0.6) !important; /* bg-white/60 */
     backdrop-filter: blur(12px);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     transition: all 0.2s ease-in-out;
 
     &:hover {
       background-color: rgba(255, 255, 255, 0.75) !important;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
     }
   }
 
@@ -196,5 +196,4 @@ watch(selectedRest, (newValue) => {
     }
   }
 }
-
 </style>

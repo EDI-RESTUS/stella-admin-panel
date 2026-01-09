@@ -67,8 +67,8 @@ const onSave = () => {
 
 const roleSelectOptions: { text: Capitalize<Lowercase<UserRole>>; value: UserRole }[] = [
   { text: 'Admin', value: 'admin' },
-{ text: 'Caller', value: 'caller' },
-{ text: 'Caller & Editor', value: 'caller-editor' },
+  { text: 'Caller', value: 'caller' },
+  { text: 'Caller & Editor', value: 'caller-editor' },
   { text: 'User', value: 'user' },
   { text: 'Owner', value: 'owner' },
 ]

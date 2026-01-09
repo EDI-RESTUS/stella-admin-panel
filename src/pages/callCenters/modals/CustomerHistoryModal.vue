@@ -152,7 +152,7 @@
               <span class="text-xs text-gray-500"
                 >{{ formatDateTime(order.createdAt) }} •
                 <template v-if="order.orderFor === 'future'">
-                  <span 
+                  <span
                     class="text-blue-600 hover:text-blue-800 cursor-pointer underline decoration-dotted font-medium transition-colors"
                     title="Click to reschedule"
                     @click.stop="openReschedule(order)"
@@ -270,10 +270,8 @@
             <span
               v-if="
                 !isCancelled(order, index) &&
-                (
-                  (index === 0 && ['kds','preparing'].includes(String(orderStatuses || '').toLowerCase())) ||
-                  order.orderFor === 'future'
-                )                
+                ((index === 0 && ['kds', 'preparing'].includes(String(orderStatuses || '').toLowerCase())) ||
+                  order.orderFor === 'future')
               "
               size="small"
               class="flex items-center gap-1 rounded-full text-white px-2 py-2 font-semibold text-xs cursor-pointer bg-green-600 hover:bg-green-700 transition-colors"
@@ -286,11 +284,10 @@
             <span
               v-if="
                 !isCancelled(order, index) &&
-                (
-                  (index === 0 && ['kds','preparing','onrack', 'in progress'].includes(String(orderStatuses || '').toLowerCase())) ||
+                ((index === 0 &&
+                  ['kds', 'preparing', 'onrack', 'in progress'].includes(String(orderStatuses || '').toLowerCase())) ||
                   order.status === 'Completed' ||
-                  order.status === 'In Progress'
-                )
+                  order.status === 'In Progress')
               "
               size="small"
               class="flex items-center gap-1 rounded-full text-white px-2 py-2 font-semibold text-xs cursor-pointer bg-red-600 hover:bg-red-700 transition-colors"
@@ -303,10 +300,9 @@
             <span
               v-if="
                 !isCancelled(order, index) &&
-                (
-                  (index === 0 && ['kds','preparing','onrack', 'in progress'].includes(String(orderStatuses || '').toLowerCase())) ||
-                  order.status === 'In Progress'
-                )
+                ((index === 0 &&
+                  ['kds', 'preparing', 'onrack', 'in progress'].includes(String(orderStatuses || '').toLowerCase())) ||
+                  order.status === 'In Progress')
               "
               size="small"
               class="flex items-center gap-1 rounded-full text-white px-3 py-2 font-semibold text-xs cursor-pointer bg-blue-600 hover:bg-blue-700 transition-colors"
@@ -315,150 +311,163 @@
               <ArrowRightLeft class="w-4 h-4" />
               {{ order.orderType === 'Delivery' ? 'Switch to TA' : 'Switch to Del' }}
             </span>
-
           </div>
 
-<!-- Cancelled always wins (from liveStatus or order.status) -->
-<!-- SINGLE status chip: Cancelled > Coordinator > Stella -->
-<span
-  v-if="isCancelled(order, index)"
-  class="px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors bg-red-600 text-white"
->
-  <XCircle class="w-3.5 h-3.5" />
-  Cancelled
-</span>
+          <!-- Cancelled always wins (from liveStatus or order.status) -->
+          <!-- SINGLE status chip: Cancelled > Coordinator > Stella -->
+          <span
+            v-if="isCancelled(order, index)"
+            class="px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors bg-red-600 text-white"
+          >
+            <XCircle class="w-3.5 h-3.5" />
+            Cancelled
+          </span>
 
-<span
-  v-else-if="
-    index === 0 &&
-    ['kds','preparing','onrack'].includes(String(orderStatuses || '').toLowerCase())
-  "
-  class="px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors bg-yellow-500 text-white capitalize"
->
-  <Loader2 class="w-3.5 h-3.5 animate-spin-slow" />
-  {{ orderStatuses === 'onrack' ? 'On Rack' : orderStatuses }}
-</span>
+          <span
+            v-else-if="
+              index === 0 && ['kds', 'preparing', 'onrack'].includes(String(orderStatuses || '').toLowerCase())
+            "
+            class="px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors bg-yellow-500 text-white capitalize"
+          >
+            <Loader2 class="w-3.5 h-3.5 animate-spin-slow" />
+            {{ orderStatuses === 'onrack' ? 'On Rack' : orderStatuses }}
+          </span>
 
-<span
-  v-else
-  class="px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors"
-  :class="{
-    'bg-green-600 text-white': order.status === 'Completed',
-    'bg-yellow-500 text-white': order.status === 'In Progress',
-    'bg-red-600 text-white': order.status === 'Cancelled',
-  }"
->
-  <template v-if="order.status === 'Completed'">
-    <CheckCircle class="w-3.5 h-3.5" />
-  </template>
-  <template v-else-if="order.status === 'In Progress'">
-    <Loader2 class="w-3.5 h-3.5 animate-spin-slow" />
-  </template>
-  <template v-else-if="order.status === 'Cancelled'">
-    <XCircle class="w-3.5 h-3.5" />
-  </template>
-  {{ order.status }}
-</span>
-
+          <span
+            v-else
+            class="px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors"
+            :class="{
+              'bg-green-600 text-white': order.status === 'Completed',
+              'bg-yellow-500 text-white': order.status === 'In Progress',
+              'bg-red-600 text-white': order.status === 'Cancelled',
+            }"
+          >
+            <template v-if="order.status === 'Completed'">
+              <CheckCircle class="w-3.5 h-3.5" />
+            </template>
+            <template v-else-if="order.status === 'In Progress'">
+              <Loader2 class="w-3.5 h-3.5 animate-spin-slow" />
+            </template>
+            <template v-else-if="order.status === 'Cancelled'">
+              <XCircle class="w-3.5 h-3.5" />
+            </template>
+            {{ order.status }}
+          </span>
         </div>
 
         <!-- EXPANDABLE ARTICLE LIST -->
         <div v-if="expandedIndex === index" class="bg-white px-6 pb-4 border-t border-gray-200">
-         <div
-  v-for="(offer, idx) in order.offerDetails || []"              
-  :key="idx"
-  class="flex flex-col justify-between py-2 border-b last:border-none relative"
-  :class="{
-    'bg-gray-50 text-black': isOfferSelected(order._id, idx),
-    'hover:bg-gray-50 cursor-pointer':
-      (index === 0 &&
-      !isCancelled(order, index) &&
-      (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack' || orderStatuses === 'In Progress')) ||
-      order.orderFor === 'future',
-    'opacity-60 cursor-not-allowed':
-      (index !== 0 ||
-      isCancelled(order, index) ||
-      !(orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack' || orderStatuses === 'In Progress')) &&
-      order.orderFor !== 'future',
-  }"
-  @click="
-    ((index === 0 &&
-    !isCancelled(order, index) &&
-    (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack'|| orderStatuses === 'In Progress')) ||
-    order.orderFor === 'future') &&
-    toggleOfferSelection(order._id, idx)
-  "
->
-  <div
-    v-if="
-    (index !== 0 ||
-      isCancelled(order, index) ||
-      !(orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack' || orderStatuses === 'In Progress')) &&
-      order.orderFor !== 'future'
-    "
-    class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"
-  >
-    <Ban class="w-4 h-4" />
-  </div>
+          <div
+            v-for="(offer, idx) in order.offerDetails || []"
+            :key="idx"
+            class="flex flex-col justify-between py-2 border-b last:border-none relative"
+            :class="{
+              'bg-gray-50 text-black': isOfferSelected(order._id, idx),
+              'hover:bg-gray-50 cursor-pointer':
+                (index === 0 &&
+                  !isCancelled(order, index) &&
+                  (orderStatuses === 'kds' ||
+                    orderStatuses === 'preparing' ||
+                    orderStatuses === 'onrack' ||
+                    orderStatuses === 'In Progress')) ||
+                order.orderFor === 'future',
+              'opacity-60 cursor-not-allowed':
+                (index !== 0 ||
+                  isCancelled(order, index) ||
+                  !(
+                    orderStatuses === 'kds' ||
+                    orderStatuses === 'preparing' ||
+                    orderStatuses === 'onrack' ||
+                    orderStatuses === 'In Progress'
+                  )) &&
+                order.orderFor !== 'future',
+            }"
+            @click="
+              ((index === 0 &&
+                !isCancelled(order, index) &&
+                (orderStatuses === 'kds' ||
+                  orderStatuses === 'preparing' ||
+                  orderStatuses === 'onrack' ||
+                  orderStatuses === 'In Progress')) ||
+                order.orderFor === 'future') &&
+                toggleOfferSelection(order._id, idx)
+            "
+          >
+            <div
+              v-if="
+                (index !== 0 ||
+                  isCancelled(order, index) ||
+                  !(
+                    orderStatuses === 'kds' ||
+                    orderStatuses === 'preparing' ||
+                    orderStatuses === 'onrack' ||
+                    orderStatuses === 'In Progress'
+                  )) &&
+                order.orderFor !== 'future'
+              "
+              class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"
+            >
+              <Ban class="w-4 h-4" />
+            </div>
 
-  <div v-if="isOfferSelected(order._id, idx)" class="absolute left-2 top-1/2 -translate-y-1/2">
-    <VaCheckbox
-      :model-value="true"
-      color="primary"
-      :readonly="true"
-      class="pointer-events-none"
-      @click.stop
-    />
-  </div>
+            <div v-if="isOfferSelected(order._id, idx)" class="absolute left-2 top-1/2 -translate-y-1/2">
+              <VaCheckbox
+                :model-value="true"
+                color="primary"
+                :readonly="true"
+                class="pointer-events-none"
+                @click.stop
+              />
+            </div>
 
-  <span class="pl-8">{{ offer.offerName }}</span>
+            <span class="pl-8">{{ offer.offerName }}</span>
 
-  <div v-for="item in offer.offerItems" :key="item._id" class="flex flex-row justify-between">
-    <div
-      class="flex flex-wrap items-center gap-2 pt-1 pl-10"
-      :class="isOfferSelected(order._id, idx) ? 'pl-10' : 'pl-12'"
-    >
-      <p class="font-semibold text-xs">
-        {{ item.quantity }} x {{ item.name }}
-        <span
-          v-if="item.extra"
-          class="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-normal"
-        >
-          {{ item.extra }}
-        </span>
-      </p>
+            <div v-for="item in offer.offerItems" :key="item._id" class="flex flex-row justify-between">
+              <div
+                class="flex flex-wrap items-center gap-2 pt-1 pl-10"
+                :class="isOfferSelected(order._id, idx) ? 'pl-10' : 'pl-12'"
+              >
+                <p class="font-semibold text-xs">
+                  {{ item.quantity }} x {{ item.name }}
+                  <span
+                    v-if="item.extra"
+                    class="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-normal"
+                  >
+                    {{ item.extra }}
+                  </span>
+                </p>
 
-      <div class="flex flex-wrap gap-1 text-xs">
-        <span
-          v-for="addon in item.options || []"
-          :key="addon.name"
-          class="px-2 py-0.5 rounded-full"
-          :class="{
-            'bg-green-100 text-green-700': addon.type.toLowerCase() === 'extra',
-            'bg-blue-100 text-blue-700': addon.type.toLowerCase() === 'article',
-            'bg-red-100 text-red-700': addon.type.toLowerCase() === 'hold',
-            'bg-amber-100 text-amber-700': addon.type.toLowerCase() === 'modifier',
-          }"
-        >
-          {{ addon.name }}
-          <span v-if="addon.price > 0">(€{{ addon.price.toFixed(2) }})</span>
-        </span>
-      </div>
-    </div>
-  </div>
+                <div class="flex flex-wrap gap-1 text-xs">
+                  <span
+                    v-for="addon in item.options || []"
+                    :key="addon.name"
+                    class="px-2 py-0.5 rounded-full"
+                    :class="{
+                      'bg-green-100 text-green-700': addon.type.toLowerCase() === 'extra',
+                      'bg-blue-100 text-blue-700': addon.type.toLowerCase() === 'article',
+                      'bg-red-100 text-red-700': addon.type.toLowerCase() === 'hold',
+                      'bg-amber-100 text-amber-700': addon.type.toLowerCase() === 'modifier',
+                    }"
+                  >
+                    {{ addon.name }}
+                    <span v-if="addon.price > 0">(€{{ addon.price.toFixed(2) }})</span>
+                  </span>
+                </div>
+              </div>
+            </div>
 
-  <div class="flex items-center justify-end pr-0">
-    <template v-if="!offer.overrideUnitPrice">
-      <span class="font-bold">€ {{ offer.totalPrice.toFixed(2) }}</span>
-    </template>
-    <template v-else>
-      <span class="font-bold line-through">€ {{ offer.totalPrice.toFixed(2) }}</span>
-      <span class="font-bold text-red-700">€ {{ offer.overrideUnitPrice.toFixed(2) }}</span>
-    </template>
-  </div>
+            <div class="flex items-center justify-end pr-0">
+              <template v-if="!offer.overrideUnitPrice">
+                <span class="font-bold">€ {{ offer.totalPrice.toFixed(2) }}</span>
+              </template>
+              <template v-else>
+                <span class="font-bold line-through">€ {{ offer.totalPrice.toFixed(2) }}</span>
+                <span class="font-bold text-red-700">€ {{ offer.overrideUnitPrice.toFixed(2) }}</span>
+              </template>
+            </div>
 
-  <div v-if="offer.overrideUnitPrice">{{ offer.overrideUnitPrice }}</div>
-</div>
+            <div v-if="offer.overrideUnitPrice">{{ offer.overrideUnitPrice }}</div>
+          </div>
 
           <div
             v-for="(item, idx) in order.menuItems || []"
@@ -467,10 +476,13 @@
             :class="{
               'bg-gray-50 text-black': isItemSelected(order._id, idx),
               'hover:bg-gray-50 cursor-pointer':
-                (index === 0 && (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack')) || order.orderFor === 'future',
+                (index === 0 &&
+                  (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack')) ||
+                order.orderFor === 'future',
               'opacity-60 cursor-not-allowed':
                 (index !== 0 ||
-                !(orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack')) && order.orderFor !== 'future',
+                  !(orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack')) &&
+                order.orderFor !== 'future',
             }"
             @click="
               ((index === 0 &&
@@ -516,16 +528,16 @@
               <div class="flex flex-wrap gap-1 text-xs">
                 <span
                   v-for="addon in (() => {
-                    const seen = new Set();
+                    const seen = new Set()
                     return item.articlesOptionsGroup
                       .flatMap((a) => a.articlesOptions)
                       .filter((a) => {
-                        if (!a.selected) return false;
-                        const key = a._id || a.optionId || a.name;
-                        if (seen.has(key)) return false;
-                        seen.add(key);
-                        return true;
-                      });
+                        if (!a.selected) return false
+                        const key = a._id || a.optionId || a.name
+                        if (seen.has(key)) return false
+                        seen.add(key)
+                        return true
+                      })
                   })()"
                   :key="addon._id || addon.optionId || addon.name"
                   class="px-2 py-0.5 rounded-full"
@@ -550,9 +562,9 @@
 
           <!-- Totals -->
           <div class="mt-2 space-y-1 text-xs">
-              <div class="flex justify-end gap-16">
-                <span class="font-semibold">SubTotal:</span>
-                <span class="font-bold">€ {{ order.subtotal.toFixed(2) }}</span>
+            <div class="flex justify-end gap-16">
+              <span class="font-semibold">SubTotal:</span>
+              <span class="font-bold">€ {{ order.subtotal.toFixed(2) }}</span>
             </div>
 
             <div v-if="getPromoForOrder(order)" class="border-b pb-1">
@@ -580,7 +592,10 @@
           <div class="flex gap-2">
             <button
               class="px-3 py-1 rounded-full bg-red-500 text-white font-semibold text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="!hasSelectedForOrder(order._id) || (!['Completed', 'Cancelled'].includes(order.status) && order.orderFor !== 'future')"
+              :disabled="
+                !hasSelectedForOrder(order._id) ||
+                (!['Completed', 'Cancelled'].includes(order.status) && order.orderFor !== 'future')
+              "
               @click="openConfirm('remove', order._id)"
             >
               Remove
@@ -588,7 +603,10 @@
 
             <button
               class="px-3 py-1 rounded-full bg-yellow-400 text-xs text-white font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="!hasSelectedForOrder(order._id) || (!['Completed', 'Cancelled'].includes(order.status) && order.orderFor !== 'future')"
+              :disabled="
+                !hasSelectedForOrder(order._id) ||
+                (!['Completed', 'Cancelled'].includes(order.status) && order.orderFor !== 'future')
+              "
               @click="openConfirm('edit', order._id)"
             >
               Edit
@@ -629,7 +647,7 @@
                     ? 'remove the selected Items'
                     : confirmAction === 'switchType'
                       ? 'switch order type'
-                    : ''
+                      : ''
         }}</span
       >
       ?
@@ -675,14 +693,14 @@
     @updated="handleComplaintUpdated"
     @removed="handleComplaintRemoved"
   />
-  
+
   <CustomerModal
     v-if="showAddressModal"
     :selected-user="addressModalCustomer"
     :user-name="addressModalCustomer?.Name || ''"
     :user-number="addressModalCustomer?.Phone || ''"
     :outlet="outlet"
-    :delivery-zone-id="orders.find(o => o._id === pendingSwitchOrderId)?.deliveryZoneId"
+    :delivery-zone-id="orders.find((o) => o._id === pendingSwitchOrderId)?.deliveryZoneId"
     :is-selection-mode="true"
     @selectAddress="handleAddressSelection"
     @close="showAddressModal = false"
@@ -691,29 +709,22 @@
   />
 
   <!-- Reschedule Modal -->
-  <VaModal
-    v-model="showRescheduleModal"
-    size="small"
-    hide-default-actions
-  >
+  <VaModal v-model="showRescheduleModal" size="small" hide-default-actions>
     <div class="p-4">
       <h3 class="text-lg font-bold mb-4">Reschedule Future Order</h3>
       <div class="mb-4">
         <label class="block text-sm font-medium text-gray-700 mb-1">New Date & Time</label>
-        <input 
-          type="datetime-local" 
-          v-model="rescheduleDateTime" 
+        <input
+          v-model="rescheduleDateTime"
+          type="datetime-local"
           class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
         />
       </div>
       <div class="flex justify-end gap-3 mt-6">
-        <button 
-          class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
-          @click="showRescheduleModal = false"
-        >
+        <button class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded" @click="showRescheduleModal = false">
           Cancel
         </button>
-        <button 
+        <button
           class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
           :disabled="!rescheduleDateTime"
           @click="saveReschedule"
@@ -726,7 +737,17 @@
 </template>
 <script setup>
 import { ref, onMounted, reactive, computed } from 'vue'
-import { CopyPlus, NotepadText, TriangleAlert, X, Plus, CheckCircle, Loader2, XCircle, ArrowRightLeft } from 'lucide-vue-next'
+import {
+  CopyPlus,
+  NotepadText,
+  TriangleAlert,
+  X,
+  Plus,
+  CheckCircle,
+  Loader2,
+  XCircle,
+  ArrowRightLeft,
+} from 'lucide-vue-next'
 import axios from 'axios'
 import { useUsersStore } from '@/stores/users.ts'
 import { useMenuStore } from '@/stores/getMenu'
@@ -784,18 +805,22 @@ const url = import.meta.env.VITE_API_BASE_URL
 const coordurl = import.meta.env.VITE_COORD_API_URL
 
 // ---------- Small utils ----------
-const eur = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' });
-const toNum = (v) => (v == null || v === '' ? 0 : Number(v));
-const first = (...vals) => vals.find(v => toNum(v) > 0) ?? 0;
-const titleize = (s = "") => s.replace(/[_-]+/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+const eur = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' })
+const toNum = (v) => (v == null || v === '' ? 0 : Number(v))
+const first = (...vals) => vals.find((v) => toNum(v) > 0) ?? 0
+const titleize = (s = '') =>
+  s
+    .replace(/[_-]+/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
 const idOf = (x) => x?._id || x?.id || x
 const optId = (o) => o?.option?._id || o?.option?.id || o?.optionId || o?._id || o?.id || o?.option
 
 const TYPE_LABELS = {
-  TAKE_X_PAY_Y: "Take X Pay Y",
-  PERCENTAGE_DISCOUNT: "Percentage Discount",
-  VALUE_DISCOUNT: "Value Discount",
-};
+  TAKE_X_PAY_Y: 'Take X Pay Y',
+  PERCENTAGE_DISCOUNT: 'Percentage Discount',
+  VALUE_DISCOUNT: 'Value Discount',
+}
 
 // ---------- Complaint / Note handlers ----------
 const editComplaint = (orderId, text) => {
@@ -807,8 +832,16 @@ const editComplaint = (orderId, text) => {
     showComplaintModal.value = true
   }, 0)
 }
-const openComplaint = (orderId) => { selectedOrderId.value = orderId; complaintToEdit.value = null; showComplaintModal.value = true }
-const openNote = (orderId, note) => { selectedOrderId.value = orderId; noteToEdit.value = note ? { orderId, text: note } : null; showAddNoteModal.value = true }
+const openComplaint = (orderId) => {
+  selectedOrderId.value = orderId
+  complaintToEdit.value = null
+  showComplaintModal.value = true
+}
+const openNote = (orderId, note) => {
+  selectedOrderId.value = orderId
+  noteToEdit.value = note ? { orderId, text: note } : null
+  showAddNoteModal.value = true
+}
 
 const handleComplaintSaved = async ({ orderId, text }) => {
   const order = orders.value.find((o) => o._id === orderId)
@@ -855,12 +888,24 @@ const openConfirm = (action, orderId) => {
 const confirmYes = () => {
   if (!confirmAction.value || !confirmOrderId.value) return
   switch (confirmAction.value) {
-    case 'remove': removeSelected(confirmOrderId.value); break
-    case 'edit':   editSelected(confirmOrderId.value); break
-    case 'repeat': repeatOrder(confirmOrderId.value); break
-    case 'add':    addItemsToOrder(confirmOrderId.value); break
-    case 'cancel': cancelOrder(confirmOrderId.value); break
-    case 'switchType': switchOrderType(confirmOrderId.value); break
+    case 'remove':
+      removeSelected(confirmOrderId.value)
+      break
+    case 'edit':
+      editSelected(confirmOrderId.value)
+      break
+    case 'repeat':
+      repeatOrder(confirmOrderId.value)
+      break
+    case 'add':
+      addItemsToOrder(confirmOrderId.value)
+      break
+    case 'cancel':
+      cancelOrder(confirmOrderId.value)
+      break
+    case 'switchType':
+      switchOrderType(confirmOrderId.value)
+      break
   }
   isConfirmOpen.value = false
 }
@@ -879,7 +924,8 @@ const toggleOfferSelection = (orderId, idx) => {
   else selectedOfferItems[orderId].push(idx)
 }
 const isItemSelected = (orderId, idx) => Array.isArray(selectedItems[orderId]) && selectedItems[orderId].includes(idx)
-const isOfferSelected = (orderId, idx) => Array.isArray(selectedOfferItems[orderId]) && selectedOfferItems[orderId].includes(idx)
+const isOfferSelected = (orderId, idx) =>
+  Array.isArray(selectedOfferItems[orderId]) && selectedOfferItems[orderId].includes(idx)
 const hasSelectedForOrder = (orderId) =>
   (Array.isArray(selectedItems[orderId]) && selectedItems[orderId].length > 0) ||
   (selectedOfferItems[orderId] && selectedOfferItems[orderId].length)
@@ -916,7 +962,9 @@ const buildOrderMenuItemsPayload = (items) => {
   for (const raw of Array.isArray(items) ? items : []) {
     // Prefer stable IDs from the spread menu item doc, then fall back
     const menuItemId =
-      raw?._id || raw?.id || raw?.menuItemId ||
+      raw?._id ||
+      raw?.id ||
+      raw?.menuItemId ||
       (raw?.menuItem && (raw.menuItem._id || raw.menuItem.id)) ||
       raw?.menuItem
 
@@ -929,8 +977,7 @@ const buildOrderMenuItemsPayload = (items) => {
     if (Array.isArray(raw?.options) && raw.options.length) {
       options = raw.options.map((op) => ({
         option: String(
-          (op?.option && (op.option._id || op.option.id)) ||
-          op?.optionId || op?._id || op?.id || op?.option
+          (op?.option && (op.option._id || op.option.id)) || op?.optionId || op?._id || op?.id || op?.option,
         ),
         quantity: Number(op?.quantity || 1),
       }))
@@ -960,7 +1007,7 @@ const removeSelected = async (orderId) => {
   const order = orders.value.find((o) => o._id === orderId)
   if (!order) return
 
-  const menuIdxs  = (selectedItems[orderId] || []).slice()
+  const menuIdxs = (selectedItems[orderId] || []).slice()
   const offerIdxs = (selectedOfferItems[orderId] || []).slice()
 
   if (!menuIdxs.length && !offerIdxs.length) return
@@ -1060,10 +1107,7 @@ const editSelected = async (orderId) => {
         return {
           groupId: group._id,
           groupName: group.name,
-          categoryId:
-            menuItem.categories && menuItem.categories.length > 0
-              ? menuItem.categories[0].id
-              : null,
+          categoryId: menuItem.categories && menuItem.categories.length > 0 ? menuItem.categories[0].id : null,
           menuItemId: menuItem._id,
           selected,
         }
@@ -1085,7 +1129,7 @@ const editSelected = async (orderId) => {
         item.addedItems.forEach((addedItem) => {
           selectionTotal += (Number(addedItem.basePrice) || 0) * (Number(addedItem.quantity) || 1)
           ;(addedItem.selectedOptions || []).forEach((group) => {
-            (group.selected || []).forEach((selection) => {
+            ;(group.selected || []).forEach((selection) => {
               selectionTotal += (Number(selection.price) || 0) * (Number(selection.quantity) || 1)
             })
           })
@@ -1161,14 +1205,14 @@ const getPromoForOrder = (order) => {
 
   // If we only have a percent, derive value from the totals
   let discountValue = discountValueRaw
-  
+
   // Fix: If stored discount value matches the percentage (e.g. 10 and 10%) but subtotal math disagrees,
   // it means the DB stored the percentage in the amount field. Recalculate it.
   if (discountPercentRaw > 0) {
     const calculated = (toNum(order.subtotal) * discountPercentRaw) / 100
     // If raw value ~ percentage ID but calculated is different (allow small error margin)
     if (Math.abs(discountValueRaw - discountPercentRaw) < 0.01 && Math.abs(discountValueRaw - calculated) > 0.05) {
-        discountValue = calculated
+      discountValue = calculated
     }
   }
 
@@ -1196,22 +1240,28 @@ const getPromoForOrder = (order) => {
   }
 }
 
-
 // ---------- Status / formatting ----------
 const formatDateTime = (dateStr) => {
   if (!dateStr) return 'N/A'
   const date = new Date(dateStr)
-  return date.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 const getPromisedTime = (createdAt, orderType) => {
   if (!createdAt) return 'N/A'
   const date = new Date(createdAt)
   if (orderType?.toLowerCase() === 'takeaway') date.setMinutes(date.getMinutes() + (props.takeawayPromiseTime || 0))
-  else if (orderType?.toLowerCase() === 'delivery') date.setMinutes(date.getMinutes() + (props.deliveryPromiseTime || 0))
+  else if (orderType?.toLowerCase() === 'delivery')
+    date.setMinutes(date.getMinutes() + (props.deliveryPromiseTime || 0))
   return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
-const getOrderSource = (source) => !source ? '' : (source === 'CC' ? 'Call Center' : source)
-const getDisplayStatus = (order, index) => (index === 0 && liveStatus.value) ? liveStatus.value : order.status
+const getOrderSource = (source) => (!source ? '' : source === 'CC' ? 'Call Center' : source)
+const getDisplayStatus = (order, index) => (index === 0 && liveStatus.value ? liveStatus.value : order.status)
 const getDeliveryZoneName = (deliveryZoneId) => {
   if (!deliveryZoneId || !Array.isArray(props.deliveryZoneOptions)) return ''
   const zone = props.deliveryZoneOptions.find((z) => z._id === deliveryZoneId)
@@ -1220,14 +1270,17 @@ const getDeliveryZoneName = (deliveryZoneId) => {
 
 // ---------- Toggle accordion + reset selections ----------
 const toggleOrder = (index) => {
-  expandedIndex.value = (expandedIndex.value === index) ? null : index
+  expandedIndex.value = expandedIndex.value === index ? null : index
   for (const key in selectedItems) delete selectedItems[key]
   for (const key in selectedOfferItems) delete selectedOfferItems[key]
 }
 const isCancelled = (order, index) => {
-  const norm = (s) => String(s || '').trim().toLowerCase()
-  const hist  = norm(order?.status)                              // Stella history
-  const live  = index === 0 ? norm(liveStatus.value) : ''        // latest row live chip (if you use it)
+  const norm = (s) =>
+    String(s || '')
+      .trim()
+      .toLowerCase()
+  const hist = norm(order?.status) // Stella history
+  const live = index === 0 ? norm(liveStatus.value) : '' // latest row live chip (if you use it)
   const coord = index === 0 ? norm(orderStatuses?.value ?? orderStatuses) : '' // coordinator code
 
   // treat any variant like "canceled"/"cancelled" as cancelled
@@ -1235,20 +1288,27 @@ const isCancelled = (order, index) => {
   return [hist, live, coord].some(saysCancel)
 }
 
-
 // ---------- Stats / filters ----------
 const showAll = ref(false)
-const ordersToShow = computed(() => showAll.value ? orders.value : orders.value.slice(0, 5))
+const ordersToShow = computed(() => (showAll.value ? orders.value : orders.value.slice(0, 5)))
 const orderStatuses = ref(null)
 
 const periodStartDate = computed(() => {
   const today = new Date()
   let startDate = new Date(today)
   switch (selectedPeriod.value) {
-    case '1 Month': startDate.setMonth(today.getMonth() - 1); break
-    case '6 Months': startDate.setMonth(today.getMonth() - 6); break
-    case '12 Months': startDate.setMonth(today.getMonth() - 12); break
-    case 'All Time': startDate = new Date(0); break
+    case '1 Month':
+      startDate.setMonth(today.getMonth() - 1)
+      break
+    case '6 Months':
+      startDate.setMonth(today.getMonth() - 6)
+      break
+    case '12 Months':
+      startDate.setMonth(today.getMonth() - 12)
+      break
+    case 'All Time':
+      startDate = new Date(0)
+      break
   }
   startDate.setHours(0, 0, 0, 0)
   return startDate
@@ -1322,10 +1382,12 @@ const fetchOrderStatus = async () => {
         w4CompanyCode: outlet.restDetails.winmaxConfig.company.toLowerCase(),
       },
       headers: { 'X-API-Key': '1234567890' },
-      transformRequest: [(data, headers) => {
-        if (headers && headers.hasOwnProperty('Authorization')) delete headers['Authorization']
-        return data
-      }],
+      transformRequest: [
+        (data, headers) => {
+          if (headers && headers.hasOwnProperty('Authorization')) delete headers['Authorization']
+          return data
+        },
+      ],
     })
     orderStatuses.value = res.data?.statusCode ? res.data.statusCode.toLowerCase() : null
   } catch {
@@ -1394,17 +1456,30 @@ const fetchOrders = async () => {
     )
     if (res.data?.status === 'Success') {
       orders.value = res.data.data.items.map((order) => {
+        // Calculate order-level discount percentage
+        const p = order.promotion || {}
+        const discountPercentRaw = toNum(first(order.discountPercentage, p.discountPercent))
+
         const detailedOfferItems = (order.offerDetails || [])
           .map((offer) => {
             const offerItem = orderStore.offers.find((a) => a._id === offer.offerId)
             if (!offerItem) return ''
             const mappedData = mapOfferDetailsToSelections(offer, offerItem)
-            return { orderOffer: offer, offerData: mappedData }
+
+            // Apply discount to offers if needed
+            let overrideUnitPrice = 0
+            if (discountPercentRaw > 0) {
+              const originalTotal = mappedData.totalPrice || 0
+              overrideUnitPrice = originalTotal * (1 - discountPercentRaw / 100)
+            }
+
+            return { orderOffer: offer, offerData: mappedData, overrideUnitPrice }
           })
           .filter(Boolean)
           .map((offer) => ({
             ...offer.orderOffer,
             structuredOffer: { ...offer.offerData },
+            overrideUnitPrice: offer.overrideUnitPrice > 0 ? Number(offer.overrideUnitPrice).toFixed(2) : null,
           }))
 
         const detailedItems = (order.menuItems || []).map((item) => {
@@ -1415,7 +1490,7 @@ const fetchOrders = async () => {
           if (item.options && item.options.length) {
             item.options.forEach((o) => {
               const qty = Number(o.quantity || 1)
-              const unitQ = (item.quantity && item.quantity > 1) ? Math.floor(qty / item.quantity) : qty
+              const unitQ = item.quantity && item.quantity > 1 ? Math.floor(qty / item.quantity) : qty
               if (unitQ > 0) {
                 optionCounts.set(o.option, (optionCounts.get(o.option) || 0) + unitQ)
               }
@@ -1423,7 +1498,7 @@ const fetchOrders = async () => {
           }
 
           const mappedGroups = (menuItem?.articlesOptionsGroup || []).map((group) => {
-            const limit = group.singleChoice ? 1 : (group.maximumChoices || Infinity)
+            const limit = group.singleChoice ? 1 : group.maximumChoices || Infinity
             let selectedTotalQty = 0
 
             const options = (group.articlesOptions || []).map((opt) => {
@@ -1445,12 +1520,24 @@ const fetchOrders = async () => {
             return { ...group, articlesOptions: options }
           })
 
-          return {
+          const enrichedItem = {
             ...item,
             menuItem: menuItem ? menuItem.name : 'Unknown Item',
             ...menuItem,
             articlesOptionsGroup: mappedGroups,
+            // Ensure we don't accidentally bring in a stale overrideUnitPrice from store
+            overrideUnitPrice: null,
           }
+
+          // Calculate discounted price for this item
+          if (discountPercentRaw > 0) {
+            // Calculate local total (Original)
+            const originalTotal = Number(getTotalPrice(enrichedItem))
+            const discounted = originalTotal * (1 - discountPercentRaw / 100)
+            enrichedItem.overrideUnitPrice = discounted.toFixed(2)
+          }
+
+          return enrichedItem
         })
 
         return { ...order, menuItems: detailedItems, offerDetails: detailedOfferItems }
@@ -1477,22 +1564,23 @@ const getTotalPrice = (item) => {
   if (item.unitPrice != null && item.unitPrice > 0) {
     return Number(item.unitPrice).toFixed(2)
   }
-  
+
   // Otherwise calculate from base price + unique options
   const basePrice = Number(item.price || 0)
-  
+
   // Deduplicate options before summing prices
   const seen = new Set()
-  const uniqueOptions = item.articlesOptionsGroup
-    ?.flatMap((a) => a.articlesOptions)
-    .filter((a) => {
-      if (!a.selected) return false
-      const key = a._id || a.optionId || a.name
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    }) || []
-  
+  const uniqueOptions =
+    item.articlesOptionsGroup
+      ?.flatMap((a) => a.articlesOptions)
+      .filter((a) => {
+        if (!a.selected) return false
+        const key = a._id || a.optionId || a.name
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      }) || []
+
   const optionsTotal = uniqueOptions.reduce((sum, opt) => sum + (Number(opt.price) || 0), 0)
   return (basePrice + optionsTotal).toFixed(2)
 }
@@ -1502,7 +1590,11 @@ const fetchUsers = async () => {
   try {
     const userStore = useUsersStore()
     const { data } = await userStore.getAll({
-      page: 1, limit: 1000, search: '', sortBy: 'name', sortOrder: 'asc',
+      page: 1,
+      limit: 1000,
+      search: '',
+      sortBy: 'name',
+      sortOrder: 'asc',
     })
     users.value = data
   } catch (error) {
@@ -1526,90 +1618,91 @@ const repeatOrder = async (orderId) => {
 
   // 1. Process Menu Items
   // We iterate history items, but we rebuild the cart item using the FRESH item from store
-  const items = (order.menuItems || []).map((histItem) => {
-    // histItem._id is the Menu Item ID (because fetchOrders merges store item properties)
-    const freshItem = menuStore.unFilteredMenuItems.find((mi) => mi._id === histItem._id)
-    
-    // If item no longer exists in store, we might skip it or handle it. 
-    // Here we skip gracefully or fall back? 
-    // If detailedItems in fetchOrders succeeded, freshItem *should* exist. 
-    // If it doesn't, we probably shouldn't add it to cart as it's discontinued.
-    if (!freshItem) return null
+  const items = (order.menuItems || [])
+    .map((histItem) => {
+      // histItem._id is the Menu Item ID (because fetchOrders merges store item properties)
+      const freshItem = menuStore.unFilteredMenuItems.find((mi) => mi._id === histItem._id)
 
-    // Map historical option selection to fresh option data
-    // We need to know WHICH options were selected. 
-    // histItem.articlesOptionsGroup has the 'selected' flag from fetchOrders logic.
-    const histOptionMap = new Map() // OptionID -> quantity
-    if (histItem.articlesOptionsGroup) {
-         histItem.articlesOptionsGroup.forEach(g => {
-             (g.articlesOptions || []).forEach(opt => {
-                 if (opt.selected) {
-                     histOptionMap.set(opt._id, opt.quantity || 1)
-                 }
-             })
-         })
-    }
+      // If item no longer exists in store, we might skip it or handle it.
+      // Here we skip gracefully or fall back?
+      // If detailedItems in fetchOrders succeeded, freshItem *should* exist.
+      // If it doesn't, we probably shouldn't add it to cart as it's discontinued.
+      if (!freshItem) return null
 
-    const freshSelectedOptions = (freshItem.articlesOptionsGroup || []).map((group) => {
-        const limit = group.singleChoice ? 1 : (group.maximumChoices || Infinity)
-        let groupSelectedQty = 0
+      // Map historical option selection to fresh option data
+      // We need to know WHICH options were selected.
+      // histItem.articlesOptionsGroup has the 'selected' flag from fetchOrders logic.
+      const histOptionMap = new Map() // OptionID -> quantity
+      if (histItem.articlesOptionsGroup) {
+        histItem.articlesOptionsGroup.forEach((g) => {
+          ;(g.articlesOptions || []).forEach((opt) => {
+            if (opt.selected) {
+              histOptionMap.set(opt._id, opt.quantity || 1)
+            }
+          })
+        })
+      }
 
-        const selected = (group.articlesOptions || [])
-          .map((opt) => {
-             // Check if this option is in our historical map
-             if (!histOptionMap.has(opt._id)) return null
+      const freshSelectedOptions = (freshItem.articlesOptionsGroup || [])
+        .map((group) => {
+          const limit = group.singleChoice ? 1 : group.maximumChoices || Infinity
+          let groupSelectedQty = 0
 
-             const available = histOptionMap.get(opt._id)
-             if (available <= 0) return null
+          const selected = (group.articlesOptions || [])
+            .map((opt) => {
+              // Check if this option is in our historical map
+              if (!histOptionMap.has(opt._id)) return null
 
-             // Calculate how many we can take for this group
-             const remainingLimit = limit - groupSelectedQty
-             const take = Math.min(available, remainingLimit)
+              const available = histOptionMap.get(opt._id)
+              if (available <= 0) return null
 
-             if (take <= 0) return null
+              // Calculate how many we can take for this group
+              const remainingLimit = limit - groupSelectedQty
+              const take = Math.min(available, remainingLimit)
 
-             // Consume from map
-             histOptionMap.set(opt._id, available - take)
-             groupSelectedQty += take
+              if (take <= 0) return null
 
-             return {
+              // Consume from map
+              histOptionMap.set(opt._id, available - take)
+              groupSelectedQty += take
+
+              return {
                 ...opt,
                 optionId: opt._id,
                 optionName: opt.name,
                 price: parseFloat(opt.price) || 0, // USE FRESH PRICE
                 type: opt.type,
                 quantity: take, // Use consumed quantity
-             }
-          })
-          .filter(Boolean)
+              }
+            })
+            .filter(Boolean)
 
-        if (!selected.length) return null
-        return {
-          groupId: group._id,
-          groupName: group.name,
-          categoryId: freshItem.categories && freshItem.categories.length > 0
-              ? freshItem.categories[0].id
-              : null,
-          menuItemId: freshItem._id,
-          selected,
-        }
-      })
-      .filter(Boolean)
+          if (!selected.length) return null
+          return {
+            groupId: group._id,
+            groupName: group.name,
+            categoryId: freshItem.categories && freshItem.categories.length > 0 ? freshItem.categories[0].id : null,
+            menuItemId: freshItem._id,
+            selected,
+          }
+        })
+        .filter(Boolean)
 
-    return {
-      orderId,
-      itemId: freshItem._id,
-      itemName: freshItem.name,
-      basePrice: parseFloat(freshItem.price) || 0, // USE FRESH BASE PRICE
-      totalPrice: 0, // Will be recalc by store
-      imageUrl: freshItem.imageUrl || '',
-      promotionCode: freshItem.promotionCode || '',
-      isRepeatedOrder: true,
-      quantity: histItem.quantity,
-      isFree: !!freshItem.isFree,
-      selectedOptions: freshSelectedOptions,
-    }
-  }).filter(Boolean)
+      return {
+        orderId,
+        itemId: freshItem._id,
+        itemName: freshItem.name,
+        basePrice: parseFloat(freshItem.price) || 0, // USE FRESH BASE PRICE
+        totalPrice: 0, // Will be recalc by store
+        imageUrl: freshItem.imageUrl || '',
+        promotionCode: freshItem.promotionCode || '',
+        isRepeatedOrder: true,
+        quantity: histItem.quantity,
+        isFree: !!freshItem.isFree,
+        selectedOptions: freshSelectedOptions,
+      }
+    })
+    .filter(Boolean)
 
   // 2. Process Offers
   // Similar logic: find fresh offer definition from orderStore.offers
@@ -1619,114 +1712,116 @@ const repeatOrder = async (orderId) => {
       const freshOfferDef = orderStore.offers.find((o) => o._id === histOffer.offerId)
       if (!freshOfferDef) return null
 
-      // We need to reconstruct the selections. 
-      // histOffer.structuredOffer.selections (from fetchOrders) should effectively map to what we need, 
+      // We need to reconstruct the selections.
+      // histOffer.structuredOffer.selections (from fetchOrders) should effectively map to what we need,
       // BUT we must ensure we use fresh prices.
-      
+
       // Ideally, we re-run `mapOfferDetailsToSelections` but using the FRESH prices from `freshOfferDef`.
-      // However, `mapOfferDetailsToSelections` takes the "offerDetails" response from history (which lacks prices or has old prices?) 
+      // However, `mapOfferDetailsToSelections` takes the "offerDetails" response from history (which lacks prices or has old prices?)
       // and looks up items in `storeMenuItems`.
-      
+
       // Actually, `mapOfferDetailsToSelections` (lines 1225+) ALREADY looks up `useMenuStore`.
       // It sets `basePrice: Number(item.price || 0).toFixed(2)` where `item` comes from `offerDetailsResponse.offerItems`.
       // `offerDetailsResponse` IS `histOffer` (the history object).
-      // So `mapOfferDetailsToSelections` uses the *historical configuration* of the offer (items list), 
+      // So `mapOfferDetailsToSelections` uses the *historical configuration* of the offer (items list),
       // but it looks up `storeMenu` (fresh) to get `articlesOptionsGroup`.
-      
+
       // WAIT using `mapOfferDetailsToSelections`:
       // `const item = offerItems.find(...)` -> `offerItems` comes from `offerDetailsResponse` (History).
-      // `item.price` (History) is used? `Number(item.price || 0)`. 
+      // `item.price` (History) is used? `Number(item.price || 0)`.
       // YES, `mapOfferDetailsToSelections` uses `item.price` from the history object!
       // This is why offers have old prices.
-      
+
       // To fix offers, we must look up the price from the FRESH `freshOfferDef` items list, not the history one.
-      
+
       // Let's re-map manually for safety and freshness.
-      
+
       // 1. We have `freshOfferDef`. It has `offerItems` (definition with current override prices).
       // 2. We have `histOffer` (user's selection).
-      
+
       let selectionTotal = 0
-      
+
       // Get FRESH selections structure based on history choices
       const selections = []
-      
-       // Iterate over `structuredOffer.selections` (which tells us what the user picked: quantities, options)
+
+      // Iterate over `structuredOffer.selections` (which tells us what the user picked: quantities, options)
       // `structuredOffer` was built by `mapOfferDetailsToSelections`.
       if (histOffer.structuredOffer && histOffer.structuredOffer.selections) {
-          
-          histOffer.structuredOffer.selections.forEach(sel => {
-             // 'sel' corresponds to a Selection Group (e.g. "Select 2 Pizzas")
-             // We need to map the addedItems
-             
-             const freshAddedItems = []
-             
-             sel.addedItems.forEach(addedItem => {
-                 // addedItem.itemId is the menu item ID.
-                 // Find this item in the FRESH offer definition to get the override price.
-                 const freshOfferItemDef = freshOfferDef.offerItems.find(oi => oi.menuItem === addedItem.itemId)
-                 
-                 // If not in fresh offer, maybe it was removed? Skip.
-                 if (!freshOfferItemDef) return 
-                 
-                 // Fresh override price (or 0 if not overridden? check definition)
-                 const freshBasePrice = Number(freshOfferItemDef.price || 0)
-                 
-                 // Now options.
-                 // addedItem.selectedOptions has the groups/selected structure.
-                 // We need to recalculate option prices using FRESH menu item.
-                 const freshMenuItem = menuStore.unFilteredMenuItems.find(m => m._id === addedItem.itemId)
-                 if (!freshMenuItem) return
+        histOffer.structuredOffer.selections.forEach((sel) => {
+          // 'sel' corresponds to a Selection Group (e.g. "Select 2 Pizzas")
+          // We need to map the addedItems
 
-                 // Re-map options with fresh prices
-                 const freshSelectedOptions = (addedItem.selectedOptions || []).map(group => {
-                     const freshGroup = freshMenuItem.articlesOptionsGroup.find(g => g._id === group.groupId)
-                     if (!freshGroup) return null
-                     
-                     const validSelections = (group.selected || []).map(s => {
-                         const freshOpt = freshGroup.articlesOptions.find(o => o._id === s.optionId)
-                         if (!freshOpt) return null
-                         return {
-                             ...s,
-                             price: parseFloat(freshOpt.price) || 0, // FRESH
-                         }
-                     }).filter(Boolean)
-                     
-                     if (!validSelections.length) return null
-                     return { ...group, selected: validSelections }
-                 }).filter(Boolean)
+          const freshAddedItems = []
 
+          sel.addedItems.forEach((addedItem) => {
+            // addedItem.itemId is the menu item ID.
+            // Find this item in the FRESH offer definition to get the override price.
+            const freshOfferItemDef = freshOfferDef.offerItems.find((oi) => oi.menuItem === addedItem.itemId)
 
-                 // Calc total so we can pass it (though orderStore might recalc, better safe)
-                 let itemOptionsTotal = 0
-                 freshSelectedOptions.forEach(g => {
-                     g.selected.forEach(s => itemOptionsTotal += (s.price * s.quantity))
-                 })
-                 
-                 selectionTotal += (freshBasePrice * addedItem.quantity) + itemOptionsTotal
+            // If not in fresh offer, maybe it was removed? Skip.
+            if (!freshOfferItemDef) return
 
-                 freshAddedItems.push({
-                     ...addedItem,
-                     basePrice: freshBasePrice, // Updated
-                     selectedOptions: freshSelectedOptions
-                 })
-             })
-             
-             if (freshAddedItems.length) {
-                 selections.push({ ...sel, addedItems: freshAddedItems })
-             }
+            // Fresh override price (or 0 if not overridden? check definition)
+            const freshBasePrice = Number(freshOfferItemDef.price || 0)
+
+            // Now options.
+            // addedItem.selectedOptions has the groups/selected structure.
+            // We need to recalculate option prices using FRESH menu item.
+            const freshMenuItem = menuStore.unFilteredMenuItems.find((m) => m._id === addedItem.itemId)
+            if (!freshMenuItem) return
+
+            // Re-map options with fresh prices
+            const freshSelectedOptions = (addedItem.selectedOptions || [])
+              .map((group) => {
+                const freshGroup = freshMenuItem.articlesOptionsGroup.find((g) => g._id === group.groupId)
+                if (!freshGroup) return null
+
+                const validSelections = (group.selected || [])
+                  .map((s) => {
+                    const freshOpt = freshGroup.articlesOptions.find((o) => o._id === s.optionId)
+                    if (!freshOpt) return null
+                    return {
+                      ...s,
+                      price: parseFloat(freshOpt.price) || 0, // FRESH
+                    }
+                  })
+                  .filter(Boolean)
+
+                if (!validSelections.length) return null
+                return { ...group, selected: validSelections }
+              })
+              .filter(Boolean)
+
+            // Calc total so we can pass it (though orderStore might recalc, better safe)
+            let itemOptionsTotal = 0
+            freshSelectedOptions.forEach((g) => {
+              g.selected.forEach((s) => (itemOptionsTotal += s.price * s.quantity))
+            })
+
+            selectionTotal += freshBasePrice * addedItem.quantity + itemOptionsTotal
+
+            freshAddedItems.push({
+              ...addedItem,
+              basePrice: freshBasePrice, // Updated
+              selectedOptions: freshSelectedOptions,
+            })
           })
+
+          if (freshAddedItems.length) {
+            selections.push({ ...sel, addedItems: freshAddedItems })
+          }
+        })
       }
-      
+
       return {
-          ...freshOfferDef, // Use fresh definition (name, basePrice of offer itself)
-          _id: freshOfferDef._id,
-          offerId: freshOfferDef._id,
-          basePrice: freshOfferDef.price, // Fresh base price of offer
-          selectionTotalPrice: selectionTotal,
-          totalPrice: Number(freshOfferDef.price || 0) + selectionTotal,
-          quantity: 1,
-          selections: selections // Our rebuilt selections
+        ...freshOfferDef, // Use fresh definition (name, basePrice of offer itself)
+        _id: freshOfferDef._id,
+        offerId: freshOfferDef._id,
+        basePrice: freshOfferDef.price, // Fresh base price of offer
+        selectionTotalPrice: selectionTotal,
+        totalPrice: Number(freshOfferDef.price || 0) + selectionTotal,
+        quantity: 1,
+        selections: selections, // Our rebuilt selections
       }
     })
     .filter(Boolean)
@@ -1740,7 +1835,7 @@ const addItemsToOrder = (orderId) => {
   if (!order) return
 
   const orderStore = useOrderStore()
-  
+
   // Reset and prepare edit context similar to editSelected
   orderStore.resetEditOrder()
   orderStore.setCartItems([])
@@ -1771,7 +1866,7 @@ const switchOrderType = async (orderId) => {
   const newType = isDelivery ? 'Takeaway' : 'Delivery'
   const action = 'add'
 
-  let payload = {
+  const payload = {
     orderTypeChange: {
       to: newType,
     },
@@ -1789,47 +1884,51 @@ const switchOrderType = async (orderId) => {
 
   isLoading.value = true // Buffer: immediate feedback
   try {
-     await applyOrderEdit(orderId, action, order.tableNumber, payload)
-     fetchOrders()
-  } catch(e) { /* handled primarily by applyOrderEdit toast but we ensure fetch runs or state resets */ }
+    await applyOrderEdit(orderId, action, order.tableNumber, payload)
+    fetchOrders()
+  } catch (e) {
+    /* handled primarily by applyOrderEdit toast but we ensure fetch runs or state resets */
+  }
 }
 
 const handleAddressSelection = async (addr) => {
   if (!pendingSwitchOrderId.value) return
-  
+
   isLoading.value = true // Buffer: immediate feedback
-  
+
   const order = orders.value.find((o) => o._id === pendingSwitchOrderId.value)
   if (!order) return
 
   // addr comes from CustomerModal address list item
   // format: { designation, floor, aptNo, streetName, streetNo, district, city, postCode, deliveryNote }
-  
-  const streetPart = [addr.streetName, addr.streetNo].filter(val => val && String(val).trim()).join(' ')
-  const locationPart = [addr.district, addr.city].filter(val => val && String(val).trim()).join(', ')
-  const buildingPart = [addr.aptNo ? `Apt ${addr.aptNo}` : '', addr.floor ? `Floor ${addr.floor}` : ''].filter(val => val && String(val).trim()).join(', ')
 
-  const fullParts = [buildingPart, streetPart, locationPart, addr.postCode].filter(val => val && String(val).trim())
+  const streetPart = [addr.streetName, addr.streetNo].filter((val) => val && String(val).trim()).join(' ')
+  const locationPart = [addr.district, addr.city].filter((val) => val && String(val).trim()).join(', ')
+  const buildingPart = [addr.aptNo ? `Apt ${addr.aptNo}` : '', addr.floor ? `Floor ${addr.floor}` : '']
+    .filter((val) => val && String(val).trim())
+    .join(', ')
+
+  const fullParts = [buildingPart, streetPart, locationPart, addr.postCode].filter((val) => val && String(val).trim())
   const fullAddress = fullParts.join(', ')
 
   const zip = addr.postCode || addr.postalCode || ''
   const designation = addr.designation || ''
-  
+
   // Calculate Delivery Fee based on Zone
   let fee = props.deliveryFee || 0 // Default fallback
-  
+
   if (props.deliveryZoneOptions && props.deliveryZoneOptions.length) {
     // 1. Try Postal Code Match
-    let zone = props.deliveryZoneOptions.find(z => 
-      z.postalCodes && z.postalCodes.some(pc => String(pc).trim() === String(zip).trim())
+    let zone = props.deliveryZoneOptions.find(
+      (z) => z.postalCodes && z.postalCodes.some((pc) => String(pc).trim() === String(zip).trim()),
     )
-    
+
     // 2. Try Meeting Point Match if not found and looks like MP
     if (!zone && (designation.includes('Meeting') || designation.includes('M.P'))) {
-       // Simple match by designation inclusion
-       zone = props.deliveryZoneOptions.find(z => 
-         z.meetingPoints && z.meetingPoints.some(mp => designation.includes(mp.designation))
-       )
+      // Simple match by designation inclusion
+      zone = props.deliveryZoneOptions.find(
+        (z) => z.meetingPoints && z.meetingPoints.some((mp) => designation.includes(mp.designation)),
+      )
     }
 
     if (zone && typeof zone.deliveryCharge === 'number') {
@@ -1838,7 +1937,7 @@ const handleAddressSelection = async (addr) => {
   }
 
   const c = props.customer || {}
-  
+
   const payload = {
     action: 'add',
     orderTypeChange: {
@@ -1853,7 +1952,7 @@ const handleAddressSelection = async (addr) => {
       Address: fullAddress,
       ZipCode: zip,
       DeliveryNote: addr.deliveryNote || '', // If backend supports it on entity/update
-    }
+    },
   }
 
   try {
@@ -1869,39 +1968,39 @@ const handleAddressSelection = async (addr) => {
 // ---------- Reschedule Logic ----------
 const openReschedule = (order) => {
   pendingRescheduleOrderId.value = order._id
-  
+
   if (order.orderDateTime) {
-      const d = new Date(order.orderDateTime)
-      // Format local ISO string for datetime-local input (YYYY-MM-DDTHH:mm)
-      // We adjust for timezone offset manually to get local time string
-      const offset = d.getTimezoneOffset() * 60000
-      const local = new Date(d.getTime() - offset)
-      rescheduleDateTime.value = local.toISOString().slice(0, 16)
+    const d = new Date(order.orderDateTime)
+    // Format local ISO string for datetime-local input (YYYY-MM-DDTHH:mm)
+    // We adjust for timezone offset manually to get local time string
+    const offset = d.getTimezoneOffset() * 60000
+    const local = new Date(d.getTime() - offset)
+    rescheduleDateTime.value = local.toISOString().slice(0, 16)
   } else {
-      rescheduleDateTime.value = ''
+    rescheduleDateTime.value = ''
   }
-  
+
   showRescheduleModal.value = true
 }
 
 const saveReschedule = async () => {
-    if (!pendingRescheduleOrderId.value || !rescheduleDateTime.value) return
+  if (!pendingRescheduleOrderId.value || !rescheduleDateTime.value) return
 
-    isLoading.value = true // Buffer
-    showRescheduleModal.value = false // Close immediately to show buffer on list
-    
-    try {
-        const payload = {
-            orderDateTime: new Date(rescheduleDateTime.value).toISOString()
-        }
-        await axios.patch(`${url}/orders/${pendingRescheduleOrderId.value}/schedule`, payload)
-        init({ message: 'Order rescheduled successfully', color: 'success' })
-        fetchOrders() // Logic handles isLoading toggle
-    } catch (e) {
-        const msg = e?.response?.data?.message || e?.message || 'Failed to reschedule'
-        init({ message: msg, color: 'danger' })
-        isLoading.value = false // Reset if error
+  isLoading.value = true // Buffer
+  showRescheduleModal.value = false // Close immediately to show buffer on list
+
+  try {
+    const payload = {
+      orderDateTime: new Date(rescheduleDateTime.value).toISOString(),
     }
+    await axios.patch(`${url}/orders/${pendingRescheduleOrderId.value}/schedule`, payload)
+    init({ message: 'Order rescheduled successfully', color: 'success' })
+    fetchOrders() // Logic handles isLoading toggle
+  } catch (e) {
+    const msg = e?.response?.data?.message || e?.message || 'Failed to reschedule'
+    init({ message: msg, color: 'danger' })
+    isLoading.value = false // Reset if error
+  }
 }
 </script>
 

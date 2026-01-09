@@ -44,7 +44,11 @@
                     :ref="(el) => (addressItems.value[index] = el)"
                     :class="[
                       'flex items-center justify-between mt-1 px-4 py-2 rounded border text-gray-500 cursor-pointer',
-                      editAddress === index ? 'bg-yellow-100 border-yellow-500' : (isSelectionMode && selectedAddressObj === addr ? 'bg-blue-50 border-blue-200' : 'bg-[#f8f9fa]'),
+                      editAddress === index
+                        ? 'bg-yellow-100 border-yellow-500'
+                        : isSelectionMode && selectedAddressObj === addr
+                          ? 'bg-blue-50 border-blue-200'
+                          : 'bg-[#f8f9fa]',
                     ]"
                     @click="isSelectionMode ? (selectedAddressObj = addr) : null"
                   >
@@ -185,7 +189,7 @@
             <div class="flex flex-col gap-1 mb-4">
               <label class="text-sm font-medium text-gray-500">Address Notes</label>
 
-              <VaTextarea v-model="addressNote" placeholder="Delivery instructions, building access..." rows="3"/>
+              <VaTextarea v-model="addressNote" placeholder="Delivery instructions, building access..." rows="3" />
 
               <div class="mt-2 flex justify-end">
                 <VaButton
@@ -216,18 +220,17 @@
           />
         </div>
 
-<VaButtonToggle
-  v-model="isTick"
-  :disabled="lockTick"
-  :toggle-color="outlet.primaryColor"
-  color="#65667c"
-  :options="[
-    { label: 'Save Data', value: true, icon: 'va-check' },
-    { label: `Don't Save`, value: false, icon: 'va-close' },
-  ]"
-  icon-color="warning"
-/>
-
+        <VaButtonToggle
+          v-model="isTick"
+          :disabled="lockTick"
+          :toggle-color="outlet.primaryColor"
+          color="#65667c"
+          :options="[
+            { label: 'Save Data', value: true, icon: 'va-check' },
+            { label: `Don't Save`, value: false, icon: 'va-close' },
+          ]"
+          icon-color="warning"
+        />
 
         <VaButton
           preset="secondary"
@@ -244,7 +247,7 @@
           class="text-white text-sm font-semibold"
           @click="handleSubmit"
         >
-          {{ isSelectionMode ? 'Select Address' : (isEdit ? 'Save' : 'Add Customer') }}
+          {{ isSelectionMode ? 'Select Address' : isEdit ? 'Save' : 'Add Customer' }}
         </VaButton>
       </div>
     </div>
@@ -281,37 +284,42 @@ function isAddressInZone(addr: any) {
   // If we have no zones, maybe we shouldn't show any addresses? Or show all?
   // Safest: Show all if catch error, but if success and empty, show none.
   // Let's assume if fetchedZones is populated, we filter.
-  if (!fetchedZones.value.length) return true 
-  
-  const currentText = (addr.designation || '') + (addr.designation && addr.postCode ? ' ' : '') +  (addr.postCode || '')
+  if (!fetchedZones.value.length) return true
+
+  const currentText = (addr.designation || '') + (addr.designation && addr.postCode ? ' ' : '') + (addr.postCode || '')
   const postalCode = addr.postCode
 
   // 1. Try postal code match
   const matchingZone = fetchedZones.value.find((zone) => {
-     return zone.postalCodes && zone.postalCodes.some((zoneCode: any) => String(zoneCode).trim() === String(postalCode).trim())
+    return (
+      zone.postalCodes &&
+      zone.postalCodes.some((zoneCode: any) => String(zoneCode).trim() === String(postalCode).trim())
+    )
   })
   if (matchingZone) return true
 
   // 2. Try meeting point match
   if (addr.designation && (addr.designation.includes('Meeting') || addr.designation.includes('M.P'))) {
-     for (const zone of fetchedZones.value) {
-        if (!zone.meetingPoints) continue
-        const match = zone.meetingPoints.find((mp: any) => {
-           if (!mp || !mp.designation) return false
-           // Normal match
-           if (currentText.includes(mp.designation)) return true
-           
-           // Abbreviation match
-           try {
-             const abbr = mp.designation.replace(
-                /(Meeting\s*Point)(\s*-\s*)([^-]+)(.*)/i,
-                (_:any, _mp:any, sep:any, mid:any, rest:any) => `M.P${sep}${(mid || '').trim().slice(0, 4)}${rest}`
-             )
-             return currentText.toLowerCase().replace(/\s/g, '').includes(abbr.toLowerCase().replace(/\s/g, ''))
-           } catch { return false }
-        })
-        if (match) return true
-     }
+    for (const zone of fetchedZones.value) {
+      if (!zone.meetingPoints) continue
+      const match = zone.meetingPoints.find((mp: any) => {
+        if (!mp || !mp.designation) return false
+        // Normal match
+        if (currentText.includes(mp.designation)) return true
+
+        // Abbreviation match
+        try {
+          const abbr = mp.designation.replace(
+            /(Meeting\s*Point)(\s*-\s*)([^-]+)(.*)/i,
+            (_: any, _mp: any, sep: any, mid: any, rest: any) => `M.P${sep}${(mid || '').trim().slice(0, 4)}${rest}`,
+          )
+          return currentText.toLowerCase().replace(/\s/g, '').includes(abbr.toLowerCase().replace(/\s/g, ''))
+        } catch {
+          return false
+        }
+      })
+      if (match) return true
+    }
   }
 
   return false
@@ -320,65 +328,69 @@ function isAddressInZone(addr: any) {
 // ... existing code ...
 
 const fetchDeliveryZones = async () => {
-    // We need the parent ID (Brand/Portal) to fetch all zones, then find our specific outlet's zone
-    const serviceStore = useServiceStore()
-    const parentId = serviceStore.selectedRest
-    
-    console.log('DEBUG: fetchDeliveryZones Called', {
-        isSelectionMode: props.isSelectionMode,
-        hasOutlet: !!props.outlet,
-        parentId
+  // We need the parent ID (Brand/Portal) to fetch all zones, then find our specific outlet's zone
+  const serviceStore = useServiceStore()
+  const parentId = serviceStore.selectedRest
+
+  console.log('DEBUG: fetchDeliveryZones Called', {
+    isSelectionMode: props.isSelectionMode,
+    hasOutlet: !!props.outlet,
+    parentId,
+  })
+
+  if (!props.isSelectionMode || !props.outlet) {
+    console.log('DEBUG: Returning early due to missing props')
+    return
+  }
+  if (!parentId) {
+    console.log('DEBUG: Returning early due to missing parentId')
+    return
+  }
+
+  try {
+    // Fetch all zones for the brand
+    const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/deliveryZones/${parentId}`)
+    // Handle potentially different response structures (array directly or wrapped in zones)
+    const allZones = response.data?.data?.zones || (Array.isArray(response.data?.data) ? response.data.data : [])
+
+    // Find the specific zone for THIS outlet (e.g. Lakatamia)
+    // props.outlet contains the specific outlet details
+    // We match by ID first, then Name as fallback
+
+    console.log('DEBUG: Filter Logic', {
+      parentId,
+      outletProp: props.outlet,
+      deliveryZoneIdProp: props.deliveryZoneId,
+      allZones,
     })
 
-    if (!props.isSelectionMode || !props.outlet) {
-        console.log('DEBUG: Returning early due to missing props')
-        return
-    }
-    if (!parentId) {
-        console.log('DEBUG: Returning early due to missing parentId')
-        return
-    }
+    const targetZone = allZones.find(
+      (z) =>
+        (props.deliveryZoneId && z._id === props.deliveryZoneId) ||
+        (z._id && props.outlet._id && z._id === props.outlet._id) ||
+        (z.name && props.outlet.name && z.name.toLowerCase() === props.outlet.name.toLowerCase()),
+    )
 
-    try {
-        // Fetch all zones for the brand
-        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/deliveryZones/${parentId}`)
-        // Handle potentially different response structures (array directly or wrapped in zones)
-        const allZones = response.data?.data?.zones || (Array.isArray(response.data?.data) ? response.data.data : [])
-        
-        // Find the specific zone for THIS outlet (e.g. Lakatamia)
-        // props.outlet contains the specific outlet details
-        // We match by ID first, then Name as fallback
-        
-        console.log('DEBUG: Filter Logic', {
-            parentId,
-            outletProp: props.outlet,
-            deliveryZoneIdProp: props.deliveryZoneId,
-            allZones
-        })
+    console.log('DEBUG: Target Zone Found:', targetZone)
 
-        const targetZone = allZones.find(z => 
-             (props.deliveryZoneId && z._id === props.deliveryZoneId) ||
-             (z._id && props.outlet._id && z._id === props.outlet._id) || 
-             (z.name && props.outlet.name && z.name.toLowerCase() === props.outlet.name.toLowerCase())
-        )
-
-        console.log('DEBUG: Target Zone Found:', targetZone)
-
-        // We only care about the postal codes/meeting points for THIS specific zone
-        fetchedZones.value = targetZone ? [targetZone] : []
-        
-    } catch (e) {
-        console.error('Failed to fetch delivery zones for filtering', e)
-    }
+    // We only care about the postal codes/meeting points for THIS specific zone
+    fetchedZones.value = targetZone ? [targetZone] : []
+  } catch (e) {
+    console.error('Failed to fetch delivery zones for filtering', e)
+  }
 }
 
-watch(() => props.isSelectionMode, (val) => {
+watch(
+  () => props.isSelectionMode,
+  (val) => {
     if (val) fetchDeliveryZones()
-}, { immediate: true })
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
-  if (props.isSelectionMode && (!fetchedZones.value.length)) fetchDeliveryZones()
+  if (props.isSelectionMode && !fetchedZones.value.length) fetchDeliveryZones()
 })
 
 const addressListRef = ref(null)
@@ -489,14 +501,16 @@ function setAddress(addr: any) {
   addressSet.value = addr
 
   if (addr.Designation && addr.Designation.includes('Meeting Point')) {
-    const d = addr?.Designation ?? "";
+    const d = addr?.Designation ?? ''
 
-    designation.value = d.includes("Meeting Point")
-      ? d.replace(
-          /(Meeting\s*Point)(\s*-\s*)([^-]+)(.*)/i,
-          (_, _mp, sep, mid, rest) => `M.P${sep}${mid.trim().slice(0, 4)}${rest}`
-        ).trim()
-      : d;
+    designation.value = d.includes('Meeting Point')
+      ? d
+          .replace(
+            /(Meeting\s*Point)(\s*-\s*)([^-]+)(.*)/i,
+            (_, _mp, sep, mid, rest) => `M.P${sep}${mid.trim().slice(0, 4)}${rest}`,
+          )
+          .trim()
+      : d
   }
 
   streetAddress.value = addr['Street Name'] || ''
@@ -513,7 +527,7 @@ async function addAddress() {
     return
   }
 
-  const isMeetingPoint = designation.value.includes("M.P")
+  const isMeetingPoint = designation.value.includes('M.P')
 
   if (!isMeetingPoint /*&& editAddress.value === -1*/) {
     try {
@@ -549,22 +563,22 @@ async function addAddress() {
     address.value[editAddress.value] = payload
     // If in selection mode, keep the selection if we just edited the selected one
     if (props.isSelectionMode && selectedAddressObj.value === address.value[editAddress.value]) {
-       // already selected, logic holds
+      // already selected, logic holds
     } else if (props.isSelectionMode) {
-        // Option: auto-select the edited one? Usually yes.
-        selectedAddressObj.value = address.value[editAddress.value]
+      // Option: auto-select the edited one? Usually yes.
+      selectedAddressObj.value = address.value[editAddress.value]
     }
   } else {
     address.value.push(payload)
     // Auto-select the newly added address if in selection mode
     if (props.isSelectionMode) {
-        selectedAddressObj.value = payload
+      selectedAddressObj.value = payload
     }
   }
   // Set the order’s delivery notes for this session only (not persisted in customer profile)
- if (addressNote.value?.trim()) {
-   orderStore.deliveryNotes = addressNote.value.trim()
- }
+  if (addressNote.value?.trim()) {
+    orderStore.deliveryNotes = addressNote.value.trim()
+  }
   floor.value = ''
   aptNumber.value = ''
   designation.value = ''
@@ -573,7 +587,7 @@ async function addAddress() {
   district.value = ''
   postCode.value = ''
   muncipality.value = ''
-  addressNote.value = ''    // Clear address note
+  addressNote.value = '' // Clear address note
 
   // Clear search fields too
   searchAdd.postalCode = ''
@@ -713,7 +727,7 @@ async function winmaxCreateOrUpdate(base: any, outletId: string, selected?: any)
   const wmPayload = {
     name: String(base.name || ''),
     phone: String(base.phone || ''),
-    address: addressForWinmax.map(a => ({ ...a, PostCode: a.postCode })),
+    address: addressForWinmax.map((a) => ({ ...a, PostCode: a.postCode })),
     isTick: !!base.isTick,
     isPresent: !!base.isTick, // ← as requested: “isPresent: isTick”
     notifications: !!base.notifications,
@@ -749,8 +763,8 @@ async function winmaxCreateOrUpdate(base: any, outletId: string, selected?: any)
 }
 const lockTick = computed(() => {
   // Lock only when editing an existing customer AND their isTick is true
-  return !!(props.selectedUser && (props.selectedUser as any).isTick);
-});
+  return !!(props.selectedUser && (props.selectedUser as any).isTick)
+})
 
 async function addOrUpdateCustomerDetails() {
   const servicesStore = useServiceStore()
@@ -837,17 +851,17 @@ async function handleSubmit() {
   isSubmitting.value = true
   try {
     await addOrUpdateCustomerDetails()
-    
+
     // If in selection mode, emit the selected address now (using the potentially updated list)
     // If in selection mode, emit the selected address now
     if (props.isSelectionMode) {
-        if (selectedAddressObj.value) {
-            emits('selectAddress', selectedAddressObj.value)
-        } else {
-             init({ color: 'warning', message: 'Please select an address.' })
-             isSubmitting.value = false
-             return
-        }
+      if (selectedAddressObj.value) {
+        emits('selectAddress', selectedAddressObj.value)
+      } else {
+        init({ color: 'warning', message: 'Please select an address.' })
+        isSubmitting.value = false
+        return
+      }
     }
 
     // close modal on success

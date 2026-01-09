@@ -142,29 +142,29 @@
           </div>
 
           <div class="summary-totals flex-shrink-0">
-  <div class="total-row">
-    <span>Subtotal:</span>
-    <span>€{{ subtotal.toFixed(2) }}</span>
-  </div>
-  <div v-if="orderType === 'delivery'" class="total-row">
-    <span>Delivery Fee:</span>
-    <span>€{{ deliveryFee.toFixed(2) }}</span>
-  </div>
-  <div v-if="promoTotal" class="total-row">
-    <span>Total Discount:</span>
-    <span>- €{{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }}</span>
-  </div>
-  <div class="total-row total-final">
-    <span v-if="orderStore.editOrder">Total:
-      <span class="text-green-600">PAID AMOUNT: €{{ orderStore.editOrder.editOrderTotal.toFixed(2) }}</span>
-    </span>
-    <span v-else>Total:</span>
-    <span v-if="orderStore.editOrder">Balance €{{ getTotalPrice }}</span>
-    <span v-else-if="!promoTotal">€{{ (totalAmount + deliveryFee).toFixed(2) }}</span>
-    <span v-else>€{{ promoTotal.updatedTotal.toFixed(2) }}</span>
-  </div>
-</div>
-
+            <div class="total-row">
+              <span>Subtotal:</span>
+              <span>€{{ subtotal.toFixed(2) }}</span>
+            </div>
+            <div v-if="orderType === 'delivery'" class="total-row">
+              <span>Delivery Fee:</span>
+              <span>€{{ deliveryFee.toFixed(2) }}</span>
+            </div>
+            <div v-if="promoTotal" class="total-row">
+              <span>Total Discount:</span>
+              <span>- €{{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }}</span>
+            </div>
+            <div class="total-row total-final">
+              <span v-if="orderStore.editOrder"
+                >Total:
+                <span class="text-green-600">PAID AMOUNT: €{{ orderStore.editOrder.editOrderTotal.toFixed(2) }}</span>
+              </span>
+              <span v-else>Total:</span>
+              <span v-if="orderStore.editOrder">Balance €{{ getTotalPrice }}</span>
+              <span v-else-if="!promoTotal">€{{ (totalAmount + deliveryFee).toFixed(2) }}</span>
+              <span v-else>€{{ promoTotal.updatedTotal.toFixed(2) }}</span>
+            </div>
+          </div>
         </div>
       </div>
       <!-- Payment Section -->
@@ -201,7 +201,7 @@
                 v-for="amount in cashDenominations"
                 :key="amount"
                 class="denomination-btn"
-                :class="{ 'selected': selectedCashAmount === amount }"
+                :class="{ selected: selectedCashAmount === amount }"
                 @click="selectedCashAmount = amount"
               >
                 {{ amount.toFixed(2) }}
@@ -229,12 +229,7 @@
 
         <div class="action-container">
           <div class="flex gap-2 w-full justify-center">
-            <button
-              v-if="orderId"
-              class="btn btn-flat-danger mr-2"
-              :disabled="apiLoading"
-              @click="cancelOrder()"
-            >
+            <button v-if="orderId" class="btn btn-flat-danger mr-2" :disabled="apiLoading" @click="cancelOrder()">
               Cancel Order
             </button>
             <button
@@ -264,17 +259,12 @@
             Payment in progress...
           </span>
           <div class="flex gap-2">
-            <button
-              class="btn btn-flat-danger text-sm px-4 py-2"
-              @click="cancelOrder()"
-            >
-              Cancel Order
-            </button>
+            <button class="btn btn-flat-danger text-sm px-4 py-2" @click="cancelOrder()">Cancel Order</button>
             <button
               class="btn btn-secondary text-sm px-4 py-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
               @click="manualRetry()"
             >
-              Problems? Retry
+              Try Another Payment
             </button>
           </div>
         </div>
@@ -303,7 +293,7 @@ const props = defineProps<{
   orderType: string
   dateSelected: string
   promoCode: string
-  promoCodes?: string[]          
+  promoCodes?: string[]
 }>()
 
 const orderStore = useOrderStore()
@@ -319,7 +309,7 @@ const orderFor = computed(() => orderStore.orderFor)
 
 // Cash payment state
 const selectedCashAmount = ref<number | null>(null)
-const cashDenominations = [5.00, 10.00, 20.00, 50.00, 100.00, 200.00]
+const cashDenominations = [5.0, 10.0, 20.0, 50.0, 100.0, 200.0]
 
 const finalTotal = computed(() => {
   if (promoTotal.value) {
@@ -375,7 +365,6 @@ const etaTime = computed(() => {
     return `${zoneName}${props.orderType === 'delivery' ? 'Delivery - ETA' : 'Takeaway - Ready at'} ${timeString}`
   }
 })
-
 
 const getTotalPrice = computed(() => {
   const total = totalAmount.value + props.deliveryFee
@@ -448,7 +437,10 @@ const totalAmount = computed(() => {
  * Each unit contains originalPrice, optionsPrice, updatedPrice, discount, isAffected.
  */
 const promoUnitsMap = computed(() => {
-  const map = new Map<string, Array<{ originalPrice: number; optionsPrice: number; updatedPrice: number; discount: number; isAffected: boolean }>>()
+  const map = new Map<
+    string,
+    Array<{ originalPrice: number; optionsPrice: number; updatedPrice: number; discount: number; isAffected: boolean }>
+  >()
   const resp = promoTotal.value
   const lines = resp?.menuItems || []
   for (const line of lines) {
@@ -540,7 +532,7 @@ async function checkPaymentStatus(requestId: string, paymentId: string, isPollin
       const gateway = responseData.gateway || ''
       const isWallee = /wallee/i.test(gateway)
       const isDeviceSuccess = responseData.raw?.kind === 'deviceSuccess'
-      
+
       if ((isWallee || isDeviceSuccess) && responseData.status === 'Completed') {
         console.log('WalleePOS/Device Success Detected - Triggering Success Handler')
         handlePaymentSuccess()
@@ -625,25 +617,25 @@ function setInter() {
   let iframeReturnDetected = false
   let lastRetryTime = 0
   const startTime = Date.now()
-  
+
   checkInterval.value = setInterval(async () => {
     const iframe = document.querySelector('iframe')
     const elapsedSeconds = (Date.now() - startTime) / 1000
     const timeSinceLastRetry = (Date.now() - lastRetryTime) / 1000
-    
+
     // After 8 seconds, try verification every 5 seconds until success
     if (elapsedSeconds > 8 && timeSinceLastRetry > 5 && !iframeReturnDetected) {
       console.log('[Payment Debug] Triggering automatic verification attempt...')
       lastRetryTime = Date.now()
-      
+
       try {
         const response = await orderStore.retryPayment(orderId.value, selectedPayment.value.paymentTypeId)
         console.log('[Payment Debug] Auto-retry response:', response.status)
-        
+
         if (response.status === 200 || response.status === 201) {
           const orderRes = await orderStore.getOrderStatus(orderId.value)
           console.log('[Payment Debug] Order status after auto-retry:', orderRes.data?.data?.status)
-          
+
           if (orderRes.data?.data?.status === 'Completed') {
             console.log('[Payment Debug] Payment completed via auto-retry!')
             iframeReturnDetected = true
@@ -656,30 +648,30 @@ function setInter() {
         console.error('[Payment Debug] Auto-retry failed:', e)
       }
     }
-    
+
     // Try to detect if iframe has returned from payment gateway
     if (iframe && iframe.contentWindow && !iframeReturnDetected) {
       try {
         const currentUrl = iframe.contentWindow.location.href
         console.log('[Payment Debug] Iframe URL readable:', currentUrl)
-        
+
         // IGNORE about:blank which means "not loaded yet" or "loading"
         if (currentUrl && currentUrl !== 'about:blank' && !currentUrl.startsWith('about:')) {
-          // We are back on our domain! 
+          // We are back on our domain!
           console.log('[Payment Debug] Iframe returned from gateway, triggering payment verification...')
           iframeReturnDetected = true
-          
+
           // Trigger server-side payment verification (same as retry button)
           try {
             console.log('[Payment Debug] Calling retryPayment for orderId:', orderId.value)
             const response = await orderStore.retryPayment(orderId.value, selectedPayment.value.paymentTypeId)
             console.log('[Payment Debug] retryPayment response:', response.status, response.data)
-            
+
             if (response.status === 200 || response.status === 201) {
               // Check if payment is now completed
               const orderRes = await orderStore.getOrderStatus(orderId.value)
               console.log('[Payment Debug] Order status:', orderRes.data?.data?.status)
-              
+
               if (orderRes.data?.data?.status === 'Completed') {
                 console.log('[Payment Debug] Payment completed! Triggering success handler...')
                 resetInter()
@@ -696,7 +688,7 @@ function setInter() {
         // This is expected while user is on Saferpay
       }
     }
-    
+
     // Continue polling status for all payment types
     if (orderId.value && selectedPayment.value) {
       checkPaymentStatus(orderId.value, selectedPayment.value.paymentTypeId, true)
@@ -710,13 +702,14 @@ function resetInter() {
 
 async function cancelOrder() {
   if (!orderId.value) return
+  resetInter() // Stop polling
   try {
     apiLoading.value = true
     // Use new cancel endpoint
     await orderStore.cancelOrder(orderId.value)
-    
+
     init({ color: 'info', message: 'Order cancelled' })
-    
+
     // Reset everything by reloading, similar to success flow
     setTimeout(() => {
       orderStore.cartItems = []
@@ -731,6 +724,7 @@ async function cancelOrder() {
 }
 
 async function manualRetry() {
+  resetInter() // Stop polling so it doesn't auto-retry with new selection
   // Check status one last time in case it actually went through
   try {
     apiLoading.value = true
@@ -752,6 +746,10 @@ async function manualRetry() {
     apiLoading.value = false
   }
 }
+
+onUnmounted(() => {
+  resetInter()
+})
 
 async function updateOrder() {
   apiLoading.value = true
@@ -937,7 +935,7 @@ const moneyEq = (a: number, b: number) => Math.abs(Number(a) - Number(b)) < 0.00
 function cartItemPromoDisplay(item: any, idx: number) {
   const lp = promoTotal.value ? linePromoCart(item, idx) : null
   const original = Number(lp?.lineOriginal ?? item.totalPrice ?? 0)
-  const updated  = Number(lp?.lineUpdated  ?? item.totalPrice ?? 0)
+  const updated = Number(lp?.lineUpdated ?? item.totalPrice ?? 0)
   const affected = !moneyEq(original, updated)
   return { affected, original, updated }
 }
@@ -946,7 +944,7 @@ function cartItemPromoDisplay(item: any, idx: number) {
 function offerPromoDisplay(item: any, index: number) {
   const updatedMaybe = promoOfferItemPrice(item, index)
   const original = Number(item.totalPrice ?? 0)
-  const updated  = updatedMaybe != null ? Number(updatedMaybe) : original
+  const updated = updatedMaybe != null ? Number(updatedMaybe) : original
   const affected = updatedMaybe != null && !moneyEq(original, updated)
   return { affected, original, updated }
 }
@@ -964,7 +962,7 @@ function normalizeCodes(singleStr, codesArr) {
   if (!codes.length && singleStr) {
     codes = singleStr
       .split(/[\s,;\n\r]+/g)
-      .map(s => s.trim())
+      .map((s) => s.trim())
       .filter(Boolean)
   }
 
@@ -973,11 +971,13 @@ function normalizeCodes(singleStr, codesArr) {
   const out = []
   for (const c of codes) {
     const k = c.toLowerCase()
-    if (!seen.has(k)) { seen.add(k); out.push(c) }
+    if (!seen.has(k)) {
+      seen.add(k)
+      out.push(c)
+    }
   }
   return out
 }
-
 
 async function createOrder() {
   apiLoading.value = true
@@ -1011,7 +1011,7 @@ async function createOrder() {
       })),
     ),
   }))
-const codes = normalizeCodes(props.promoCode, props.promoCodes)
+  const codes = normalizeCodes(props.promoCode, props.promoCodes)
 
   try {
     const payload = {
@@ -1029,10 +1029,9 @@ const codes = normalizeCodes(props.promoCode, props.promoCodes)
       paymentMode: selectedPayment.value,
       address: sanitizeAddress(orderStore.address),
       phoneNo: orderStore.phoneNumber || '',
-  ...(codes.length ? { promoCodes: codes } : {}),
-  ...(codes.length === 1 ? { promoCode: codes[0] } : {}),
+      ...(codes.length ? { promoCodes: codes } : {}),
+      ...(codes.length === 1 ? { promoCode: codes[0] } : {}),
     }
-
 
     let response: any = ''
     if (orderId.value) {
@@ -1047,11 +1046,11 @@ const codes = normalizeCodes(props.promoCode, props.promoCodes)
 
     if (response.status === 201 || response.status === 200) {
       // CASE 1: Payment Gateway (e.g. Wallee) - Expects Iframe Interaction
-        if (selectedPayment.value.paymentGateway) {
+      if (selectedPayment.value.paymentGateway) {
         if (!orderId.value) {
-           init({ color: 'success', message: 'Order created.' })
+          init({ color: 'success', message: 'Order created.' })
         }
-        
+
         // Immediate success check (e.g. test gateways or auto-capture)
         if (response.data.data.status === 'Completed') {
           handlePaymentSuccess()
@@ -1060,13 +1059,13 @@ const codes = normalizeCodes(props.promoCode, props.promoCodes)
           orderId.value = response.data.data.requestId
           setInter()
         }
-      } 
+      }
       // CASE 2: No Gateway (Cash, External Terminal) - Immediate Success
       else {
         if (orderFor.value === 'current') {
           init({ color: 'success', message: 'Order sent to Winmax' })
         }
-        
+
         handlePaymentSuccess()
       }
     } else {
@@ -1106,14 +1105,17 @@ const promoOfferItemPrice = (item: any, index: number) => {
     const it = orderStore.offerItems[i]
     const itOfferId = it.offerId || (it.fullItem && it.fullItem.offerId)
     if (itOfferId === offerId) {
-      if (i === index) { occ = seen; break }
+      if (i === index) {
+        occ = seen
+        break
+      }
       seen++
     }
   }
 
   // Pick corresponding validator entry (fallback to last if fewer entries)
   const picked = matches[Math.min(occ, matches.length - 1)]
-  const updated = Number((picked && picked.totalPrice) ? picked.totalPrice : 0)
+  const updated = Number(picked && picked.totalPrice ? picked.totalPrice : 0)
 
   return Number(updated.toFixed(2))
 }
@@ -1571,5 +1573,4 @@ const promoOfferItemPrice = (item: any, index: number) => {
   padding-top: 12px;
   font-size: 16px;
 }
-
 </style>

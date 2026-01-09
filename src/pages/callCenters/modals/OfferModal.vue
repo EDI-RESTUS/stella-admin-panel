@@ -135,8 +135,8 @@ const hasAtLeastOneSelection = computed(() => {
   return offer.value
     ? offer.value.selections.filter((a) => a.isRequired).length
       ? offer.value.selections
-        .filter((a) => a.isRequired)
-        .every((group) => group.addedItems && group.addedItems.length > 0)
+          .filter((a) => a.isRequired)
+          .every((group) => group.addedItems && group.addedItems.length > 0)
       : true
     : false
 })

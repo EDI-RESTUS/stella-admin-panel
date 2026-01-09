@@ -141,7 +141,6 @@
               </li>
             </ul>
           </div>
-
         </div>
 
         <div v-if="selectedTab && selectedUser" class="flex items-center gap-1 w-full">
@@ -164,13 +163,12 @@
             </button>
           </div>
 
-        <input
-          v-model="localDateTime"
-          type="datetime-local"
-          class="text-xs border rounded px-1 py-1 w-[40%]"
-          :disabled="orderFor === 'current'"
-        />
-
+          <input
+            v-model="localDateTime"
+            type="datetime-local"
+            class="text-xs border rounded px-1 py-1 w-[40%]"
+            :disabled="orderFor === 'current'"
+          />
         </div>
 
         <!-- Address -->
@@ -202,9 +200,9 @@
                 <div
                   :class="[
                     'border rounded w-full px-2 py-[5px] text-xs flex items-center justify-between',
-                    isLocationLocked 
-                      ? 'bg-gray-100 cursor-not-allowed opacity-60' 
-                      : 'bg-white cursor-pointer hover:bg-gray-50'
+                    isLocationLocked
+                      ? 'bg-gray-100 cursor-not-allowed opacity-60'
+                      : 'bg-white cursor-pointer hover:bg-gray-50',
                   ]"
                   @click="!isLocationLocked && (showDeliveryDropdown = !showDeliveryDropdown)"
                 >
@@ -274,8 +272,8 @@
                 size="small"
                 :style="{ '--va-background-color': outlet.primaryColor }"
                 :disabled="selectedTab === 'delivery'"
-                @click.prevent
                 title="Zone is auto-selected from address"
+                @click.prevent
               >
                 {{ serviceZoneId || 'N/A' }}
               </VaButton>
@@ -305,17 +303,17 @@
 
         <!-- Notes -->
         <div v-if="selectedTab">
-            <label class="text-xs text-gray-600 font-medium block mb-1">Notes</label>
-            <VaTextarea
-              v-model="orderStore.deliveryNotes"
-              placeholder="Delivery notes e.g call on arrival, gate code, or takeaway instructions"
-              autosize
-              :autofocus="false"
-              :min-rows="1"
-              class="block !h-auto"
-              style="width: calc(100% - 32px);"
-              @input="autoGrow"
-            />
+          <label class="text-xs text-gray-600 font-medium block mb-1">Notes</label>
+          <VaTextarea
+            v-model="orderStore.deliveryNotes"
+            placeholder="Delivery notes e.g call on arrival, gate code, or takeaway instructions"
+            autosize
+            :autofocus="false"
+            :min-rows="1"
+            class="block !h-auto"
+            style="width: calc(100% - 32px)"
+            @input="autoGrow"
+          />
         </div>
       </div>
     </Transition>
@@ -331,6 +329,7 @@
     <ConfirmRemoveCustomerDetails
       v-model="showConfirmRemove"
       @confirm="onConfirmRemove"
+      @confirmClearAll="onConfirmClearAll"
       @close="closeConfirmRemoveModal"
     />
     <CustomerHistoryModal
@@ -344,20 +343,21 @@
       :delivery-fee="selectedZoneDetails?.deliveryCharge || 0"
       :selected-tab="selectedTab"
       @close="showHistoryModal = false"
-      @repeat-order="handleRepeatOrder"
+      @repeatOrder="handleRepeatOrder"
     />
   </div>
 </template>
 
 <script setup>
 import { ref, watch, defineEmits, computed, defineExpose, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
-import { useToast, useColors } from 'vuestic-ui'
+import { useToast, useModal } from 'vuestic-ui'
 import axios from 'axios'
 import { useServiceStore } from '@/stores/services.ts'
 import CustomerModal from '../modals/CustomerModal.vue'
 import ConfirmRemoveCustomerDetails from '../modals/ConfirmRemoveCustomerDetails.vue'
 import CustomerHistoryModal from '../modals/CustomerHistoryModal.vue'
 import { useOrderStore } from '@/stores/order-store'
+import { useUsersStore } from '@/stores/users' // Import Users Store
 import { onClickOutside } from '@vueuse/core'
 const props = defineProps(['forceRemount'])
 const emits = defineEmits([
@@ -367,7 +367,7 @@ const emits = defineEmits([
   'setCustomerDetailsId',
   'setDeliveryFee',
   'setDeliveryZone',
-  'setDateSelected', 
+  'setDateSelected',
 ])
 const target = ref('userList')
 const deliveryTarget = ref('deliveryList')
@@ -376,7 +376,9 @@ const selectedTab = ref('')
 const isUserLoading = ref(false)
 const selectedAddress = ref('')
 const { init } = useToast()
+const { confirm } = useModal()
 const orderStore = useOrderStore()
+const userStore = useUsersStore() // Instantiate User Store
 const showCustomerModal = ref(false)
 const serviceZoneId = ref('')
 const phoneNumber = ref('')
@@ -390,7 +392,6 @@ const orderFor = ref('current')
 const showConfirmRemove = ref(false)
 const showHistoryModal = ref(false)
 
-
 watch(phoneNumber, (val) => {
   orderStore.setPhoneNumber(val)
 })
@@ -403,7 +404,7 @@ watch(
       // Immediately clear notes if they're set in takeaway mode
       orderStore.deliveryNotes = ''
     }
-  }
+  },
 )
 
 watch(selectedAddress, (val) => {
@@ -466,6 +467,19 @@ function clearCustomerDetails() {
 function onConfirmRemove() {
   clearCustomerDetails()
 }
+
+function onConfirmClearAll() {
+  // Clear customer details
+  clearCustomerDetails()
+
+  // Clear cart items and related store data
+  orderStore.cartItems = []
+  orderStore.offerItems = []
+  orderStore.cartTotal = null
+  orderStore.editOrder = null
+  orderStore.validation = null
+}
+
 function closeConfirmRemoveModal() {
   showConfirmRemove.value = false
 }
@@ -490,7 +504,7 @@ const updateTimeOnly = () => {
   localDateTime.value = getLocalDateTime()
 }
 // --- opening hours helpers ---
-const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
+const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
 function parseHHmm(hhmm) {
   // "11:00" -> {h:11,m:0}; tolerate "", null
@@ -511,12 +525,15 @@ const FALLBACK_CLOSE = { h: 23, m: 0 }
 
 function getOpenCloseFor(dt) {
   const ot = outlet.value?.openingTimes
-  let opensStr = '', closesStr = ''
+  let opensStr = '',
+    closesStr = ''
 
   if (ot) {
     if (ot.is24h) {
-      const open = new Date(dt); open.setHours(0,0,0,0)
-      const close = new Date(open); close.setDate(close.getDate() + 1)
+      const open = new Date(dt)
+      open.setHours(0, 0, 0, 0)
+      const close = new Date(open)
+      close.setDate(close.getDate() + 1)
       return { open, close }
     }
     if (ot.selected === 'byDay') {
@@ -535,10 +552,12 @@ function getOpenCloseFor(dt) {
 
   const open = dateAtHM(dt, o.h, o.m)
   let close = dateAtHM(dt, c.h, c.m)
-  if (close <= open) { close = new Date(close.getTime()); close.setDate(close.getDate() + 1) }
+  if (close <= open) {
+    close = new Date(close.getTime())
+    close.setDate(close.getDate() + 1)
+  }
   return { open, close }
 }
-
 
 function fmtForInput(d) {
   const pad = (n) => String(n).padStart(2, '0')
@@ -580,16 +599,15 @@ watch(
           chosen.getDate(),
           chosen.getHours(),
           chosen.getMinutes(),
-          0, 0
+          0,
+          0,
         )
         const inWindow = normalized >= win.open && normalized < win.close
-        
       }
     }
   },
-  { immediate: false }
+  { immediate: false },
 )
-
 
 let timeInterval = null
 const futureMin = computed(() => {
@@ -599,7 +617,8 @@ const futureMin = computed(() => {
   if (!win) return null
   // If selecting today and we’re already past open, min should be now
   const now = new Date()
-  const min = (dt.toDateString() === now.toDateString()) ? new Date(Math.max(now.getTime(), win.open.getTime())) : win.open
+  const min =
+    dt.toDateString() === now.toDateString() ? new Date(Math.max(now.getTime(), win.open.getTime())) : win.open
   return fmtForInput(min)
 })
 
@@ -649,7 +668,6 @@ watch(orderFor, (mode) => {
   selectedDate.value = clamped
   localDateTime.value = fmtForInput(clamped)
 })
-
 
 onMounted(() => {
   if (orderFor.value === 'current') {
@@ -701,34 +719,36 @@ async function fetchCustomerDetails(setUser = false) {
           if (!winmaxNotFound) {
             // Winmax HAS a match → check Stella for 'deliveryNote' and merge BEFORE mapping/selecting
             try {
-               const stellaRes = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/customers/search`, {
-                  params: {
-                     outletId: servicesStore.selectedRest,
-                     ...(phoneNumber.value && { phoneNo: phoneNumber.value }),
-                     ...(name.value && { customerName: name.value }),
-                  },
-               })
-               const hits = Array.isArray(stellaRes?.data?.data) ? stellaRes.data.data : []
-               if (hits.length > 0) {
-                  const stellaUser = hits[0] 
-                  const stellaAddrs = Array.isArray(stellaUser.address) ? stellaUser.address : []
+              const stellaRes = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/customers/search`, {
+                params: {
+                  outletId: servicesStore.selectedRest,
+                  ...(phoneNumber.value && { phoneNo: phoneNumber.value }),
+                  ...(name.value && { customerName: name.value }),
+                },
+              })
+              const hits = Array.isArray(stellaRes?.data?.data) ? stellaRes.data.data : []
+              if (hits.length > 0) {
+                const stellaUser = hits[0]
+                const stellaAddrs = Array.isArray(stellaUser.address) ? stellaUser.address : []
 
-                  // Merge deliveryNote into Winmax list
-                  wmList.forEach(u => {
-                    if (u.OtherAddresses) {
-                       u.OtherAddresses.forEach(wmAddr => {
-                          const match = stellaAddrs.find(sa => 
-                             (sa.designation || '').trim().toLowerCase() === (wmAddr.Designation || '').trim().toLowerCase()
-                          )
-                          if (match && match.deliveryNote) {
-                             wmAddr.deliveryNote = match.deliveryNote
-                          }
-                       })
-                    }
-                  })
-               }
+                // Merge deliveryNote into Winmax list
+                wmList.forEach((u) => {
+                  if (u.OtherAddresses) {
+                    u.OtherAddresses.forEach((wmAddr) => {
+                      const match = stellaAddrs.find(
+                        (sa) =>
+                          (sa.designation || '').trim().toLowerCase() ===
+                          (wmAddr.Designation || '').trim().toLowerCase(),
+                      )
+                      if (match && match.deliveryNote) {
+                        wmAddr.deliveryNote = match.deliveryNote
+                      }
+                    })
+                  }
+                })
+              }
             } catch (err) {
-               console.warn("Failed to fetch Stella details for merging notes", err)
+              console.warn('Failed to fetch Stella details for merging notes', err)
             }
 
             // Winmax HAS a match → use it
@@ -740,11 +760,11 @@ async function fetchCustomerDetails(setUser = false) {
                       ...add,
                       Address: typeof add.Address === 'string' ? add.Address : '',
                       ZipCode:
-                        (add.PostCode || add.postalCode || add.ZipCode)
-                          ? (add.PostCode || add.postalCode || add.ZipCode)
-                          : (add.Designation && (add.Designation.startsWith('Meet') || add.Designation.startsWith('M.P')))
+                        add.PostCode || add.postalCode || add.ZipCode
+                          ? add.PostCode || add.postalCode || add.ZipCode
+                          : add.Designation && (add.Designation.startsWith('Meet') || add.Designation.startsWith('M.P'))
                             ? '' // Meeting points may not have a zip
-                            : (typeof add.Address === 'string' && add.Address.split(',').length > 1)
+                            : typeof add.Address === 'string' && add.Address.split(',').length > 1
                               ? add.Address.split(',')[add.Address.split(',').length - 1].trim()
                               : '',
                       deliveryNote: add.deliveryNote || '', // ADD THIS
@@ -782,7 +802,9 @@ async function fetchCustomerDetails(setUser = false) {
                   address.district,
                   address.city,
                   address.postalCode,
-                ].filter(val => val && String(val).trim()).join(','),
+                ]
+                  .filter((val) => val && String(val).trim())
+                  .join(','),
                 ZipCode: address.postalCode,
                 Phone: '',
                 Fax: '',
@@ -831,7 +853,9 @@ async function fetchCustomerDetails(setUser = false) {
                   address.district,
                   address.city,
                   address.postalCode,
-                ].filter(val => val && String(val).trim()).join(','),
+                ]
+                  .filter((val) => val && String(val).trim())
+                  .join(','),
                 ZipCode: address.postalCode,
                 Phone: '',
                 Fax: '',
@@ -865,17 +889,8 @@ function setNewUser(payload) {
 
 function selectUser(user) {
   // normalize different payload shapes
-  const normName =
-    user['Name'] ??
-    user['customerName'] ??
-    user['name'] ??
-    ''
-  const normPhone =
-    user['MobilePhone'] ??
-    user['Phone'] ??
-    user['phoneNo'] ??
-    user['phone'] ??
-    ''
+  const normName = user['Name'] ?? user['customerName'] ?? user['name'] ?? ''
+  const normPhone = user['MobilePhone'] ?? user['Phone'] ?? user['phoneNo'] ?? user['phone'] ?? ''
 
   name.value = String(normName)
   phoneNumber.value = String(normPhone)
@@ -889,15 +904,9 @@ function selectUser(user) {
       : Array.isArray(user.address)
         ? user.address.map((addr) => ({
             Designation: addr.designation,
-            Address: [
-              addr.aptNo,
-              addr.floor,
-              addr.streetName,
-              addr.streetNo,
-              addr.district,
-              addr.city,
-              addr.postalCode,
-            ].filter(val => val && String(val).trim()).join(','),
+            Address: [addr.aptNo, addr.floor, addr.streetName, addr.streetNo, addr.district, addr.city, addr.postalCode]
+              .filter((val) => val && String(val).trim())
+              .join(','),
             ZipCode: addr.postalCode,
             Phone: '',
             Fax: '',
@@ -908,9 +917,8 @@ function selectUser(user) {
         : [],
   }
 
-
   userResults.value = []
-    prefillNotesFromUser(selectedUser.value)
+  prefillNotesFromUser(selectedUser.value)
 
   // Auto-select location if phone number is 1-15
   autoSelectLocationForShortPhone()
@@ -928,7 +936,7 @@ function selectUser(user) {
 function autoSelectLocationForShortPhone() {
   const phone = String(phoneNumber.value || '').trim()
   const phoneNum = Number(phone)
-  
+
   // Only apply for phone numbers 1-15
   if (phone.length <= 2 && phoneNum >= 1 && phoneNum <= 15) {
     // Wait for delivery zones to be loaded
@@ -936,19 +944,25 @@ function autoSelectLocationForShortPhone() {
       // Zones not loaded yet, will be handled after they load
       return
     }
-    
-    // For now, always select Deftera (zone 15) for phone numbers 1-15
-    const defteraZone = deliveryZoneOptions.value.find(zone => {
-      return Number(zone.serviceZoneId) === 15
+
+    const customerName = (name.value || '').toLowerCase().trim()
+
+    // Find matching zone by name
+    const matchingZone = deliveryZoneOptions.value.find((zone) => {
+      const zoneId = Number(zone.serviceZoneId)
+      if (zoneId >= 1 && zoneId <= 15) {
+        const locationName = (zone.name || '').toLowerCase().trim()
+        // Check if customer name contains location name or vice versa
+        return customerName.includes(locationName) || locationName.includes(customerName)
+      }
+      return false
     })
-    
-    if (defteraZone) {
-      selectDeliveryZone(defteraZone)
+
+    if (matchingZone) {
+      selectDeliveryZone(matchingZone)
     }
   }
 }
-
-
 
 const deliveryZoneOptions = ref([])
 
@@ -959,18 +973,63 @@ const isLocationLocked = computed(() => {
   return phone.length <= 2 && phoneNum >= 1 && phoneNum <= 15
 })
 
-// Filter delivery zones - for phone 1-15, show only Deftera (zone 15)
+// Filter delivery zones based on customer name for phone numbers 1-15
 const filteredDeliveryZones = computed(() => {
   if (!deliveryZoneOptions.value.length) return []
-  
-  // For now, show only Deftera (zone 15) for ALL phone numbers
-  return deliveryZoneOptions.value.filter(zone => {
-    return Number(zone.serviceZoneId) === 15
-  })
+
+  const phone = String(phoneNumber.value || '').trim()
+  const phoneNum = Number(phone)
+
+  // For phone numbers 1-15, filter by matching customer name with location name
+  if (phone.length <= 2 && phoneNum >= 1 && phoneNum <= 15) {
+    const customerName = (name.value || '').toLowerCase().trim()
+
+    return deliveryZoneOptions.value.filter((zone) => {
+      const zoneId = Number(zone.serviceZoneId)
+      if (zoneId >= 1 && zoneId <= 15) {
+        const locationName = (zone.name || '').toLowerCase().trim()
+        // Only show zones where customer name matches location name
+        return customerName.includes(locationName) || locationName.includes(customerName)
+      }
+      return false
+    })
+  }
+
+  // For regular phone numbers, show all zones
+  return deliveryZoneOptions.value
 })
 
 function selectDeliveryZone(zone) {
   if (zone) {
+    // Debug logging
+    console.log('[selectDeliveryZone] Checking availability for:', zone.name)
+    console.log('[selectDeliveryZone] Current Tab:', selectedTab.value)
+    console.log('[selectDeliveryZone] Availability:', zone.availability)
+
+    // Check availability for current tab
+    const currentService = selectedTab.value // 'delivery' or 'takeaway'
+    const isAvailable = zone.availability?.[currentService]?.cc
+
+    console.log(`[selectDeliveryZone] Is available for ${currentService} (cc):`, isAvailable)
+
+    if (isAvailable === false) {
+      confirm({
+        message: `${selectedTab.value === 'takeaway' ? 'Takeaway' : 'Delivery'} not available for this Zone`,
+        okText: 'Close',
+        cancelText: '', // Hide cancel button
+        size: 'small',
+        zIndex: 9999, // Ensure it's on top
+      })
+      // Clear selection if it was set (or just don't set it)
+       selectedZone.value = ''
+       serviceZoneId.value = ''
+       emits('setDeliveryZone', false)
+       orderStore.setDeliveryZone(null)
+      return
+    }
+
+    // Existing logic continues if valid...
+    emits('setDeliveryFee', selectedTab.value === 'takeaway' ? 0 : zone.deliveryCharge)
     emits('setDeliveryFee', selectedTab.value === 'takeaway' ? 0 : zone.deliveryCharge)
     emits('setDeliveryZone', true)
     orderStore.setDeliveryZone(zone)
@@ -978,10 +1037,50 @@ function selectDeliveryZone(zone) {
     serviceZoneId.value = zone.serviceZoneId
     selectedZoneDetails.value = zone
     showDeliveryDropdown.value = false
+
+    // Also reset delivery fee/zone if switching tabs might have left stale data?
+    // Usually handled by tab change, but good to be safe.
+  } else {
+    // Handle clearing?
   }
 }
 
+// Watch for tab changes to re-validate selected zone
+watch(selectedTab, (newTab) => {
+  console.log('[watcher:selectedTab] Tab changed to:', newTab)
 
+  if (serviceZoneId.value && deliveryZoneOptions.value.length) {
+    const currentZone = deliveryZoneOptions.value.find(z => z.serviceZoneId == serviceZoneId.value)
+
+    if (currentZone) {
+      console.log('[watcher:selectedTab] Re-validating zone:', currentZone.name)
+      const isAvailable = currentZone.availability?.[newTab]?.cc
+      console.log(`[watcher:selectedTab] Is available for ${newTab} (cc):`, isAvailable)
+
+      if (isAvailable === false) {
+          confirm({
+            message: `${newTab === 'takeaway' ? 'Takeaway' : 'Delivery'} not available for this Zone`,
+            okText: 'Close',
+            cancelText: '',
+            size: 'small',
+            zIndex: 9999,
+          })
+          // Clear invalid selection
+          selectedZone.value = ''
+          serviceZoneId.value = ''
+          emits('setDeliveryZone', false)
+          orderStore.setDeliveryZone(null)
+      } else {
+         // Re-emit fee if needed? Delivery has charge, Takeaway 0.
+         // CustomerDetails logic usually handles this on select, maybe need to re-trigger or rely on consumer?
+         // The original code emits setDeliveryFee only on selectDeliveryZone.
+         // Let's ensure we update the fee when tab changes if zone is valid.
+         const fee = newTab === 'takeaway' ? 0 : currentZone.deliveryCharge
+         emits('setDeliveryFee', fee)
+      }
+    }
+  }
+})
 async function handleDeliveryZoneFetch() {
   const servicesStore = useServiceStore()
   if (deliveryZoneOptions.value.length) {
@@ -990,16 +1089,32 @@ async function handleDeliveryZoneFetch() {
   try {
     const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/deliveryZones/${servicesStore.selectedRest}`)
 
-    deliveryZoneOptions.value = response.data.data.sort((a, b) => {
-      return Number(a.serviceZoneId) - Number(b.serviceZoneId)
-    })
+    deliveryZoneOptions.value = response.data.data
+      .filter((zone) => zone.isActive !== false) // Filter out inactive zones
+      .filter((zone) => {
+        // Filter by allowedDeliveryZoneIds if present
+        const allowed = userStore.userDetails?.allowedDeliveryZoneIds
+        if (allowed && allowed.length > 0) {
+          return allowed.includes(zone._id) || allowed.includes(zone.id)
+        }
+        return true
+      })
+      .sort((a, b) => {
+        return Number(a.serviceZoneId) - Number(b.serviceZoneId)
+      })
 
     // Auto-select location if phone is 1-15 and user is already selected
     if (selectedUser.value) {
       autoSelectLocationForShortPhone()
     }
 
-    if (!response.data.data.length) {
+    // Auto-select if user is restricted to exactly one zone
+    const allowed = userStore.userDetails?.allowedDeliveryZoneIds
+    if (allowed && allowed.length > 0 && deliveryZoneOptions.value.length === 1) {
+       selectDeliveryZone(deliveryZoneOptions.value[0])
+    }
+
+    if (!deliveryZoneOptions.value.length) {
       selectedZone.value = ''
       if (selectedTab.value === 'delivery') {
         serviceZoneId.value = ''
@@ -1026,7 +1141,7 @@ function prefillNotesFromUser(user) {
   if (selectedTab.value === 'takeaway') {
     return
   }
-  
+
   const note = String(user?.customerNote || '').trim()
   if (note && !String(orderStore.deliveryNotes || '').trim()) {
     orderStore.deliveryNotes = note
@@ -1071,10 +1186,8 @@ function fromEditOrder(order) {
   name.value = order.customerName || order.name || ''
 
   // build a minimal Winmax-like "OtherAddresses" array so filteredAddresses works unchanged
-  const fullAddr =
-    order.deliveryAddress || order.address || order.delivery_address || '' // pick what you store
-  const postal =
-    order.postalCode || order.postCode || ''                               // optional, used for zone match
+  const fullAddr = order.deliveryAddress || order.address || order.delivery_address || '' // pick what you store
+  const postal = order.postalCode || order.postCode || '' // optional, used for zone match
   const designation = order.addressDesignation || 'From order'
 
   selectedUser.value = {
@@ -1131,7 +1244,7 @@ const filteredAddresses = computed(() => {
           value: `${e.Designation ? e.Designation + ' - ' : ''}${getParsedAddress(e.Address)}`,
           postalCode: postalCode,
           fullAddress: e.Address,
-          deliveryNote: e.deliveryNote || '', 
+          deliveryNote: e.deliveryNote || '',
         }
       }
     })
@@ -1163,7 +1276,6 @@ watch(
     }
   },
 )
-
 
 watch(
   () => selectedTab.value,
@@ -1214,7 +1326,7 @@ watch(
 
       if (selectedTab.value === 'delivery') {
         const isMeetingPointAddress = currentText.includes('Meeting Point') || currentText.includes('M.P')
-        
+
         let foundZone = null
         if (isMeetingPointAddress) {
           // 1. Try to find a meeting point match in our zones
@@ -1222,44 +1334,46 @@ watch(
             if (!zone.meetingPoints) continue
             // Simple check: does the address include the designation?
             // OR checks if fuzzy match (e.g. M.P - Laka...)
-            const match = zone.meetingPoints.find(mp => {
-               // Normal match
-               if (currentText.includes(mp.designation)) return true
-               
-               // Abbreviation match: Meeting Point -> M.P with truncated middle part (same as CustomerModal logic)
-               // Regex: /(Meeting\s*Point)(\s*-\s*)([^-]+)(.*)/i
-               const abbr = mp.designation.replace(
-                  /(Meeting\s*Point)(\s*-\s*)([^-]+)(.*)/i,
-                  (_, _mp, sep, mid, rest) => `M.P${sep}${mid.trim().slice(0, 4)}${rest}`
-               )
+            const match = zone.meetingPoints.find((mp) => {
+              // Normal match
+              if (currentText.includes(mp.designation)) return true
 
-               // Remove spaces and case-insensitive check for fuzzier match
-               // Check if currentText includes the abbr
-               return currentText.toLowerCase().replace(/\s/g, '').includes(abbr.toLowerCase().replace(/\s/g, ''))
+              // Abbreviation match: Meeting Point -> M.P with truncated middle part (same as CustomerModal logic)
+              // Regex: /(Meeting\s*Point)(\s*-\s*)([^-]+)(.*)/i
+              const abbr = mp.designation.replace(
+                /(Meeting\s*Point)(\s*-\s*)([^-]+)(.*)/i,
+                (_, _mp, sep, mid, rest) => `M.P${sep}${mid.trim().slice(0, 4)}${rest}`,
+              )
+
+              // Remove spaces and case-insensitive check for fuzzier match
+              // Check if currentText includes the abbr
+              return currentText.toLowerCase().replace(/\s/g, '').includes(abbr.toLowerCase().replace(/\s/g, ''))
             })
-            
+
             if (match) {
-               // User request: "pass the id ... which is the delivy zone"
-               // matched id: meeting-68482fb4...-0
-               if (match.id && match.id.includes('-')) {
-                 const extractedId = match.id.split('-')[1] // 68482fb4...
-                 // Find zone by this ID if possible, or just use the current 'zone' iterate
-                 // But ensuring we pick the zone defined by ID is safer if shared
-                 foundZone = deliveryZoneOptions.value.find(z => z.restaurant_id === extractedId || z._id === extractedId || z.id === extractedId)
-               }
-               if (!foundZone) foundZone = zone
-               break;
+              // User request: "pass the id ... which is the delivy zone"
+              // matched id: meeting-68482fb4...-0
+              if (match.id && match.id.includes('-')) {
+                const extractedId = match.id.split('-')[1] // 68482fb4...
+                // Find zone by this ID if possible, or just use the current 'zone' iterate
+                // But ensuring we pick the zone defined by ID is safer if shared
+                foundZone = deliveryZoneOptions.value.find(
+                  (z) => z.restaurant_id === extractedId || z._id === extractedId || z.id === extractedId,
+                )
+              }
+              if (!foundZone) foundZone = zone
+              break
             }
           }
         }
 
         if (foundZone) {
-            selectDeliveryZone(foundZone)
-            orderStore.setDeliveryZone(foundZone)
-            emits('setDeliveryZone', true)
-            // Use the selected address's fullAddress, not a fallback
-            orderStore.setAddress(fullAddress)
-            return
+          selectDeliveryZone(foundZone)
+          orderStore.setDeliveryZone(foundZone)
+          emits('setDeliveryZone', true)
+          // Use the selected address's fullAddress, not a fallback
+          orderStore.setAddress(fullAddress)
+          return
         }
 
         if (matchingZone) {
@@ -1318,7 +1432,6 @@ watch(orderFor, (newVal) => {
 defineExpose({
   isOpen,
   fromEditOrder,
-
 })
 </script>
 

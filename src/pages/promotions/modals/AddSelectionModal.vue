@@ -338,7 +338,7 @@ watch(
       selectedMenuItems.value = [...newVal] as string[]
     }
   },
-  { deep: true, immediate: true }
+  { deep: true, immediate: true },
 )
 
 onBeforeUnmount(() => {

@@ -58,24 +58,29 @@ pre {
 
 table,
 .big-form,
-td .va-button__content, .va-select-option {
+td .va-button__content,
+.va-select-option {
   font-size: 12px !important;
 }
 td {
   max-width: 150px;
 }
 
-.table-big th, td {
+.table-big th,
+td {
   max-width: 300px !important;
 }
 
-table,  {
-  .va-select, .va-input:not(.search-input) {
-    .va-input-wrapper__field  {
+table {
+  .va-select,
+  .va-input:not(.search-input) {
+    .va-input-wrapper__field {
       padding: 0 0.25rem;
       width: fit-content;
     }
-    .va-input-wrapper__fieldset, input, .va-input-wrapper__text {
+    .va-input-wrapper__fieldset,
+    input,
+    .va-input-wrapper__text {
       max-width: fit-content;
       min-width: none;
     }
@@ -91,9 +96,10 @@ table,  {
   }
 }
 
-
-main, .va-layout__area--content, body {
-  background-color: var(--va-background-primary)
+main,
+.va-layout__area--content,
+body {
+  background-color: var(--va-background-primary);
 }
 
 .va-layout {
@@ -114,7 +120,7 @@ main, .va-layout__area--content, body {
 }
 /* Individual pagination buttons */
 .va-pagination .va-button {
-  min-width: 32px; 
+  min-width: 32px;
   height: 32px;
   border-radius: 8px;
   font-weight: 500;
@@ -236,31 +242,31 @@ main, .va-layout__area--content, body {
 .va-pagination.theme-gradient {
   --va-button-background: none;
   --va-button-hover-background: none;
-  
+
   .va-button {
-    &[data-v-active="true"],
+    &[data-v-active='true'],
     &.va-button--active,
     &.va-button--current,
-    &[aria-current="true"] {
-      background-image: linear-gradient(135deg, #94A3B8 0%, #94A3B8 100%) !important;
+    &[aria-current='true'] {
+      background-image: linear-gradient(135deg, #94a3b8 0%, #94a3b8 100%) !important;
       background-color: transparent !important;
       --va-button-background: none !important;
       --va-background-color: transparent !important;
       border: none !important;
       color: white !important;
-      
+
       &::before,
       &::after {
         display: none !important;
       }
     }
 
-    &:not([data-v-active="true"]):not(.va-button--active):not(.va-button--current):not([aria-current="true"]) {
-      background-image: linear-gradient(135deg, #CBD5E1 0%, #CBD5E1 100%) !important;
+    &:not([data-v-active='true']):not(.va-button--active):not(.va-button--current):not([aria-current='true']) {
+      background-image: linear-gradient(135deg, #cbd5e1 0%, #cbd5e1 100%) !important;
       background-color: transparent !important;
       --va-button-background: none !important;
       --va-background-color: transparent !important;
-      
+
       &::before,
       &::after {
         display: none !important;
@@ -322,16 +328,16 @@ main, .va-layout__area--content, body {
   .va-pagination {
     gap: 4px;
   }
-  
+
   .va-pagination .va-button {
     min-width: 36px;
     height: 36px;
     font-size: 0.875rem;
     margin: 0 2px;
   }
-  
+
   /* Hide some page numbers on mobile */
-  .va-pagination .va-button:nth-child(n+6):nth-last-child(n+6) {
+  .va-pagination .va-button:nth-child(n + 6):nth-last-child(n + 6) {
     display: none;
   }
 }
@@ -367,12 +373,11 @@ main, .va-layout__area--content, body {
     transition: none;
     animation: none;
   }
-  
+
   .va-pagination .va-button:hover {
     transform: none;
   }
 }
-
 
 /* ========================================
    CUSTOM CLEAN PAGINATION STYLE (exact design)
@@ -393,7 +398,7 @@ main, .va-layout__area--content, body {
   font-size: 14px;
   font-weight: 500;
   color: #64748b !important; /* text/icon color */
-  background-color: #fcfdfe  !important; /* default inactive background */
+  background-color: #fcfdfe !important; /* default inactive background */
   border: none !important;
   box-shadow: none !important;
   transition: all 0.2s ease;
