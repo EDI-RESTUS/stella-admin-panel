@@ -15,12 +15,14 @@ const showColumnsMenu = ref(false)
 const columnsMenuWrapper = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
 const searchTimeout = ref<number | null>(null)
+const stockUpdating = ref(new Set()) // Track which rows are currently updating stock
 
 const emits = defineEmits(['getOptions', 'editOption', 'cloneArticle', 'sortBy', 'sortingOrder', 'updateOptionModal'])
 const props = defineProps({
   items: { type: Array, required: true },
   count: { type: Number, default: 0 },
   loading: { type: Boolean, default: false },
+  selectedDeliveryZoneId: { type: String, default: '' },
 })
 
 const { confirm } = useModal()
@@ -38,6 +40,7 @@ const columns = defineVaDataTableColumns([
   { label: 'Min', key: 'minimumChoices', sortable: false },
   { label: 'Max', key: 'maximumChoices', sortable: false },
   { label: 'Active', key: 'isActive', sortable: false, thAlign: 'center' },
+  { label: 'In Stock', key: 'inStock', sortable: false, thAlign: 'center' },
   { label: 'Actions', key: 'actions', sortable: false },
 ])
 
@@ -71,8 +74,11 @@ onMounted(() => {
 // Column visibility
 onMounted(() => {
   const saved = localStorage.getItem('optionsColumnVisibility')
-  if (saved) Object.assign(columnVisibility, JSON.parse(saved))
-  else columns.forEach((c) => (columnVisibility[c.key] = true))
+  const savedVisibility = saved ? JSON.parse(saved) : {}
+  columns.forEach((c) => {
+    // If key exists in saved, use it; otherwise default to true (new column)
+    columnVisibility[c.key] = savedVisibility.hasOwnProperty(c.key) ? savedVisibility[c.key] : true
+  })
 
   const handleClickOutside = (event: MouseEvent) => {
     if (columnsMenuWrapper.value && !columnsMenuWrapper.value.contains(event.target as Node)) {
@@ -166,6 +172,54 @@ function formatPrice(value) {
   if (parts.length === 1) return `${parts[0]}.00`
   if (parts[1].length === 1) return `${parts[0]}.${parts[1]}0`
   return parseFloat(value).toFixed(Math.min(parts[1].length, 3))
+}
+
+async function toggleStock(rowData, newValue) {
+  // Use the new value directly
+  const newStatus = newValue
+  
+  // Mark as updating
+  stockUpdating.value.add(rowData._id)
+  
+  // Optimistic update
+  const originalStatus = rowData.inStock
+  rowData.inStock = newStatus
+
+  if (props.selectedDeliveryZoneId) {
+    // Zone-specific update
+    try {
+      const url = import.meta.env.VITE_API_BASE_URL
+      await axios.patch(`${url}/deliveryZones/${props.selectedDeliveryZoneId}/stock`, {
+        outletId: selectedRest.value,
+        entityType: 'ArticlesOptions',
+        entityId: rowData._id,
+        inStock: newStatus,
+      })
+      init({ message: `Stock updated for zone: ${newStatus ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
+    } catch (err) {
+      rowData.inStock = originalStatus // Revert
+      init({ message: 'Failed to update zone stock', color: 'danger' })
+      console.error('Zone stock update failed', err)
+    } finally {
+      stockUpdating.value.delete(rowData._id)
+    }
+  } else {
+    // Global update via PATCH /articles-options/:id
+    try {
+      const url = import.meta.env.VITE_API_BASE_URL
+      await axios.patch(`${url}/articles-options/${rowData._id}`, {
+        inStock: newStatus,
+        outletId: selectedRest.value,
+      })
+      init({ message: `Global stock updated: ${newStatus ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
+    } catch (err) {
+      rowData.inStock = originalStatus // Revert
+      init({ message: 'Failed to update global stock', color: 'danger' })
+      console.error('Global stock update failed', err)
+    } finally {
+      stockUpdating.value.delete(rowData._id)
+    }
+  }
 }
 </script>
 
@@ -579,6 +633,26 @@ function formatPrice(value) {
                 class="absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300"
               ></span>
             </label>
+          </div>
+        </template>
+
+        <!-- IN STOCK -->
+        <template #cell(inStock)="{ rowData }">
+          <div class="flex justify-center items-center">
+            <!-- Loading spinner -->
+            <div v-if="stockUpdating.has(rowData._id)" class="animate-spin w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
+            <!-- Stock toggle -->
+            <VaSwitch
+              v-else
+              :model-value="rowData.inStock !== false"
+              size="small"
+              :color="rowData.inStock !== false ? 'success' : 'danger'"
+              @update:model-value="(val) => toggleStock(rowData, val)"
+            >
+              <template #innerLabel>
+                {{ rowData.inStock !== false ? '' : '' }}
+              </template>
+            </VaSwitch>
           </div>
         </template>
 

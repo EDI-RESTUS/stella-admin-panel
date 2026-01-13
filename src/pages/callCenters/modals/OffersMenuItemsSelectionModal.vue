@@ -18,9 +18,9 @@
             class="pizza-card"
             :class="{
               selected: selectedArticle && selectedArticle.id === item.id,
-              'out-of-stock': item.name?.toUpperCase().includes('OUT OF STOCK'),
+              'out-of-stock': item.inStock === false || item.name?.toUpperCase().includes('OUT OF STOCK'),
             }"
-            @click.prevent="item.name?.toUpperCase().includes('OUT OF STOCK') ? null : selectArticle(item)"
+            @click.prevent="item.inStock === false || item.name?.toUpperCase().includes('OUT OF STOCK') ? null : selectArticle(item)"
           >
             <div class="pizza-image"><img :src="item.imageUrl" class="object-fit" /></div>
             <div class="pizza-content">
@@ -34,6 +34,7 @@
               </div>
             </div>
             <div class="selection-status"></div>
+
           </div>
         </div>
       </div>
@@ -57,6 +58,7 @@ import { ref, defineExpose, defineEmits, onMounted } from 'vue'
 import OffersMenuModal from './OffersMenuModal.vue'
 import { useMenuStore } from '@/stores/getMenu'
 import { storeToRefs } from 'pinia'
+import { useToast } from 'vuestic-ui'
 const props = defineProps({
   group: Object,
   selectedMenuItem: Object,
@@ -138,6 +140,10 @@ function selectArticle(article) {
     }
   }
 }
+
+const { init } = useToast()
+
+
 </script>
 
 <style scoped>
@@ -364,4 +370,6 @@ function selectArticle(article) {
   transform: none;
   box-shadow: none;
 }
+
+
 </style>

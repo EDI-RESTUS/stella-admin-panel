@@ -89,8 +89,12 @@ const { offer } = storeToRefs(menuStore)
 
 function getMenu() {
   const url = import.meta.env.VITE_API_BASE_URL + '/offers/' + props.item._id
+  const params: Record<string, string> = {}
+  if (menuStore.deliveryZoneId) {
+    params.deliveryZoneId = menuStore.deliveryZoneId
+  }
   axios
-    .get(url)
+    .get(url, { params })
     .then((response) => {
       const resp = {
         ...response.data.data,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useToast } from 'vuestic-ui'
 import { useRoute } from 'vue-router'
 import ArticlesTable from './widgets/ArticlesTable.vue'
@@ -8,6 +8,8 @@ import { useServiceStore } from '@/stores/services'
 import EditArticleModal from './modals/EditArticleModal.vue'
 import ImportArticleModal from './modals/ImportArticleModal.vue'
 import axios from 'axios'
+import { useUsersStore } from '@/stores/users'
+
 const isEditArticleModalOpen = ref(false)
 
 const categoriesStore = useCategoryStore()
@@ -31,10 +33,15 @@ const getArticles = (outletId) => {
   originalItems.value = []
   isLoading.value = true
   const url = import.meta.env.VITE_API_BASE_URL
+  
+  let queryString = `outletId=${outletId}&limit=50&page=${pageNumber.value}&search=${searchQuery.value}&sortKey=${sortBy.value}&sortValue=${sortOrder.value}`
+  
+  if (selectedDeliveryZoneId.value) {
+    queryString += `&deliveryZoneId=${selectedDeliveryZoneId.value}`
+  }
+
   axios
-    .get(
-      `${url}/menuItems?outletId=${outletId}&limit=50&page=${pageNumber.value}&search=${searchQuery.value}&sortKey=${sortBy.value}&sortValue=${sortOrder.value}`,
-    )
+    .get(`${url}/menuItems?${queryString}`)
     .then((response) => {
       items.value = response.data
       originalItems.value = JSON.parse(JSON.stringify(response.data))
@@ -112,8 +119,75 @@ watch(
   },
   { immediate: true },
 )
-watch(searchQuery, (search) => {
-  getArticlesCount(serviceStore.selectedRest)
+
+// Fallback: ensure data loads on initial mount if selectedRest is already set
+onMounted(() => {
+  if (serviceStore.selectedRest && items.value.length === 0) {
+    getArticles(serviceStore.selectedRest)
+    getArticlesCount(serviceStore.selectedRest)
+    categoriesStore.getAll(serviceStore.selectedRest).then((response) => {
+      categories.value = response.map((e) => {
+        return {
+          ...e,
+          text: e.name,
+          value: e.wCode,
+        }
+      })
+    })
+    fetchDeliveryZones()
+  }
+})
+
+const deliveryZones = ref([])
+const selectedDeliveryZoneId = ref('')
+const userStore = useUsersStore()
+
+const fetchDeliveryZones = async () => {
+  try {
+    const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/deliveryZones/${serviceStore.selectedRest}`)
+    let zones = response.data.data.filter((zone) => zone.isActive !== false)
+
+    // Filter by user's allowed zones if applicable
+    const allowed = userStore.userDetails?.allowedDeliveryZoneIds
+    if (allowed && allowed.length > 0) {
+      zones = zones.filter((zone) => allowed.includes(zone._id) || allowed.includes(zone.id))
+    }
+    
+    deliveryZones.value = zones.sort((a, b) => Number(a.serviceZoneId) - Number(b.serviceZoneId))
+
+    // Auto-select if only one zone
+    if (deliveryZones.value.length === 1) {
+      selectedDeliveryZoneId.value = deliveryZones.value[0]._id
+    }
+  } catch (error) {
+    console.error('Failed to fetch delivery zones', error)
+  }
+}
+
+watch(
+  () => serviceStore.selectedRest,
+  async (newId) => {
+    if (newId) {
+      selectedDeliveryZoneId.value = ''
+      await fetchDeliveryZones()
+      getArticles(serviceStore.selectedRest)
+      getArticlesCount(serviceStore.selectedRest)
+      categoriesStore.getAll(serviceStore.selectedRest).then((response) => {
+        categories.value = response.map((e) => {
+          return {
+            ...e,
+            text: e.name,
+            value: e.wCode,
+          }
+        })
+      })
+    }
+  },
+  { immediate: true },
+)
+
+watch(selectedDeliveryZoneId, () => {
+  getArticles(serviceStore.selectedRest)
 })
 
 async function deleteArticle(payload) {
@@ -170,6 +244,19 @@ const isImportArticleModalOpen = ref(false)
   <div>
     <VaCard class="mt-4">
       <VaCardContent>
+        <div class="mb-4" v-if="deliveryZones.length > 1">
+          <VaSelect
+            v-model="selectedDeliveryZoneId"
+            :options="deliveryZones"
+            text-by="name"
+            value-by="_id"
+            track-by="_id"
+            label="Select Delivery Zone"
+            placeholder="Select a zone to manage stock"
+            clearable
+            class="w-full sm:w-1/3"
+          />
+        </div>
         <ArticlesTable
           :items="items"
           :loading="isLoading"
@@ -179,6 +266,7 @@ const isImportArticleModalOpen = ref(false)
           :count="count"
           :sort-by="sortBy"
           :sort-order="sortOrder"
+          :selected-delivery-zone-id="selectedDeliveryZoneId"
           @update:searchQuery="(val) => (searchQuery = val)"
           @update:currentPage="(val) => (currentPage = val)"
           @sortBy="updateSortBy"

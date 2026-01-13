@@ -142,6 +142,7 @@ import { computed, ref, watch, onMounted, onUnmounted, useTemplateRef, onBeforeU
 import { useMenuStore } from '@/stores/getMenu.js'
 import { useServiceStore } from '@/stores/services.ts'
 import { useOrderStore } from '@/stores/order-store'
+import { useUsersStore } from '@/stores/users'
 import { useRoute } from 'vue-router'
 import { useToast } from 'vuestic-ui'
 import axios from 'axios'
@@ -173,6 +174,7 @@ const menuStore = useMenuStore()
 const accordian = ref([true, true])
 const deliveryFee = ref(0)
 const orderStore = useOrderStore()
+const userStore = useUsersStore()
 const toTitleCase = (text) => {
   if (!text) return ''
   return text
@@ -220,6 +222,40 @@ const getOffers = async () => {
   const response = await axios.get(url + '/offers?outletId=' + serviceStore.selectedRest)
   orderStore.offers = response.data.data
   offers.value = response.data.data
+}
+
+// Auto-set delivery zone from user's allowed zones before fetching menu
+async function autoSetUserDeliveryZone() {
+  try {
+    const allowed = userStore.userDetails?.allowedDeliveryZoneIds
+    if (!allowed || allowed.length === 0) {
+      // User has no zone restrictions, don't auto-set
+      return
+    }
+    
+    // Fetch delivery zones for the outlet
+    const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/deliveryZones/${serviceStore.selectedRest}`)
+    const zones = response.data.data.filter((zone) => zone.isActive !== false)
+    
+    // Filter to user's allowed zones
+    const userZones = zones.filter((zone) => 
+      allowed.includes(zone._id) || allowed.includes(zone.id)
+    )
+    
+    // If user has exactly one allowed zone, auto-set it
+    if (userZones.length === 1) {
+      const zone = userZones[0]
+      menuStore.setDeliveryZoneId(zone._id)
+      orderStore.setDeliveryZone(zone)
+    } else if (userZones.length > 1) {
+      // If multiple zones, set the first one as default
+      const zone = userZones[0]
+      menuStore.setDeliveryZoneId(zone._id)
+      orderStore.setDeliveryZone(zone)
+    }
+  } catch (err) {
+    console.error('Failed to auto-set user delivery zone:', err)
+  }
 }
 
 const outlet = computed(() => {
@@ -287,12 +323,16 @@ function resetState() {
 
 watch(
   () => serviceStore.selectedRest,
-  (newVal) => {
+  async (newVal) => {
     if (newVal) {
       if (window.location.hash) {
         history.replaceState(null, '', window.location.pathname + window.location.search)
       }
       isLoading.value = true
+      
+      // Auto-set delivery zone from user's allowed zones before fetching menu
+      await autoSetUserDeliveryZone()
+      
       getMenu()
       getOffers()
       orderStore.cartItems = []
@@ -357,6 +397,21 @@ watch(
     }
   },
   { immediate: true },
+)
+
+watch(
+  () => orderStore.deliveryZone,
+  (newZone) => {
+    if (newZone && newZone._id) {
+      menuStore.setDeliveryZoneId(newZone._id)
+    } else {
+      menuStore.setDeliveryZoneId(null)
+    }
+    // Only refetch if we have a restaurant selected, otherwise let the initial load handle it
+    if (serviceStore.selectedRest) {
+      getMenu()
+    }
+  },
 )
 
 async function getMenu() {
