@@ -160,15 +160,6 @@
                     €{{ parseFloat(option.price).toFixed(2) }}
                   </div>
                 </div>
-                <input
-                  v-model="selectedOptions[group._id]"
-                  :checked="isChecked(group, option._id)"
-                  type="checkbox"
-                  :name="group._id"
-                  :value="option._id"
-                  class="absolute bottom-2 right-2 accent-gray-700 pointer-events-none"
-                />
-
               </label>
 
               <!-- Multiple Choice -->
