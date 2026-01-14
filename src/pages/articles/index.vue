@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useToast } from 'vuestic-ui'
 import { useRoute } from 'vue-router'
 import ArticlesTable from './widgets/ArticlesTable.vue'
@@ -22,13 +22,14 @@ const pageNumber = ref(1)
 const searchQuery = ref('')
 const currentPage = ref(1)
 const sortBy = ref('name')
+const isInitialLoad = ref(false)
 const sortOrder = ref('asc')
 const selectedArticle = ref('')
 const isLoading = ref(true)
 const route = useRoute()
 const categories = ref([])
 
-const getArticles = (outletId) => {
+const getArticles = async (outletId) => {
   items.value = []
   originalItems.value = []
   isLoading.value = true
@@ -40,13 +41,13 @@ const getArticles = (outletId) => {
     queryString += `&deliveryZoneId=${selectedDeliveryZoneId.value}`
   }
 
-  axios
-    .get(`${url}/menuItems?${queryString}`)
-    .then((response) => {
-      items.value = response.data
-      originalItems.value = JSON.parse(JSON.stringify(response.data))
-      isLoading.value = false
-    })
+  try {
+    const response = await axios.get(`${url}/menuItems?${queryString}`)
+    items.value = response.data
+    originalItems.value = JSON.parse(JSON.stringify(response.data))
+  } finally {
+    isLoading.value = false
+  }
 }
 
 const getArticlesCount = (outletId) => {
@@ -100,43 +101,8 @@ const updateArticleDirectly = (payload) => {
     })
 }
 
-watch(
-  () => serviceStore.selectedRest,
-  (newId) => {
-    if (newId) {
-      getArticles(serviceStore.selectedRest)
-      getArticlesCount(serviceStore.selectedRest)
-      categoriesStore.getAll(serviceStore.selectedRest).then((response) => {
-        categories.value = response.map((e) => {
-          return {
-            ...e,
-            text: e.name,
-            value: e.wCode,
-          }
-        })
-      })
-    }
-  },
-  { immediate: true },
-)
-
-// Fallback: ensure data loads on initial mount if selectedRest is already set
-onMounted(() => {
-  if (serviceStore.selectedRest && items.value.length === 0) {
-    getArticles(serviceStore.selectedRest)
-    getArticlesCount(serviceStore.selectedRest)
-    categoriesStore.getAll(serviceStore.selectedRest).then((response) => {
-      categories.value = response.map((e) => {
-        return {
-          ...e,
-          text: e.name,
-          value: e.wCode,
-        }
-      })
-    })
-    fetchDeliveryZones()
-  }
-})
+// Removed duplicate watcher - the one below properly awaits fetchDeliveryZones first
+// Note: The immediate watcher on serviceStore.selectedRest handles initial load
 
 const deliveryZones = ref([])
 const selectedDeliveryZoneId = ref('')
@@ -168,9 +134,10 @@ watch(
   () => serviceStore.selectedRest,
   async (newId) => {
     if (newId) {
+      isInitialLoad.value = true
       selectedDeliveryZoneId.value = ''
       await fetchDeliveryZones()
-      getArticles(serviceStore.selectedRest)
+      await getArticles(serviceStore.selectedRest)
       getArticlesCount(serviceStore.selectedRest)
       categoriesStore.getAll(serviceStore.selectedRest).then((response) => {
         categories.value = response.map((e) => {
@@ -181,13 +148,17 @@ watch(
           }
         })
       })
+      isInitialLoad.value = false
     }
   },
   { immediate: true },
 )
 
 watch(selectedDeliveryZoneId, () => {
-  getArticles(serviceStore.selectedRest)
+  // Skip during initial load to avoid race condition with main watcher
+  if (!isInitialLoad.value && serviceStore.selectedRest) {
+    getArticles(serviceStore.selectedRest)
+  }
 })
 
 async function deleteArticle(payload) {
