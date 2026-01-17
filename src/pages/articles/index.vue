@@ -42,7 +42,7 @@ const getArticles = async (outletId) => {
   }
 
   try {
-    const response = await axios.get(`${url}/menuItems?${queryString}`)
+    const response = await axios.get(`${url}/menuItems?${queryString}`, { timeout: 60000 })
     items.value = response.data
     originalItems.value = JSON.parse(JSON.stringify(response.data))
   } finally {
