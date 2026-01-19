@@ -328,7 +328,24 @@ watch(
   () => {
     if (!articlesOptionsGroups.value.length || selectedOptions.value.length > 1) return
     articlesOptionsGroups.value.forEach((group) => {
-      const defaults = Array.isArray(group.defaultOptions) ? group.defaultOptions : []
+      let defaults = Array.isArray(group.defaultOptions) ? group.defaultOptions : []
+
+      if (fetchConfigurations.value.length) {
+        const groupName = group.name?.toLowerCase() || ''
+        // Only auto-select for cheese and sauce groups, not extras or toppings
+        if (groupName.includes('cheese') || groupName.includes('sauce')) {
+          defaults = group.options
+            .filter((o) => {
+              const name = o.name?.toLowerCase() || ''
+              // Exclude options starting with "no " (like "No Cheese", "No Sauce")
+              if (name.startsWith('no ')) return false
+              // Include only cheese or sauce, but not crust
+              return (name.includes('cheese') || name.includes('sauce')) && !name.includes('crust')
+            })
+            .map((o) => o._id)
+        }
+      }
+
       const selected = []
       defaults.forEach((optionId) => {
         const option = group.options.find((o) => o._id === optionId)
