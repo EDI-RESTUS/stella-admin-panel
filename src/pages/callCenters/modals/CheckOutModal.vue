@@ -1072,9 +1072,18 @@ async function createOrder() {
       throw new Error(response.data?.message || 'Something went wrong')
     }
   } catch (err: any) {
+    // Build error message, including out of stock items if applicable
+    let errorMessage = err.response?.data?.message || 'Order failed, please try again.'
+    const errorData = err.response?.data
+    
+    // Check for OUT_OF_STOCK error and append item names
+    if (errorData?.code === 'OUT_OF_STOCK' && Array.isArray(errorData?.outOfStockItems) && errorData.outOfStockItems.length) {
+      errorMessage = `${errorMessage} Items: ${errorData.outOfStockItems.join(', ')}`
+    }
+    
     init({
       color: 'danger',
-      message: err.response.data.message || 'Order failed, please try again.',
+      message: errorMessage,
     })
 
     if (err?.response?.data?.data?.requestId) {

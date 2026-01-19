@@ -20,6 +20,10 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  selectedDeliveryZoneId: {
+    type: String,
+    default: '',
+  },
 })
 
 const subCategoryStore = useSubCategoriesStore()
@@ -41,8 +45,52 @@ const { confirm } = useModal()
 const { init } = useToast()
 const currentPage = ref(1)
 const searchQuery = ref('')
+const stockUpdating = ref(new Set()) // Track which rows are currently updating stock
 const onAddClick = () => {
   emits('addArticle', { adding: true, searchQuery: searchQuery.value, page: currentPage.value })
+}
+
+const toggleStock = async (rowData, event) => {
+  const newValue = event.target.checked
+  console.log('toggleStock called', { selectedDeliveryZoneId: props.selectedDeliveryZoneId, newValue, rowId: rowData._id })
+  
+  // Mark as updating
+  stockUpdating.value.add(rowData._id)
+  
+  if (props.selectedDeliveryZoneId) {
+    // Zone-specific update
+    try {
+      const url = import.meta.env.VITE_API_BASE_URL
+      await axios.patch(`${url}/deliveryZones/${props.selectedDeliveryZoneId}/stock`, {
+        outletId: serviceStore.selectedRest,
+        entityType: 'MenuItem', 
+        entityId: rowData._id,
+        inStock: newValue,
+      })
+      init({ message: `Stock updated for zone: ${newValue ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
+    } catch (err) {
+      rowData.inStock = !newValue // Revert
+      init({ message: 'Failed to update zone stock', color: 'danger' })
+      console.error('Stock update failed', err)
+    } finally {
+      stockUpdating.value.delete(rowData._id)
+    }
+  } else {
+    // Global update via PATCH /menuItems/:id
+    try {
+      const url = import.meta.env.VITE_API_BASE_URL
+      await axios.patch(`${url}/menuItems/${rowData._id}`, {
+        inStock: newValue,
+      })
+      init({ message: `Global stock updated: ${newValue ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
+    } catch (err) {
+      rowData.inStock = !newValue // Revert
+      init({ message: 'Failed to update global stock', color: 'danger' })
+      console.error('Global stock update failed', err)
+    } finally {
+      stockUpdating.value.delete(rowData._id)
+    }
+  }
 }
 const onImportClick = () => {
   emits('importArticle')
@@ -931,14 +979,15 @@ function openFileModal(data) {
         <!-- STOCK COLUMN -->
         <template #cell(stock)="{ rowData }">
           <div class="flex justify-center items-center">
-            <label class="relative inline-block w-9 h-5 cursor-pointer">
+            <!-- Loading spinner -->
+            <div v-if="stockUpdating.has(rowData._id)" class="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+            <!-- Stock toggle -->
+            <label v-else class="relative inline-block w-9 h-5 cursor-pointer">
               <input
                 v-model="rowData.inStock"
                 type="checkbox"
                 class="sr-only"
-                @change="
-                  emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value })
-                "
+                @change="(e) => toggleStock(rowData, e)"
               />
               <!-- Track -->
               <span
