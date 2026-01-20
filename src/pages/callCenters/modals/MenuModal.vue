@@ -100,9 +100,9 @@
                 :class="{
                   'border-gray-700 bg-[#f8f9fa] border-2': isChecked(group, option._id),
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option._id),
-                  'out-of-stock': option.name?.toUpperCase().includes('OUT OF STOCK'),
+                  'out-of-stock': option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
-                @click="option.name?.toUpperCase().includes('OUT OF STOCK') ? null : updateSingleChoice(group, option)"
+                @click="option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK') ? null : updateSingleChoice(group, option)"
               >
                 <div v-if="option.imageUrl" class="item-image">
                   <img
@@ -127,6 +127,8 @@
                   :value="option._id"
                   class="absolute bottom-2 right-2 accent-gray-700 pointer-events-none"
                 />
+
+
               </label>
 
               <!-- Multiple Choice (No Qty)-->
@@ -138,10 +140,10 @@
                 :class="{
                   'border-gray-700 bg-[#f8f9fa] border-2': isChecked(group, option._id),
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option._id),
-                  'out-of-stock': option.name?.toUpperCase().includes('OUT OF STOCK'),
+                  'out-of-stock': option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
                 @click.prevent="
-                  option.name?.toUpperCase().includes('OUT OF STOCK') ? null : toggleMultipleChoiceNoQty(group, option)
+                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK') ? null : toggleMultipleChoiceNoQty(group, option)
                 "
               >
                 <div v-if="option.imageUrl" class="item-image">
@@ -158,16 +160,6 @@
                     €{{ parseFloat(option.price).toFixed(2) }}
                   </div>
                 </div>
-
-                <div
-                  class="absolute bottom-2 right-2 w-3 h-3 border border-gray-500 rounded-full flex items-center justify-center p-0 m-0"
-                >
-                  <div
-                    v-if="isChecked(group, option._id)"
-                    class="w-1.5 h-1.5 bg-gray-700 rounded-full"
-                    style="margin: 0; padding: 0"
-                  ></div>
-                </div>
               </label>
 
               <!-- Multiple Choice -->
@@ -180,7 +172,7 @@
                   getQty(group._id, option._id) > 0
                     ? 'border-gray-700 bg-[#f8f9fa] border-2'
                     : 'border-gray-200 hover:border-gray-700 hover:border-2',
-                  option.name?.toUpperCase().includes('OUT OF STOCK') ? 'out-of-stock' : '',
+                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK') ? 'out-of-stock' : '',
                 ]"
               >
                 <div class="flex items-start gap-1">
@@ -196,6 +188,7 @@
                       class="font-semibold text-sm text-gray-800 leading-4 line-clamp-3"
                       style="
                         display: -webkit-box;
+                        line-clamp: 3;
                         -webkit-line-clamp: 3;
                         -webkit-box-orient: vertical;
                         overflow: hidden;
@@ -214,7 +207,7 @@
                   <button
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                     :disabled="
-                      getQty(group._id, option._id) === 0 || option.name?.toUpperCase().includes('OUT OF STOCK')
+                      getQty(group._id, option._id) === 0 || option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
                     "
                     @click="() => updateMultipleChoice(group, option, getQty(group._id, option._id) - 1)"
                   >
@@ -225,14 +218,14 @@
                     :title="
                       getQty(group._id, option._id) >= (option.maximumChoices || group.maximumChoices || 99)
                         ? 'Max quantity reached'
-                        : option.name?.toUpperCase().includes('OUT OF STOCK')
+                        : option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
                           ? 'Out of stock'
                           : ''
                     "
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                     :disabled="
                       getQty(group._id, option._id) >= (option.maximumChoices || group.maximumChoices || 99) ||
-                      option.name?.toUpperCase().includes('OUT OF STOCK')
+                      option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
                     "
                     @click="() => updateMultipleChoice(group, option, getQty(group._id, option._id) + 1)"
                   >
@@ -251,8 +244,11 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted } from 'vue'
 import { useOrderStore } from '@/stores/order-store'
+import { useMenuStore } from '@/stores/getMenu'
+import { useToast } from 'vuestic-ui'
 import axios from 'axios'
 const orderStore = useOrderStore()
+const menuStore = useMenuStore()
 
 const showMenuModal = ref(true)
 const emits = defineEmits(['cancel', 'cancel-edit'])
@@ -332,7 +328,24 @@ watch(
   () => {
     if (!articlesOptionsGroups.value.length || selectedOptions.value.length > 1) return
     articlesOptionsGroups.value.forEach((group) => {
-      const defaults = Array.isArray(group.defaultOptions) ? group.defaultOptions : []
+      let defaults = Array.isArray(group.defaultOptions) ? group.defaultOptions : []
+
+      if (fetchConfigurations.value.length) {
+        const groupName = group.name?.toLowerCase() || ''
+        // Only auto-select for cheese and sauce groups, not extras or toppings
+        if (groupName.includes('cheese') || groupName.includes('sauce')) {
+          defaults = group.options
+            .filter((o) => {
+              const name = o.name?.toLowerCase() || ''
+              // Exclude options starting with "no " (like "No Cheese", "No Sauce")
+              if (name.startsWith('no ')) return false
+              // Include only cheese or sauce, but not crust
+              return (name.includes('cheese') || name.includes('sauce')) && !name.includes('crust')
+            })
+            .map((o) => o._id)
+        }
+      }
+
       const selected = []
       defaults.forEach((optionId) => {
         const option = group.options.find((o) => o._id === optionId)
@@ -656,6 +669,7 @@ function decrement(item) {
 }
 
 onMounted(() => {
+
   if (props.isEdit && props.item?.selectedOptions) {
     selectedOptions.value = JSON.parse(JSON.stringify(props.item.selectedOptions))
     const selectedGroupAndOption = props.item.selectedOptions.find((group) =>
@@ -666,6 +680,10 @@ onMounted(() => {
     }
   }
 })
+
+const { init } = useToast()
+
+
 </script>
 
 <style>
@@ -719,4 +737,6 @@ onMounted(() => {
   border-color: #e9ecef !important;
   background: white !important;
 }
+
+
 </style>

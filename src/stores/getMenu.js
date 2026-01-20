@@ -10,6 +10,7 @@ export const useMenuStore = defineStore('menu', {
       restDetails: null,
       unFilteredMenuItems: [],
       offer: null,
+      deliveryZoneId: null,
     }
   },
   getters: {
@@ -86,12 +87,67 @@ export const useMenuStore = defineStore('menu', {
           }
         })
     },
+    setDeliveryZoneId(id) {
+      this.deliveryZoneId = id
+    },
+    async updateStockStatus(payload) {
+      if (!this.deliveryZoneId) return
+      try {
+        await axios.patch(`${this.url}/deliveryZones/${this.deliveryZoneId}/stock`, {
+          outletId: this.restDetails?._id,
+          ...payload,
+        })
+        // Optimized: update local state immediately instead of full refetch
+        // We can do a refetch in the background if needed, but immediate feedback is better
+        this.updateLocalStock(payload)
+      } catch (error) {
+        console.error('Failed to update stock status:', error)
+        throw error
+      }
+    },
+    updateLocalStock({ entityType, entityId, inStock }) {
+      // Helper to update stock in memory
+      if (entityType === 'MenuItem') {
+        const updateItem = (items) => {
+          items.forEach((item) => {
+            if (item._id === entityId) item.inStock = inStock
+            if (item.subCategories) updateItem(item.subCategories)
+            if (item.menuItems) updateItem(item.menuItems)
+          })
+        }
+        this.categories.forEach((cat) => {
+          updateItem(cat.menuItems)
+          if (cat.subCategories) updateItem(cat.subCategories) // Recurse into subcats
+        })
+        // Also update unFilteredMenuItems
+        const unfiltered = this.unFilteredMenuItems.find(i => i._id === entityId)
+        if (unfiltered) unfiltered.inStock = inStock
+      } else if (entityType === 'ArticlesOptions') {
+        // Options are nested deep in articlesOptionsGroups
+        const updateOptions = (items) => {
+          items.forEach((item) => {
+            // Check item's option groups
+            item.articlesOptionsGroup?.forEach(group => {
+              const option = group.articlesOptions?.find(o => o._id === entityId)
+              if (option) option.inStock = inStock
+            })
+            if (item.subCategories) updateOptions(item.subCategories)
+            if (item.menuItems) updateOptions(item.menuItems)
+          })
+        }
+        this.categories.forEach((cat) => {
+          updateOptions(cat.menuItems)
+          if (cat.subCategories) updateOptions(cat.subCategories)
+        })
+      }
+    },
     async getMenuItems(item) {
       axios
         .get(`${this.url}/menuItemsvo?limit=1000`, {
           params: {
-            outletName: this.restDetails.name,
+            outletId: this.restDetails._id,
             categoryId: item._id,
+            ...(this.deliveryZoneId && { deliveryZoneId: this.deliveryZoneId }),
           },
         })
         .then((response) => {
