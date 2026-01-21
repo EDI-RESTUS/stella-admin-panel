@@ -1287,6 +1287,11 @@ watch(
     selectedZoneDetails.value = null
     selectedAddress.value = null
 
+    // Clear delivery zone and address from store when switching tabs
+    orderStore.setDeliveryZone('')
+    orderStore.setAddress('')
+    emits('setDeliveryZone', false)
+
     // Clear delivery notes when switching to takeaway mode
     if (selectedTab.value === 'takeaway') {
       orderStore.deliveryNotes = ''
@@ -1394,6 +1399,17 @@ watch(
           selectedZoneDetails.value = null
           emits('setDeliveryZone', false)
         }
+      }
+    } else {
+      // Address was deselected/cleared - reset delivery zone and address
+      if (selectedTab.value === 'delivery') {
+        selectedZone.value = ''
+        serviceZoneId.value = ''
+        selectedZoneDetails.value = null
+        orderStore.setDeliveryZone(null)
+        orderStore.setAddress('')
+        emits('setDeliveryZone', false)
+        emits('setDeliveryFee', 0)
       }
     }
   },

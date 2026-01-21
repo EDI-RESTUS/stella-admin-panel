@@ -293,7 +293,6 @@
               :disabled="
                 !customerDetailsId ||
                 !orderType ||
-                (orderType === 'delivery' && !props.isDeliveryZoneSelected) ||
                 (items.length === 0 && offersItems.length === 0) ||
                 isServiceRestricted
               "
@@ -507,6 +506,31 @@ function openCheckoutModal() {
     init({ color: 'danger', message: msg })
     return
   }
+  
+  // Check if delivery is selected but no delivery zone is selected
+  if (props.orderType === 'delivery' && !props.isDeliveryZoneSelected) {
+    confirm({
+      message: 'Please select a delivery address to determine the delivery zone.',
+      okText: 'Close',
+      cancelText: '',
+      size: 'small',
+      zIndex: 9999,
+    })
+    return
+  }
+  
+  // Check if delivery is selected but no address is provided
+  if (props.orderType === 'delivery' && !orderStore.address) {
+    confirm({
+      message: 'Please select a delivery address before proceeding to checkout.',
+      okText: 'Close',
+      cancelText: '',
+      size: 'small',
+      zIndex: 9999,
+    })
+    return
+  }
+  
   showCheckoutModal.value = true
 }
 
