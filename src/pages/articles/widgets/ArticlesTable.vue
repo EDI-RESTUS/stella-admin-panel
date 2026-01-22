@@ -152,15 +152,43 @@ const pages = computed(() => {
   return Math.ceil(props.count / 50)
 })
 
+const getCategoryName = (cat: any) => {
+  // If it's a string (ID), look it up
+  if (typeof cat === 'string') {
+    const found = props.categories.find((c: any) => (c._id === cat || c.id === cat))
+    return found ? found.name : cat
+  }
+  
+  // If it's an object and has a name, use it
+  if (cat?.name && cat.name !== 'SIZE') return cat.name
+
+  // If it's an object but missing name, try looking it up by ID
+  // Prioritize 'id' (foreign key) over '_id' (subdocument id)
+  const id = cat?.id || cat?._id
+  if (id) {
+    const found = props.categories.find((c: any) => (c._id === id || c.id === id))
+    return found ? found.name : ''
+  }
+
+  return ''
+}
+
+const getCategoryKey = (cat: any, index: number) => {
+  if (typeof cat === 'string') return cat
+  return cat?.wCode || cat?._id || cat?.id || index
+}
+
+
 const filteredItems = computed(() => {
   let result = props.items
 
   // Category filter
   if (selectedCategoryFilter.value) {
-    result = result.filter((item) =>
-      item.categories.some(
-        (cat) => cat._id === selectedCategoryFilter.value || cat.id === selectedCategoryFilter.value,
-      ),
+    result = result.filter((item: any) =>
+      item.categories.some((cat: any) => {
+        const id = typeof cat === 'string' ? cat : (cat._id || cat.id)
+        return id === selectedCategoryFilter.value
+      }),
     )
   }
 
@@ -700,13 +728,12 @@ function openFileModal(data) {
           </div>
         </template>
 
-        <!-- CATEGORY COLUMN -->
         <template #cell(category)="{ rowData }">
           <div class="flex flex-col gap-1">
-            <template v-if="rowData.categories.length <= 2">
+            <template v-if="(rowData.categories || []).length <= 2">
               <span
-                v-for="e in rowData.categories"
-                :key="e.wCode"
+                v-for="(e, index) in rowData.categories"
+                :key="getCategoryKey(e, index)"
                 class="inline-block px-3 py-1 text-sm rounded-xl font-medium text-blue-800 bg-blue-100 hover:bg-blue-200 cursor-pointer transition-colors text-center"
                 @click="
                   emits('updateArticleModal', {
@@ -717,13 +744,13 @@ function openFileModal(data) {
                   })
                 "
               >
-                {{ e.name }}
+                {{ getCategoryName(e) }}
               </span>
             </template>
             <template v-else>
               <span
-                v-for="e in rowData.categories.slice(0, 2)"
-                :key="e.wCode"
+                v-for="(e, index) in rowData.categories.slice(0, 2)"
+                :key="getCategoryKey(e, index)"
                 class="inline-block px-3 py-1 text-sm rounded-xl font-medium text-blue-800 bg-blue-100 hover:bg-blue-200 cursor-pointer transition-colors text-center"
                 @click="
                   emits('updateArticleModal', {
@@ -734,7 +761,7 @@ function openFileModal(data) {
                   })
                 "
               >
-                {{ e.name }}
+                {{ getCategoryName(e) }}
               </span>
               <span
                 class="inline-block px-3 py-1 text-sm rounded-xl font-medium text-blue-800 bg-blue-50 cursor-pointer transition-colors text-center"
