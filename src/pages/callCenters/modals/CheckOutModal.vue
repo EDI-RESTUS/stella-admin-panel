@@ -980,16 +980,6 @@ function normalizeCodes(singleStr, codesArr) {
 }
 
 async function createOrder() {
-  // Validate delivery orders have an address
-  if (props.orderType === 'delivery' && !orderStore.address?.trim()) {
-    init({
-      color: 'danger',
-      message: 'Please select a delivery address before placing the order.',
-    })
-    apiLoading.value = false
-    return
-  }
-
   apiLoading.value = true
   let menuItems: any[] = []
   menuItems = orderStore.cartItems.map((e: any) => {
@@ -1066,8 +1056,7 @@ async function createOrder() {
           handlePaymentSuccess()
         } else {
           orderStore.setPaymentLink(response.data.data.redirectUrl)
-          // Use the actual order ID, not the payment requestId which has a suffix
-          orderId.value = orderResponse.value.data.data._id
+          orderId.value = response.data.data.requestId
           setInter()
         }
       }
@@ -1098,8 +1087,7 @@ async function createOrder() {
     })
 
     if (err?.response?.data?.data?.requestId) {
-      // Use the actual order ID if available, not the payment requestId
-      orderId.value = orderResponse.value?.data?.data?._id || err.response.data.data.requestId
+      orderId.value = err.response.data.data.requestId
     }
 
     orderStore.setPaymentLink('')
