@@ -154,6 +154,47 @@ categoryStore.getAll(servicesStore.selectedRest).then((response) => {
       value: e.wCode,
     }
   })
+  
+  // Refined Logic:
+  // Since the article object often only contains { id: "..." } or just "idstring" in its categories array,
+  // we must find the corresponding category in the loaded list and extract its wCode.
+  if (props.selectedCategory) {
+    if (props.selectedCategory.categories) {
+      const mappedCats = []
+      props.selectedCategory.categories.forEach((c) => {
+        const cId = typeof c === 'string' ? c : (c.id || c._id)
+        if (cId) {
+          const found = categories.value.find((cat) => cat._id === cId || cat.id === cId)
+          if (found) mappedCats.push(found.wCode)
+        } else if (c.wCode) {
+          mappedCats.push(c.wCode)
+        }
+      })
+      formData.value.categories = mappedCats
+    }
+
+    if (props.selectedCategory.subCategories) {
+      const mappedSubs = []
+      props.selectedCategory.subCategories.forEach((s) => {
+        const sId = typeof s === 'string' ? s : (s.id || s._id)
+        if (sId) {
+          // Flatten all subcategories to search
+          for (const cat of categories.value) {
+            if (cat.subCategories) {
+              const foundSub = cat.subCategories.find((sub) => sub._id === sId || sub.id === sId)
+              if (foundSub) {
+                mappedSubs.push(foundSub.wCode)
+                break
+              }
+            }
+          }
+        } else if (s.wCode) {
+          mappedSubs.push(s.wCode)
+        }
+      })
+      formData.value.subCategories = mappedSubs
+    }
+  }
 })
 
 const subCategories = computed(() => {
@@ -216,6 +257,25 @@ const submit = () => {
     delete data.__v
     if (!data.assetId) {
       delete data.assetId
+    }
+
+    // Sanitize articlesOptionsGroup to remove Mongoose wrappers
+    if (data.articlesOptionsGroup && Array.isArray(data.articlesOptionsGroup) && data.articlesOptionsGroup.length > 0) {
+      // If the array contains a Mongoose wrapper with __parentArray (as per user report), use that array
+      if ((data.articlesOptionsGroup[0] as any).__parentArray) {
+        data.articlesOptionsGroup = (data.articlesOptionsGroup[0] as any).__parentArray
+      }
+      
+      // Map to ensure we use clear objects (unwrapping _doc if present)
+      data.articlesOptionsGroup = data.articlesOptionsGroup.map((group: any) => {
+        const cleanGroup = group._doc ? group._doc : group
+        // Ensure id is present or fallback to _id if id is missing but _id exists
+        // (Though typically _doc has id if virtuals are enabled, or we use _id as id)
+        if (!cleanGroup.id && cleanGroup._id) {
+            cleanGroup.id = cleanGroup._id
+        }
+        return cleanGroup
+      })
     }
     const url: any = import.meta.env.VITE_API_BASE_URL
     if (formData.value._id) {
