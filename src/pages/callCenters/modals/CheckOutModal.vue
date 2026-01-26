@@ -168,7 +168,11 @@
         </div>
       </div>
       <!-- Payment Section -->
-      <div v-if="!redirectUrl" class="md:col-span-2 flex flex-col bg-white relative">
+      <div
+        v-if="!redirectUrl"
+        class="bg-white relative flex flex-col"
+        :class="selectedPayment?.name?.toLowerCase() === 'cash' ? 'md:col-span-1 border-r border-gray-200' : 'md:col-span-2'"
+      >
         <div v-if="apiLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-white/50">
           <div class="loading-spinner !w-16 !h-16 border-4 !border-gray-300 !border-t-gray-600"></div>
         </div>
@@ -176,74 +180,90 @@
           <h3 class="va-h3">{{ etaTime }}</h3>
         </div>
 
-        <div class="payment-content flex-grow">
-          <div class="payment-options grid sm:grid-cols-2 gap-4">
+        <div class="payment-content flex-grow overflow-y-auto">
+          <div class="payment-options grid gap-2" :class="selectedPayment?.name?.toLowerCase() === 'cash' ? 'grid-cols-2' : 'sm:grid-cols-2'">
             <div
               v-for="payment in paymentTypes.filter((a) => userDetails.paymentType.includes(a.paymentTypeId))"
               :key="payment.paymentTypeId"
-              class="payment-option"
-              :class="selectedPayment == payment ? 'selected' : ''"
+              class="payment-option transition-all"
+              :class="[
+                selectedPayment == payment ? 'selected' : '',
+                selectedPayment?.name?.toLowerCase() === 'cash' ? 'p-2 flex flex-col items-center justify-center text-center' : 'p-3 sm:p-4'
+              ]"
               @click="selectedPayment = payment"
             >
-              <div class="payment-icon">{{ payment.name === 'Cash' ? '💵' : '💳' }}</div>
-              <div class="payment-label">{{ payment.name }}</div>
-              <div class="payment-desc">
-                {{ payment.name === 'Cash' ? 'Pay with cash on delivery or pickup' : 'Secure payment with Visa/Card' }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Cash Denomination Selector -->
-          <div v-if="selectedPayment?.name?.toLowerCase() === 'cash'" class="cash-denominations-section">
-            <h4 class="text-lg font-semibold mb-3 text-gray-700">Cash Amount Received:</h4>
-            <div class="denominations-grid">
-              <button
-                v-for="amount in cashDenominations"
-                :key="amount"
-                class="denomination-btn"
-                :class="{ selected: selectedCashAmount === amount }"
-                @click="selectedCashAmount = amount"
-              >
-                {{ amount.toFixed(2) }}
-              </button>
-            </div>
-
-            <div v-if="selectedCashAmount" class="change-info">
-              <div class="change-row">
-                <span>Order Total:</span>
-                <span class="font-bold">€{{ finalTotal.toFixed(2) }}</span>
-              </div>
-              <div class="change-row">
-                <span>Cash Received:</span>
-                <span class="font-bold">€{{ selectedCashAmount.toFixed(2) }}</span>
-              </div>
-              <div class="change-row total-change">
-                <span>Change to Give:</span>
-                <span class="font-bold" :class="changeAmount >= 0 ? 'text-blue-600' : 'text-red-600'">
-                  €{{ changeAmount.toFixed(2) }}
-                </span>
+              <div class="payment-icon mb-1" :class="selectedPayment?.name?.toLowerCase() === 'cash' ? 'text-xl' : 'text-2xl'">{{ payment.name === 'Cash' ? '💵' : '💳' }}</div>
+              <div class="payment-label font-semibold" :class="selectedPayment?.name?.toLowerCase() === 'cash' ? 'text-smLeading-tight' : 'text-base'">{{ payment.name }}</div>
+              <div class="payment-desc text-xs text-gray-500 hidden sm:block" v-if="selectedPayment?.name?.toLowerCase() !== 'cash'">
+                {{ payment.name === 'Cash' ? 'Pay with cash' : 'Secure payment' }}
               </div>
             </div>
           </div>
         </div>
 
-        <div class="action-container">
-          <div class="flex gap-2 w-full justify-center">
-            <button v-if="orderId" class="btn btn-flat-danger mr-2" :disabled="apiLoading" @click="cancelOrder()">
-              Cancel Order
-            </button>
+        <div class="action-container p-4 border-t border-gray-200">
+          <div class="flex flex-col gap-2 w-full justify-center">
             <button
-              id="confirmBtn"
+               id="confirmBtn"
               :disabled="apiLoading || !selectedPayment"
-              class="btn btn-primary"
+              class="btn btn-primary w-full py-3"
               @click="orderStore.editOrder ? updateOrder() : createOrder()"
             >
               <span v-if="!apiLoading" id="btnText">
-                {{ orderId && selectedPayment?.name.includes('Card') ? 'Retry Payment' : 'Payment' }}
+                {{ orderId && selectedPayment?.name.includes('Card') ? 'Retry' : 'Payment' }}
               </span>
               <div v-if="apiLoading" id="loadingSpinner" class="loading-spinner animate-spin"></div>
             </button>
+             <button v-if="orderId" class="btn btn-flat-danger w-full py-2" :disabled="apiLoading" @click="cancelOrder()">
+              Cancel
+            </button>
           </div>
+        </div>
+      </div>
+
+       <!-- CASH / KEYPAD SECTION (3rd Column) -->
+      <div v-if="selectedPayment?.name?.toLowerCase() === 'cash'" class="md:col-span-1 flex flex-col bg-gray-50 border-l border-gray-200 h-full overflow-hidden">
+        <div class="p-4 h-full flex flex-col">
+            <!-- Display Screen -->
+            <div class="bg-white p-3 rounded-lg border border-gray-300 mb-3 text-right shadow-inner">
+               <div class="text-xs text-gray-500 mb-1">Cash Received</div>
+               <div class="text-3xl font-bold text-gray-800">€ {{ (selectedCashAmount || 0).toFixed(2) }}</div>
+               <div class="text-xs mt-1" :class="changeAmount >= 0 ? 'text-green-600' : 'text-red-600'">
+                  Change: €{{ changeAmount.toFixed(2) }}
+               </div>
+            </div>
+
+            <div class="flex flex-col gap-3 overflow-y-auto">
+                <!-- Denominations -->
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    v-for="amount in cashDenominations"
+                    :key="amount"
+                    class="py-2 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 font-bold text-gray-700 shadow-sm active:translate-y-0.5 transition-all text-lg"
+                    @click="handleDenominationClick(amount)"
+                  >
+                    {{ amount.toFixed(2) }}
+                  </button>
+                </div>
+
+                <!-- Keypad -->
+                <div class="grid grid-cols-4 gap-2 mt-2">
+                   <button v-for="n in ['7','8','9']" :key="n" class="key-btn bg-gray-200 hover:bg-gray-300" @click="handleKeypadInput(n)">{{ n }}</button>
+                   <button class="key-btn bg-gray-400 hover:bg-gray-500 text-white" @click="handleKeypadInput('backspace')">
+                      <span class="text-xl">⌫</span>
+                   </button>
+                   
+                   <button v-for="n in ['4','5','6']" :key="n" class="key-btn bg-gray-200 hover:bg-gray-300" @click="handleKeypadInput(n)">{{ n }}</button>
+                   <button class="key-btn bg-green-700 hover:bg-green-800 text-white row-span-2 flex items-center justify-center font-bold text-xl" @click="orderStore.editOrder ? updateOrder() : createOrder()">
+                      ↵
+                   </button>
+                   
+                   <button v-for="n in ['1','2','3']" :key="n" class="key-btn bg-gray-200 hover:bg-gray-300" @click="handleKeypadInput(n)">{{ n }}</button>
+                   
+                   <button class="key-btn bg-gray-200 hover:bg-gray-300 col-span-2" @click="handleKeypadInput('0')">0</button>
+                   <button class="key-btn bg-gray-200 hover:bg-gray-300" @click="handleKeypadInput('.')">.</button>
+                </div>
+            </div>
         </div>
       </div>
       <div v-else class="col-span-2 flex flex-col bg-white h-full">
@@ -310,6 +330,33 @@ const orderFor = computed(() => orderStore.orderFor)
 // Cash payment state
 const selectedCashAmount = ref<number | null>(null)
 const cashDenominations = [5.0, 10.0, 20.0, 50.0, 100.0, 200.0]
+const manualCashString = ref('')
+
+const handleKeypadInput = (input: string) => {
+  if (input === 'backspace') {
+    manualCashString.value = manualCashString.value.slice(0, -1)
+  } else if (input === '.') {
+    if (!manualCashString.value.includes('.')) {
+      manualCashString.value += '.'
+    }
+  } else {
+    // Prevent multiple leading zeros
+    if (manualCashString.value === '0' && input === '0') return
+    if (manualCashString.value === '0' && input !== '.') {
+       manualCashString.value = input
+    } else {
+       manualCashString.value += input
+    }
+  }
+
+  const val = parseFloat(manualCashString.value)
+  selectedCashAmount.value = isNaN(val) ? 0 : val
+}
+
+const handleDenominationClick = (amount: number) => {
+  selectedCashAmount.value = amount
+  manualCashString.value = amount.toString()
+}
 
 const finalTotal = computed(() => {
   if (promoTotal.value) {
@@ -1581,5 +1628,88 @@ const promoOfferItemPrice = (item: any, index: number) => {
   margin-top: 8px;
   padding-top: 12px;
   font-size: 16px;
+}
+
+/* Keypad Styles */
+.keypad-container {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+}
+
+.keypad-display {
+  background: #f3f4f6;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  text-align: right;
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  border: 2px solid transparent;
+}
+
+.keypad-display:focus-within {
+  border-color: #2d5d2a;
+}
+
+.currency-symbol {
+  color: #6b7280;
+  margin-right: 4px;
+  font-size: 20px;
+}
+
+.keypad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.key-btn {
+  padding: 12px 4px; /* Reduced side padding, kept vertical reasonable */
+  font-size: 18px; /* Slightly smaller font */
+  font-weight: 600;
+  color: #374151;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  height: 50px; /* Fixed height to prevent stretching */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.key-btn:hover {
+  background: #f9fafb;
+}
+
+.key-btn:active {
+  background: #e5e7eb;
+  transform: translateY(1px);
+}
+
+.delete-btn {
+  color: #dc2626;
+  font-weight: bold;
+}
+
+.clear-btn {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+  font-size: 16px;
+  margin-top: 8px;
+  height: 40px;
+}
+
+.clear-btn:hover {
+  background: #fecaca;
 }
 </style>
