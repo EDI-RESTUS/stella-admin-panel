@@ -185,18 +185,11 @@
             <div
               v-for="payment in paymentTypes.filter((a) => userDetails.paymentType.includes(a.paymentTypeId))"
               :key="payment.paymentTypeId"
-              class="payment-option transition-all"
-              :class="[
-                selectedPayment == payment ? 'selected' : '',
-                selectedPayment?.name?.toLowerCase() === 'cash' ? 'p-2 flex flex-col items-center justify-center text-center' : 'p-3 sm:p-4'
-              ]"
+              class="payment-option transition-all p-4 flex items-center justify-center text-center"
+              :class="selectedPayment == payment ? 'selected' : ''"
               @click="selectedPayment = payment"
             >
-              <div class="payment-icon mb-1" :class="selectedPayment?.name?.toLowerCase() === 'cash' ? 'text-xl' : 'text-2xl'">{{ payment.name === 'Cash' ? '💵' : '💳' }}</div>
-              <div class="payment-label font-semibold" :class="selectedPayment?.name?.toLowerCase() === 'cash' ? 'text-smLeading-tight' : 'text-base'">{{ payment.name }}</div>
-              <div class="payment-desc text-xs text-gray-500 hidden sm:block" v-if="selectedPayment?.name?.toLowerCase() !== 'cash'">
-                {{ payment.name === 'Cash' ? 'Pay with cash' : 'Secure payment' }}
-              </div>
+              <div class="payment-label font-bold text-lg">{{ payment.name }}</div>
             </div>
           </div>
         </div>
@@ -221,9 +214,9 @@
         </div>
       </div>
 
-       <!-- CASH / KEYPAD SECTION (3rd Column) -->
-      <div v-if="selectedPayment?.name?.toLowerCase() === 'cash'" class="md:col-span-1 flex flex-col bg-gray-50 border-l border-gray-200 h-full overflow-hidden">
-        <div class="p-4 h-full flex flex-col">
+      <!-- CASH / KEYPAD SECTION (3rd Column) -->
+      <div v-if="!redirectUrl && selectedPayment?.name?.toLowerCase() === 'cash'" class="md:col-span-1 flex flex-col bg-gray-50 border-l border-gray-200 h-full overflow-hidden">
+        <div class="p-4 pt-12 h-full flex flex-col">
             <!-- Display Screen -->
             <div class="bg-white p-3 rounded-lg border border-gray-300 mb-3 text-right shadow-inner">
                <div class="text-xs text-gray-500 mb-1">Cash Received</div>
@@ -266,7 +259,7 @@
             </div>
         </div>
       </div>
-      <div v-else class="col-span-2 flex flex-col bg-white h-full">
+      <div v-if="redirectUrl" class="col-span-2 flex flex-col bg-white h-full">
         <div class="flex-grow relative">
           <iframe :src="redirectUrl" width="100%" height="100%" class="border-none" />
           <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
