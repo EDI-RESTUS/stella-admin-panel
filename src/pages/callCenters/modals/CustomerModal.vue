@@ -21,7 +21,23 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label class="text-sm font-medium text-gray-500">Mobile Number *</label>
-                <VaInput v-model="phoneNumber" placeholder="Enter mobile number" class="mt-1" />
+                <div class="flex  mt-1 items-center">
+                   <VaSelect
+                    v-model="phonePrefix"
+                    :options="countryPrefixes"
+                    class="min-w-0"
+                    :clearable="false"
+                    value-by="value"
+                    text-by="text"
+                    track-by="value"
+                  />
+                  <VaInput
+                    v-model="phoneLocal"
+                    placeholder="Mobile"
+                    class=" w-[65px]"
+                    @input="onPhoneInput"
+                  />
+                </div>
               </div>
               <div>
                 <label class="text-sm font-medium text-gray-500">Customer Name *</label>
@@ -405,7 +421,51 @@ const searchAdd = reactive({
   postalCode: '',
 })
 const name = ref('')
-const phoneNumber = ref('')
+const phonePrefix = ref('357')
+const phoneLocal = ref('')
+
+// Computed phoneNumber to maintain compatibility with existing logic if references exist, 
+// though we will update main usages.
+const phoneNumber = computed({
+  get: () => phonePrefix.value + phoneLocal.value,
+  set: (val) => {
+    // If setting full number externally, we try to parse it
+    const raw = String(val || '').replace(/\D/g, '')
+    const found = countryPrefixes.find(p => raw.startsWith(p.value))
+    if (found) {
+      phonePrefix.value = found.value
+      phoneLocal.value = raw.slice(found.value.length)
+    } else {
+      // Default to 357 if no match or just local
+      if (raw.length > 0 && !raw.startsWith('357')) {
+         // If it doesn't match any prefix, assume it's a local number for the default prefix?
+         // Or if it's empty, clear local.
+         phonePrefix.value = '357'
+         phoneLocal.value = raw
+      } else if (raw.startsWith('357')) {
+          phonePrefix.value = '357'
+          phoneLocal.value = raw.slice(3)
+      } else {
+          phonePrefix.value = '357'
+          phoneLocal.value = ''
+      }
+    }
+  }
+})
+
+const countryPrefixes = [
+  { text: '+357', value: '357' },
+  { text: '+30', value: '30' },
+  { text: '+44', value: '44' },
+  { text: '+1', value: '1' },
+  { text: '+7', value: '7' },
+  { text: '+971', value: '971' },
+  { text: '+961', value: '961' },
+]
+
+function onPhoneInput(val: string) {
+  phoneLocal.value = val.replace(/\D/g, '')
+}
 const notifications: any = ref(false)
 const postCode = ref('')
 const streetAddress = ref('')
@@ -447,7 +507,18 @@ const isAddressValid = computed(() => {
 
 if (props.selectedUser) {
   name.value = props.selectedUser['Name'] || ''
-  phoneNumber.value = props.selectedUser['MobilePhone'] || props.selectedUser['Phone'] || ''
+  // Initialize phone split
+  const raw = String(props.selectedUser['MobilePhone'] || props.selectedUser['Phone'] || '').trim().replace(/\D/g, '')
+  const found = countryPrefixes.find(p => raw.startsWith(p.value))
+  if (found) {
+    phonePrefix.value = found.value
+    phoneLocal.value = raw.slice(found.value.length)
+  } else {
+    // Fallback or assume local
+    phonePrefix.value = '357'
+    phoneLocal.value = raw.startsWith('357') ? raw.slice(3) : raw
+  }
+  
   notifications.value = !!props.selectedUser['notifications']
 
   if (typeof props.selectedUser['isTick'] !== 'undefined') {
@@ -475,7 +546,16 @@ if (props.selectedUser) {
   }
 } else {
   name.value = props.userName || ''
-  phoneNumber.value = String(props.userNumber ?? '').trim()
+  // Initialize phone split from prop
+  const raw = String(props.userNumber ?? '').trim().replace(/\D/g, '')
+  const found = countryPrefixes.find(p => raw.startsWith(p.value))
+  if (found) {
+    phonePrefix.value = found.value
+    phoneLocal.value = raw.slice(found.value.length)
+  } else {
+    phonePrefix.value = '357'
+    phoneLocal.value = raw.startsWith('357') ? raw.slice(3) : raw
+  }
   isTick.value = null
 }
 
@@ -771,11 +851,12 @@ async function addOrUpdateCustomerDetails() {
   const outletId = servicesStore.selectedRest
 
   // normalize phone to digits only
-  phoneNumber.value = String(phoneNumber.value || '').replace(/\D+/g, '')
+  // phoneNumber is now computed, so we use prefix + local
+  const fullPhone = (phonePrefix.value + phoneLocal.value).replace(/\D+/g, '')
 
   const base = {
     name: String(name.value || '').trim(),
-    phone: String(phoneNumber.value || '').trim(),
+    phone: fullPhone,
     address: Array.isArray(address.value) ? address.value : [],
     isTick: isTick.value, // UI toggle (Save / Don’t Save). We still do Winmax-first per rule.
     notifications: !!notifications.value,
