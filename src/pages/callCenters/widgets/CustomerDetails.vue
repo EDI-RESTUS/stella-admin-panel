@@ -42,17 +42,29 @@
         <!-- Phone & Name Row -->
         <div v-if="selectedTab" class="flex flex-wrap md:flex-nowrap items-center gap-1 relative w-full">
           <!-- Mobile Number -->
-          <input
-            v-model="phoneNumber"
-            :disabled="selectedUser !== ''"
-            type="tel"
-            placeholder="Mobile No."
-            pattern="[0-9]*"
-            inputmode="numeric"
-            class="border rounded px-2 py-1 text-xs outline-none focus:outline-none focus:ring-1 focus:ring-gray-200 focus:border-gray-300 w-full md:w-[120px]"
-            @input="phoneNumber = phoneNumber.replace(/\D/g, '')"
-            @keyup.enter="fetchCustomerDetails(true)"
-          />
+          <!-- Mobile Number Combined -->
+          <div class="border rounded px-1 py-1 bg-white flex items-center w-full md:w-[150px] focus-within:ring-1 focus-within:ring-gray-200 focus-within:border-gray-300">
+             <select
+                v-model="phonePrefix"
+                class="bg-transparent text-[10px] md:text-xs outline-none w-[45px] appearance-none cursor-pointer"
+                style="text-align-last: center;"
+                :disabled="selectedUser !== ''"
+             >
+                <option v-for="p in countryPrefixes" :key="p.value" :value="p.value">+{{p.value}}</option>
+             </select>
+             <div class="h-3 w-[1px] bg-gray-300 mx-1"></div>
+             <input
+                v-model="phoneLocal"
+                :disabled="selectedUser !== ''"
+                type="tel"
+                placeholder="Mobile"
+                pattern="[0-9]*"
+                inputmode="numeric"
+                class="text-xs outline-none w-full min-w-0 bg-transparent"
+                @input="e => phoneLocal = e.target.value.replace(/\D/g, '')"
+                @keyup.enter="fetchCustomerDetails(true)"
+             />
+          </div>
 
           <!-- Customer Name -->
           <input
@@ -381,7 +393,41 @@ const orderStore = useOrderStore()
 const userStore = useUsersStore() // Instantiate User Store
 const showCustomerModal = ref(false)
 const serviceZoneId = ref('')
-const phoneNumber = ref('')
+// Refactoring phoneNumber to computed
+const phonePrefix = ref('357')
+const phoneLocal = ref('')
+const countryPrefixes = [
+  { text: '+357 (CY)', value: '357' },
+  { text: '+30 (GR)', value: '30' },
+  { text: '+44 (UK)', value: '44' },
+  { text: '+1 (US)', value: '1' },
+  { text: '+7 (RU)', value: '7' },
+   { text: '+971 (AE)', value: '971' },
+  { text: '+961 (LB)', value: '961' },
+]
+
+const phoneNumber = computed({
+  get() {
+    return (phonePrefix.value + phoneLocal.value)
+  },
+  set(val) {
+     const raw = String(val || '').replace(/\D/g, '')
+     const found = countryPrefixes.find(p => raw.startsWith(p.value))
+     if (found) {
+        phonePrefix.value = found.value
+        phoneLocal.value = raw.slice(found.value.length)
+     } else {
+        // If empty, keep default? or clear?
+        if (!raw) {
+             phoneLocal.value = ''
+             return
+        }
+        // Assume default 357 if no match
+        phonePrefix.value = '357'
+        phoneLocal.value = raw
+     }
+  }
+})
 const name = ref('')
 const userResults = ref([])
 const selectedUser = ref('')
