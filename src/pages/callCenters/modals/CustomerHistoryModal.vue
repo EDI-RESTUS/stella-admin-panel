@@ -280,7 +280,7 @@
               <Plus class="w-4 h-4" /> Add Items
             </span>
 
-            <!-- Cancel Order: allow for ANY Completed row, or the latest KDS/preparing/onrack -->
+            <!-- Cancel Order: allow for ANY Completed row, or the latest KDS/preparing/onrack
             <span
               v-if="
                 !isCancelled(order, index) &&
@@ -294,7 +294,7 @@
               @click.stop="openConfirm('cancel', order._id)"
             >
               <X class="w-4 h-4" /> Cancel Order
-            </span>
+            </span> -->
 
             <!-- Switch Order Type -->
             <span
