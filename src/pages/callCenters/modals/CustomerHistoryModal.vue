@@ -334,7 +334,7 @@
           </span>
 
           <span
-            v-else
+            v-else-if="!(order.orderFor === 'future' && order.status === 'Completed')"
             class="px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors"
             :class="{
               'bg-green-600 text-white': order.status === 'Completed',
