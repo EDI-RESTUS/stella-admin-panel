@@ -108,6 +108,14 @@ async function submit() {
     const res = await axios.post(`${url}/auth/signin`, formData)
 
     userStore.setUserDetails(res.data.user)
+
+    // Option 2A: Capture and set global Authorization header
+    const auth = res.headers['authorization']
+    if (auth) {
+      axios.defaults.headers.common.Authorization = auth
+      localStorage.setItem('admin_auth', auth)
+    }
+
     init({ message: "You've successfully logged in", color: 'success' })
 
     window.sessionStorage.setItem('token', res.data.accessToken)
