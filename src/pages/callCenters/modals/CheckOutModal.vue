@@ -1081,9 +1081,10 @@ async function createOrder() {
         if (response.data.data.status === 'Completed') {
           handlePaymentSuccess()
         } else {
-          orderStore.setPaymentLink(response.data.data.redirectUrl)
+          // orderStore.setPaymentLink(response.data.data.redirectUrl)
           orderId.value = response.data.data.requestId
-          setInter()
+          // setInter()
+          window.top.location.href = response.data.data.redirectUrl
         }
       }
       // CASE 2: No Gateway (Cash, External Terminal) - Immediate Success
