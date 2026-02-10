@@ -527,18 +527,9 @@
 
               <div class="flex flex-wrap gap-1 text-xs">
                 <span
-                  v-for="addon in (() => {
-                    const seen = new Set()
-                    return item.articlesOptionsGroup
-                      .flatMap((a) => a.articlesOptions)
-                      .filter((a) => {
-                        if (!a.selected) return false
-                        const key = a._id || a.optionId || a.name
-                        if (seen.has(key)) return false
-                        seen.add(key)
-                        return true
-                      })
-                  })()"
+                  v-for="addon in item.articlesOptionsGroup
+                    .flatMap((a) => a.articlesOptions)
+                    .filter((a) => a.selected)"
                   :key="addon._id || addon.optionId || addon.name"
                   class="px-2 py-0.5 rounded-full"
                   :class="{
@@ -1565,23 +1556,18 @@ const getTotalPrice = (item) => {
     return Number(item.unitPrice).toFixed(2)
   }
 
-  // Otherwise calculate from base price + unique options
+  // Otherwise calculate from base price + all options (no deduplication)
   const basePrice = Number(item.price || 0)
 
-  // Deduplicate options before summing prices
-  const seen = new Set()
-  const uniqueOptions =
+  const selectedOptions =
     item.articlesOptionsGroup
       ?.flatMap((a) => a.articlesOptions)
-      .filter((a) => {
-        if (!a.selected) return false
-        const key = a._id || a.optionId || a.name
-        if (seen.has(key)) return false
-        seen.add(key)
-        return true
-      }) || []
+      .filter((a) => a.selected) || []
 
-  const optionsTotal = uniqueOptions.reduce((sum, opt) => sum + (Number(opt.price) || 0), 0)
+  const optionsTotal = selectedOptions.reduce(
+    (sum, opt) => sum + (Number(opt.price) || 0) * (Number(opt.quantity) || 1),
+    0,
+  )
   return (basePrice + optionsTotal).toFixed(2)
 }
 
