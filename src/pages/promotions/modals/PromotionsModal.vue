@@ -225,6 +225,19 @@
             </div>
           </section>
 
+          <!-- Generate Additional Codes (Edit mode, MULTI only) -->
+          <section v-if="isUpdating && formData.codeType === 'MULTI'">
+            <h2 class="text-md font-semibold mb-2">Generate Additional Codes</h2>
+            <div class="grid md:grid-cols-3 gap-4">
+              <VaInput v-model="formData.startFrom" label="Start From" type="number" min="1" required-mark />
+              <VaInput v-model="formData.endAt" label="End At" type="number" min="1" required-mark />
+              <VaInput v-model="formData.codePrefix" label="Code Prefix" placeholder="e.g. SEQ" />
+            </div>
+            <div class="flex justify-end mt-3">
+              <VaButton color="primary" :loading="isGeneratingCodes" @click="generateCodes">Generate Codes</VaButton>
+            </div>
+          </section>
+
           <!-- Validity & Availability -->
           <section>
             <h2 class="text-md font-semibold mb-2">Validity & Availability</h2>
@@ -326,7 +339,7 @@ import { useForm, useToast } from 'vuestic-ui'
 import { validators } from '@/services/utils'
 import { useServiceStore } from '@/stores/services'
 import FileUpload from '@/components/file-uploader/FileUpload.vue'
-import { createPromotion, updatePromotion, getPromotionById, getMenuItemsByOutlet } from '../services/promotionService'
+import { createPromotion, updatePromotion, getPromotionById, getMenuItemsByOutlet, generatePromotionCodes } from '../services/promotionService'
 import AddSelectionModal from './AddSelectionModal.vue'
 
 const emits = defineEmits(['update:isVisible', 'submitted', 'open-selection-modal', 'getPromotions'])
@@ -359,6 +372,7 @@ const { validate } = useForm('form')
 const { init } = useToast()
 const isLoadingZones = computed(() => props.deliveryZones.length === 0)
 const articles = ref([])
+const isGeneratingCodes = ref(false)
 const isArticlesLoading = ref(false)
 const articlesSearchQuery = ref('')
 const showArticlesSection = ref(false)
@@ -595,7 +609,7 @@ function populateFormData(promotion) {
     fixedPrice: promotion.fixedPrice ?? null,
     affect: reverseAffectMap[promotion.affect] || '',
     affectItems: reverseAffectItemsMap[promotion.affectItems] || '',
-    codeType: promotion.automatic ? 'AUTO' : promotion.quantity > 1 ? 'MULTI' : 'SINGLE',
+    codeType: promotion.codeType || (promotion.automatic ? 'AUTO' : 'SINGLE'),
     quantity: promotion.codeType === 'MULTI' ? promotion.quantity : 1,
     prefix: promotion.codeType === 'MULTI' ? promotion.prefix || '' : '',
     startDate: toInputDate(promotion.dateRange?.startDate),
@@ -805,7 +819,7 @@ const submit = async () => {
     }
 
     data.codes = codeList
-  } else if (raw.codeType === 'MULTI') {
+  } else if (raw.codeType === 'MULTI' && !isUpdating.value) {
     if (!raw.startFrom || !raw.endAt || Number(raw.endAt) <= Number(raw.startFrom)) {
       init({ message: 'Invalid start/end range', color: 'danger' })
       return
@@ -814,7 +828,7 @@ const submit = async () => {
     data.startFrom = Number(raw.startFrom)
     data.endAt = Number(raw.endAt)
     data.codePrefix = raw.codePrefix || ''
-  } else if (raw.codeType === 'AUTO') {
+  } else if (raw.codeType === 'AUTO' && !isUpdating.value) {
     if (!raw.quantity || Number(raw.quantity) <= 0) {
       init({ message: 'Quantity must be greater than 0', color: 'danger' })
       return
@@ -863,6 +877,35 @@ function openArticlesModal() {
 
 function openOptionsModal() {
   isOptionsModalOpen.value = true
+}
+
+async function generateCodes() {
+  const raw = formData.value
+  if (!raw.startFrom || !raw.endAt || Number(raw.endAt) < Number(raw.startFrom)) {
+    init({ message: 'Invalid start/end range', color: 'danger' })
+    return
+  }
+
+  isGeneratingCodes.value = true
+  try {
+    const res = await generatePromotionCodes(raw._id, {
+      startFrom: Number(raw.startFrom),
+      endAt: Number(raw.endAt),
+      codePrefix: raw.codePrefix || '',
+    })
+    init({ message: `${res.data?.added || ''} codes appended successfully!`, color: 'success' })
+    // Clear the fields after success
+    formData.value.startFrom = null
+    formData.value.endAt = null
+    formData.value.codePrefix = ''
+  } catch (err) {
+    init({
+      message: err?.response?.data?.message || err.message || 'Failed to generate codes',
+      color: 'danger',
+    })
+  } finally {
+    isGeneratingCodes.value = false
+  }
 }
 </script>
 
