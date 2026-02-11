@@ -68,7 +68,7 @@
             <MenuSection
               v-if="offers.length"
               id="offers"
-              :category="category"
+              :category="{ _id: 'offers', name: 'OFFERS' }"
               title="OFFERS"
               :items="offers"
               :outlet="outlet"
@@ -123,6 +123,7 @@
         <VaCard class="order-card">
           <VaCardContent>
             <OrderDetails
+              @restore-context="updateContext"
               :delivery-fee="deliveryFee"
               :date-selected="dateSelected ? new Date(dateSelected).toString() : ''"
               :is-delivery-zone-selected="isDeliveryZoneSelected"
@@ -224,6 +225,16 @@ const getOffers = async () => {
   offers.value = response.data.data
 }
 
+const updateContext = (ctx) => {
+  customerDetailsId.value = ctx.customerDetailsId
+  orderType.value = ctx.orderType
+  deliveryFee.value = ctx.deliveryFee
+  isDeliveryZoneSelected.value = ctx.isDeliveryZoneSelected
+  dateSelected.value = ctx.dateSelected
+  // Force customer tab to appear active if needed, but OrderDetails logic handles modal opening
+  if (ctx.customerDetailsId) isCustomerTabActivated.value = true
+}
+
 // Auto-set delivery zone from user's allowed zones before fetching menu
 async function autoSetUserDeliveryZone() {
   try {
@@ -299,7 +310,7 @@ onBeforeUnmount(() => {
   resetState()
 })
 watch(
-  () => route.fullPath,
+  () => route.path,
   () => {
     resetState()
   },
