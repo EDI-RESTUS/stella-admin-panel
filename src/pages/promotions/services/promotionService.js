@@ -85,6 +85,19 @@ export async function validatePromotion(data) {
 }
 
 /**
+ * 7. Generate additional codes for a MULTI promotion
+ */
+export async function generatePromotionCodes(promotionId, { startFrom, endAt, codePrefix }) {
+  return safeRequest(
+    axios.post(`${API_BASE_URL}/promotions/${promotionId}/codes`, {
+      startFrom,
+      endAt,
+      codePrefix,
+    }),
+  )
+}
+
+/**
  * 7. Get Menu Items by Outlet
  */
 export async function getMenuItemsByOutlet(outletId) {

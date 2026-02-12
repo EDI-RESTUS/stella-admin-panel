@@ -177,6 +177,10 @@ const getOutlets = () => {
     outlets.value = servicesStore.items.map((e) => {
       return { text: e.name, value: e._id }
     })
+    // Auto-select if only one outlet is available
+    if (outlets.value.length === 1 && !formData.value.outlets.length) {
+      formData.value.outlets = [outlets.value[0].value]
+    }
   })
 }
 

@@ -330,13 +330,15 @@
       @cancelEdit="isEdit = false"
     />
     <CheckOutModal
+      v-if="showCheckoutModal"
       v-model="showCheckoutModal"
-      :date-selected="dateSelected"
+      :date-selected="orderStore.orderDateTime || dateSelected"
       :delivery-fee="deliveryFee"
       :customer-details-id="customerDetailsId"
       :order-type="orderType"
       :promo-code="promoCode"
       :promo-codes="appliedPromoCodes"
+      :existing-order-id="existingOrderId"
       @cancel="closeCheckoutModal"
     />
     <PromotionModal
@@ -366,6 +368,9 @@ import axios from 'axios'
 import { useToast, useModal } from 'vuestic-ui'
 import PromotionModal from '../modals/PromotionModal.vue'
 
+import { useMenuStore } from '@/stores/getMenu.js'
+import { useRoute, useRouter } from 'vue-router'
+
 const props = defineProps({
   isCustomerOpen: Boolean,
   customerDetailsId: [String, Number],
@@ -375,6 +380,11 @@ const props = defineProps({
   dateSelected: String,
 })
 
+const emit = defineEmits(['restore-context'])
+
+const route = useRoute()
+const router = useRouter()
+const menuStore = useMenuStore()
 const promotionRef = useTemplateRef('promotionModal')
 const serviceStore = useServiceStore()
 
@@ -1074,6 +1084,91 @@ function closeOfferModal() {
 function closePromotionModal() {
   showPromotionModal.value = false
 }
+import { onMounted } from 'vue'
+
+const existingOrderId = ref('')
+
+onMounted(async () => {
+  if (route.query.payment === 'failed' && route.query.orderId) {
+    console.log('[PaymentRetry] Detected failed payment redirect', route.query)
+    isLoading.value = true
+    try {
+      const oid = String(route.query.orderId)
+      // 1. Fetch order
+      const res = await orderStore.getOrderStatus(oid)
+      console.log('[PaymentRetry] Order status response:', res.data)
+
+      if (res.data?.data) {
+        const order = res.data.data
+        console.log('[PaymentRetry] Order data:', order)
+        
+        // Check if SPECIFIC menu items are loaded
+        const requiredItemIds = (order.menuItems || []).map(i => i.menuItem)
+        console.log('[PaymentRetry] Required Item IDs:', requiredItemIds)
+
+        let retries = 0
+        let allItemsFound = false
+        
+        while (!allItemsFound && retries < 40) { // Increased retries to 40 (20s)
+           const loadedIds = new Set(menuStore.unFilteredMenuItems.map(m => m._id))
+           const missing = requiredItemIds.filter(id => !loadedIds.has(id))
+           
+           if (missing.length === 0) {
+             allItemsFound = true
+             console.log('[PaymentRetry] All required menu items found.')
+           } else {
+             console.warn(`[PaymentRetry] Missing items: ${missing.join(', ')}. Waiting... (${retries + 1}/40)`)
+             if (retries % 5 === 0) console.log(`[PaymentRetry] Loaded count: ${menuStore.unFilteredMenuItems.length}`)
+             await new Promise(resolve => setTimeout(resolve, 500))
+             retries++
+           }
+        }
+
+        if (menuStore.unFilteredMenuItems.length === 0) {
+           console.error('[PaymentRetry] Menu items failed to load after timeout. Cart restoration may be incomplete.')
+           init({ message: 'Menu data missing. Order details may be incomplete.', color: 'warning' })
+        } else {
+           console.log('[PaymentRetry] Menu items loaded. Proceeding with restoration.')
+        }
+
+        // 2. Restore cart
+        await orderStore.restoreCartFromOrder(order, menuStore)
+        console.log('[PaymentRetry] Cart restored. Cart items:', orderStore.cartItems)
+        
+        // 2b. Emit context to parent (index.vue) to update props
+        emit('restore-context', {
+          customerDetailsId: order.customerDetailId,
+          orderType: (order.orderType || '').toLowerCase(), 
+          deliveryFee: Number(order.deliveryFee || 0),
+          isDeliveryZoneSelected: !!order.deliveryZoneId,
+          dateSelected: order.orderDateTime || order.createdAt
+        })
+
+        // 3. Set local state to match order 
+        // Note: Props are passed from parent, so we might need to emit or rely on store
+        // For CheckOutModal, we pass 'existingOrderId'
+        existingOrderId.value = oid
+        orderStore.orderDateTime = order.orderDateTime || order.createdAt
+        
+        // 4. Open modal
+        console.log('[OrderDetails] Setting showCheckoutModal = true. Cart items LEN:', orderStore.cartItems.length)
+        showCheckoutModal.value = true
+        
+        // 5. Clean URL
+        const q = { ...route.query }
+        delete q.payment
+        delete q.orderId
+        delete q.status
+        router.replace({ query: q })
+      }
+    } catch (e) {
+      console.error('Failed to restore failed payment order', e)
+      init({ message: 'Failed to restore order for retry', color: 'danger' })
+    } finally {
+      isLoading.value = false
+    }
+  }
+})
 </script>
 <style>
 .original-price {

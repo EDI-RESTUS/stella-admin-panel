@@ -95,39 +95,36 @@
 
           <!-- Add / Edit Button -->
           <template v-if="!selectedUser">
-            <VaTooltip text="Add Customer" placement="top">
               <VaButton
                 class="text-white h-[24px] w-[24px] rounded-md flex items-center justify-center"
                 size="small"
                 icon="mso-add"
+                title="Add Customer"
                 :style="{ '--va-background-color': outlet.primaryColor }"
                 @click="openCustomerModal"
               />
-            </VaTooltip>
           </template>
 
           <template v-else>
             <div class="flex items-center gap-1">
-              <VaTooltip text="Edit Customer" placement="top">
                 <VaButton
                   class="hover:bg-blue-600 text-white h-[24px] w-[24px] rounded-md flex items-center justify-center"
                   size="small"
                   icon="mso-edit"
+                  title="Edit Customer"
                   :style="{ '--va-background-color': outlet.primaryColor }"
                   @click="openCustomerModal"
                 />
-              </VaTooltip>
 
               <!-- Order History Button -->
-              <VaTooltip text="View Order History" placement="top">
                 <VaButton
                   class="hover:bg-green-600 text-white h-[24px] w-[24px] rounded-md flex items-center justify-center"
                   size="small"
                   icon="mso-history"
+                  title="View Order History"
                   :style="{ '--va-background-color': outlet.primaryColor }"
                   @click="showHistoryModal = true"
                 />
-              </VaTooltip>
             </div>
           </template>
 

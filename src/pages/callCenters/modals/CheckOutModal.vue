@@ -15,6 +15,9 @@
           <h3 class="va-h3">Order Details</h3>
 
           <div class="order-items order-items-wrapper overflow-y-auto flex-1 min-h-0 basis-0 h-0">
+            <div v-if="!orderStore.cartItems || orderStore.cartItems.length === 0" class="p-4 text-red-600 font-bold bg-red-100 rounded mb-2">
+              DEBUG: CART IS EMPTY (Len: {{ orderStore.cartItems ? orderStore.cartItems.length : 'null' }})
+            </div>
             <div v-for="(item, index) in orderStore.cartItems" :key="item.itemId" class="order-item">
               <div class="item-main">
                 <div class="item-details">
@@ -288,12 +291,13 @@ const props = defineProps<{
   dateSelected: string
   promoCode: string
   promoCodes?: string[]
+  existingOrderId?: string
 }>()
 
 const orderStore = useOrderStore()
 const serviceStore = useServiceStore()
 const userStore = useUsersStore()
-const orderId: any = ref('')
+const orderId: any = ref(props.existingOrderId || '')
 const orderResponse: any = ref('')
 const redirectUrl = computed(() => orderStore.redirectUrl)
 const userDetails = computed(() => userStore.userDetails)
@@ -347,7 +351,8 @@ const changeAmount = computed(() => {
 const etaTime = computed(() => {
   const now = new Date()
 
-  const selectedDate = new Date(props.dateSelected)
+  const parsedDate = props.dateSelected ? new Date(props.dateSelected) : new Date()
+  const selectedDate = !isNaN(parsedDate.getTime()) ? parsedDate : new Date()
 
   const promiseTime =
     props.orderType === 'delivery'
@@ -405,6 +410,10 @@ const getTotalPrice = computed(() => {
 })
 
 onMounted(() => {
+  console.log('[CheckOutModal] Mounted. Cart items LEN:', orderStore.cartItems.length)
+  console.log('[CheckOutModal] Mounted. Offer items LEN:', orderStore.offerItems.length)
+  console.log('[CheckOutModal] Store ID ref:', orderStore.$id) 
+  
   if (serviceStore.selectedRest) {
     getPaymentOptions()
   }
@@ -424,6 +433,7 @@ const getPaymentOptions = () => {
     })
 }
 
+
 watch(
   () => showCheckoutModal.value,
   (val) => {
@@ -438,6 +448,14 @@ watch(
     if (val) {
       getPaymentOptions()
     }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.existingOrderId,
+  (val) => {
+    if (val) orderId.value = val
   },
   { immediate: true },
 )
@@ -1007,62 +1025,68 @@ function normalizeCodes(singleStr, codesArr) {
 
 async function createOrder() {
   apiLoading.value = true
-  let menuItems: any[] = []
-  menuItems = orderStore.cartItems.map((e: any) => {
-    return {
-      menuItem: e.itemId,
-      quantity: e.quantity,
-      options: e.selectedOptions.flatMap((group: any) =>
-        group.selected.map((option: any) => ({
-          option: option.optionId,
-          quantity: option.quantity,
-        })),
-      ),
-    }
-  })
-
-  const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
-    offerId: offer.offerId,
-    menuItems: offer.selections.flatMap((selection: any) =>
-      selection.addedItems.map((item: any) => ({
-        menuItem: item.itemId,
-        quantity: item.quantity || 1,
-        options:
-          item.selectedOptions?.flatMap((group: any) =>
-            group.selected.map((option: any) => ({
-              option: option.optionId,
-              quantity: option.quantity,
-            })),
-          ) || [],
-      })),
-    ),
-  }))
-  const codes = normalizeCodes(props.promoCode, props.promoCodes)
 
   try {
-    const payload = {
-      orderFor: orderFor.value,
-      customerDetailId: props.customerDetailsId,
-      orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
-      deliveryZoneId: orderStore.deliveryZone?._id,
-      menuItems,
-      deliveryNotes: orderStore.deliveryNotes || '',
-      offerMenuItems,
-      orderNotes: orderStore.orderNotes,
-      deliveryFee: props.deliveryFee,
-      outletId: serviceStore.selectedRest,
-      orderDateTime: new Date(props.dateSelected).toISOString(),
-      paymentMode: selectedPayment.value,
-      address: sanitizeAddress(orderStore.address),
-      phoneNo: orderStore.phoneNumber || '',
-      ...(codes.length ? { promoCodes: codes } : {}),
-      ...(codes.length === 1 ? { promoCode: codes[0] } : {}),
-    }
-
     let response: any = ''
+
+    // ── Payment Retry path ──
+    // When we already have an orderId (from a failed payment redirect),
+    // skip building the full payload and just retry the payment.
     if (orderId.value) {
       response = await orderStore.retryPayment(orderId.value, selectedPayment.value?.paymentTypeId)
     } else {
+      // ── New Order path ──
+      const menuItems = orderStore.cartItems.map((e: any) => ({
+        menuItem: e.itemId,
+        quantity: e.quantity,
+        options: e.selectedOptions.flatMap((group: any) =>
+          group.selected.map((option: any) => ({
+            option: option.optionId,
+            quantity: option.quantity,
+          })),
+        ),
+      }))
+
+      const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
+        offerId: offer.offerId,
+        menuItems: offer.selections.flatMap((selection: any) =>
+          selection.addedItems.map((item: any) => ({
+            menuItem: item.itemId,
+            quantity: item.quantity || 1,
+            options:
+              item.selectedOptions?.flatMap((group: any) =>
+                group.selected.map((option: any) => ({
+                  option: option.optionId,
+                  quantity: option.quantity,
+                })),
+              ) || [],
+          })),
+        ),
+      }))
+      const codes = normalizeCodes(props.promoCode, props.promoCodes)
+
+      const dateVal = props.dateSelected ? new Date(props.dateSelected) : new Date()
+      const orderDateTime = !isNaN(dateVal.getTime()) ? dateVal.toISOString() : new Date().toISOString()
+
+      const payload = {
+        orderFor: orderFor.value,
+        customerDetailId: props.customerDetailsId,
+        orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
+        deliveryZoneId: orderStore.deliveryZone?._id,
+        menuItems,
+        deliveryNotes: orderStore.deliveryNotes || '',
+        offerMenuItems,
+        orderNotes: orderStore.orderNotes,
+        deliveryFee: props.deliveryFee,
+        outletId: serviceStore.selectedRest,
+        orderDateTime,
+        paymentMode: selectedPayment.value,
+        address: sanitizeAddress(orderStore.address),
+        phoneNo: orderStore.phoneNumber || '',
+        ...(codes.length ? { promoCodes: codes } : {}),
+        ...(codes.length === 1 ? { promoCode: codes[0] } : {}),
+      }
+
       orderResponse.value = await orderStore.createOrder(payload)
       response = await orderStore.createPayment({
         orderId: orderResponse.value.data.data._id,
@@ -1081,9 +1105,10 @@ async function createOrder() {
         if (response.data.data.status === 'Completed') {
           handlePaymentSuccess()
         } else {
-          orderStore.setPaymentLink(response.data.data.redirectUrl)
+          // orderStore.setPaymentLink(response.data.data.redirectUrl)
           orderId.value = response.data.data.requestId
-          setInter()
+          // setInter()
+          window.top.location.href = response.data.data.redirectUrl
         }
       }
       // CASE 2: No Gateway (Cash, External Terminal) - Immediate Success
@@ -1098,6 +1123,9 @@ async function createOrder() {
       throw new Error(response.data?.message || 'Something went wrong')
     }
   } catch (err: any) {
+    console.error('[CheckOutModal] Payment failed. Error details:', err)
+    console.error('[CheckOutModal] Response data:', err.response?.data)
+    
     // Build error message, including out of stock items if applicable
     let errorMessage = err.response?.data?.message || 'Order failed, please try again.'
     const errorData = err.response?.data
