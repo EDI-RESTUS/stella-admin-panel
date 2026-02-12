@@ -17,7 +17,7 @@ const searchValue = ref('')
 const sortBy = ref('name')
 const sortOrder = ref('asc')
 const deliveryZones = ref([])
-const selectedDeliveryZoneId = ref('')
+const initialStockMap = ref<Record<string, string[]>>({})
 
 const fetchDeliveryZones = async () => {
   try {
@@ -31,14 +31,37 @@ const fetchDeliveryZones = async () => {
     }
     
     deliveryZones.value = zones.sort((a, b) => Number(a.serviceZoneId) - Number(b.serviceZoneId))
-
-    // Auto-select if only one zone
-    if (deliveryZones.value.length === 1) {
-      selectedDeliveryZoneId.value = deliveryZones.value[0]._id
-    }
   } catch (error) {
     console.error('Failed to fetch delivery zones', error)
   }
+}
+
+// Fetch stock status for all delivery zones and build a map: optionId -> [zoneIds that are in stock]
+const fetchStockForZones = async () => {
+  const stockMap: Record<string, string[]> = {}
+  const url = import.meta.env.VITE_API_BASE_URL
+  try {
+    const promises = deliveryZones.value.map(async (zone) => {
+      try {
+        const res = await axios.get(`${url}/deliveryZones/${zone._id}/stock`, {
+          params: { outletId: servicesStore.selectedRest, entityType: 'ArticlesOptions' },
+        })
+        const entries = res.data?.data || res.data || []
+        entries.forEach((entry: any) => {
+          if (entry.inStock && entry.entityId) {
+            if (!stockMap[entry.entityId]) stockMap[entry.entityId] = []
+            stockMap[entry.entityId].push(zone._id)
+          }
+        })
+      } catch (err) {
+        console.warn(`Failed to fetch stock for zone ${zone._id}`, err)
+      }
+    })
+    await Promise.all(promises)
+  } catch (error) {
+    console.error('Failed to fetch stock for zones', error)
+  }
+  initialStockMap.value = stockMap
 }
 
 const getOptions = async () => {
@@ -49,9 +72,7 @@ const getOptions = async () => {
       url +
         `/articles-options?limit=100000&search=${encodeURIComponent(searchValue.value)}&sortKey=${encodeURIComponent(
           sortBy.value,
-        )}&sortValue=${encodeURIComponent(sortOrder.value)}&outletId=${encodeURIComponent(servicesStore.selectedRest)}${
-          selectedDeliveryZoneId.value ? `&deliveryZoneId=${encodeURIComponent(selectedDeliveryZoneId.value)}` : ''
-        }`,
+        )}&sortValue=${encodeURIComponent(sortOrder.value)}&outletId=${encodeURIComponent(servicesStore.selectedRest)}`,
     )
     
     // Handle both response structures (array directly or wrapped in result)
@@ -88,20 +109,17 @@ const getOptions = async () => {
 watch(
   () => servicesStore.selectedRest,
   async () => {
-    selectedDeliveryZoneId.value = ''
     await fetchDeliveryZones()
-    getOptions()
+    await getOptions()
+    await fetchStockForZones()
   },
   { immediate: true },
 )
 
-watch(selectedDeliveryZoneId, () => {
-  getOptions()
-})
-
 if (servicesStore.selectedRest) {
-  fetchDeliveryZones().then(() => {
-    getOptions()
+  fetchDeliveryZones().then(async () => {
+    await getOptions()
+    await fetchStockForZones()
   })
 }
 
@@ -124,24 +142,12 @@ function updateSortOrder(payload) {
 <template>
   <VaCard square>
     <VaCardContent>
-      <div class="mb-4" v-if="deliveryZones.length > 1">
-        <VaSelect
-          v-model="selectedDeliveryZoneId"
-          :options="deliveryZones"
-          text-by="name"
-          value-by="_id"
-          track-by="_id"
-          label="Select Delivery Zone"
-          placeholder="Select a zone to manage stock"
-          clearable
-          class="w-full sm:w-1/3"
-        />
-      </div>
       <OptionsTable
         :items="items"
         :loading="isLoading"
         :search-query="searchValue"
-        :selected-delivery-zone-id="selectedDeliveryZoneId"
+        :delivery-zones="deliveryZones"
+        :initial-stock-map="initialStockMap"
         @update:searchValue="(val) => (searchValue = val)"
         @sortBy="updateSortBy"
         @sortingOrder="updateSortOrder"

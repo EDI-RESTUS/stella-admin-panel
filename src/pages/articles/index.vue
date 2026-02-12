@@ -36,10 +36,6 @@ const getArticles = async (outletId) => {
   const url = import.meta.env.VITE_API_BASE_URL
   
   let queryString = `outletId=${outletId}&limit=50&page=${pageNumber.value}&search=${searchQuery.value}&sortKey=${sortBy.value}&sortValue=${sortOrder.value}`
-  
-  if (selectedDeliveryZoneId.value) {
-    queryString += `&deliveryZoneId=${selectedDeliveryZoneId.value}`
-  }
 
   try {
     const response = await axios.get(`${url}/menuItems?${queryString}`, { timeout: 60000 })
@@ -101,11 +97,8 @@ const updateArticleDirectly = (payload) => {
     })
 }
 
-// Removed duplicate watcher - the one below properly awaits fetchDeliveryZones first
-// Note: The immediate watcher on serviceStore.selectedRest handles initial load
-
 const deliveryZones = ref([])
-const selectedDeliveryZoneId = ref('')
+const initialStockMap = ref<Record<string, string[]>>({})
 const userStore = useUsersStore()
 
 const fetchDeliveryZones = async () => {
@@ -120,14 +113,37 @@ const fetchDeliveryZones = async () => {
     }
     
     deliveryZones.value = zones.sort((a, b) => Number(a.serviceZoneId) - Number(b.serviceZoneId))
-
-    // Auto-select if only one zone
-    if (deliveryZones.value.length === 1) {
-      selectedDeliveryZoneId.value = deliveryZones.value[0]._id
-    }
   } catch (error) {
     console.error('Failed to fetch delivery zones', error)
   }
+}
+
+// Fetch stock status for all delivery zones and build a map: articleId -> [zoneIds that are in stock]
+const fetchStockForZones = async () => {
+  const stockMap: Record<string, string[]> = {}
+  const url = import.meta.env.VITE_API_BASE_URL
+  try {
+    const promises = deliveryZones.value.map(async (zone) => {
+      try {
+        const res = await axios.get(`${url}/deliveryZones/${zone._id}/stock`, {
+          params: { outletId: serviceStore.selectedRest, entityType: 'MenuItem' },
+        })
+        const entries = res.data?.data || res.data || []
+        entries.forEach((entry: any) => {
+          if (entry.inStock && entry.entityId) {
+            if (!stockMap[entry.entityId]) stockMap[entry.entityId] = []
+            stockMap[entry.entityId].push(zone._id)
+          }
+        })
+      } catch (err) {
+        console.warn(`Failed to fetch stock for zone ${zone._id}`, err)
+      }
+    })
+    await Promise.all(promises)
+  } catch (error) {
+    console.error('Failed to fetch stock for zones', error)
+  }
+  initialStockMap.value = stockMap
 }
 
 watch(
@@ -135,9 +151,9 @@ watch(
   async (newId) => {
     if (newId) {
       isInitialLoad.value = true
-      selectedDeliveryZoneId.value = ''
       await fetchDeliveryZones()
       await getArticles(serviceStore.selectedRest)
+      await fetchStockForZones()
       getArticlesCount(serviceStore.selectedRest)
       categoriesStore.getAll(serviceStore.selectedRest).then((response) => {
         categories.value = response.map((e) => {
@@ -153,13 +169,6 @@ watch(
   },
   { immediate: true },
 )
-
-watch(selectedDeliveryZoneId, () => {
-  // Skip during initial load to avoid race condition with main watcher
-  if (!isInitialLoad.value && serviceStore.selectedRest) {
-    getArticles(serviceStore.selectedRest)
-  }
-})
 
 async function deleteArticle(payload) {
   const data = {
@@ -215,19 +224,6 @@ const isImportArticleModalOpen = ref(false)
   <div>
     <VaCard class="mt-4">
       <VaCardContent>
-        <div class="mb-4" v-if="deliveryZones.length > 1">
-          <VaSelect
-            v-model="selectedDeliveryZoneId"
-            :options="deliveryZones"
-            text-by="name"
-            value-by="_id"
-            track-by="_id"
-            label="Select Delivery Zone"
-            placeholder="Select a zone to manage stock"
-            clearable
-            class="w-full sm:w-1/3"
-          />
-        </div>
         <ArticlesTable
           :items="items"
           :loading="isLoading"
@@ -237,7 +233,8 @@ const isImportArticleModalOpen = ref(false)
           :count="count"
           :sort-by="sortBy"
           :sort-order="sortOrder"
-          :selected-delivery-zone-id="selectedDeliveryZoneId"
+          :delivery-zones="deliveryZones"
+          :initial-stock-map="initialStockMap"
           @update:searchQuery="(val) => (searchQuery = val)"
           @update:currentPage="(val) => (currentPage = val)"
           @sortBy="updateSortBy"

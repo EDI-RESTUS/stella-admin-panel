@@ -20,9 +20,13 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
-  selectedDeliveryZoneId: {
-    type: String,
-    default: '',
+  deliveryZones: {
+    type: Array,
+    default: () => [],
+  },
+  initialStockMap: {
+    type: Object,
+    default: () => ({}),
   },
 })
 
@@ -46,50 +50,52 @@ const { init } = useToast()
 const currentPage = ref(1)
 const searchQuery = ref('')
 const stockUpdating = ref(new Set()) // Track which rows are currently updating stock
+const rowSelectedZones = reactive<Record<string, string[]>>({}) // Track selected delivery zones per row
+
+// Initialize rowSelectedZones from the initialStockMap prop (API data)
+watch(
+  () => props.initialStockMap,
+  (newMap) => {
+    // Clear existing and apply new data
+    Object.keys(rowSelectedZones).forEach((key) => delete rowSelectedZones[key])
+    Object.entries(newMap).forEach(([articleId, zoneIds]) => {
+      rowSelectedZones[articleId] = [...(zoneIds as string[])]
+    })
+  },
+  { immediate: true, deep: true },
+)
 const onAddClick = () => {
   emits('addArticle', { adding: true, searchQuery: searchQuery.value, page: currentPage.value })
 }
 
-const toggleStock = async (rowData, event) => {
-  const newValue = event.target.checked
-  console.log('toggleStock called', { selectedDeliveryZoneId: props.selectedDeliveryZoneId, newValue, rowId: rowData._id })
-  
-  // Mark as updating
-  stockUpdating.value.add(rowData._id)
-  
-  if (props.selectedDeliveryZoneId) {
-    // Zone-specific update
-    try {
-      const url = import.meta.env.VITE_API_BASE_URL
-      await axios.patch(`${url}/deliveryZones/${props.selectedDeliveryZoneId}/stock`, {
-        outletId: serviceStore.selectedRest,
-        entityType: 'MenuItem', 
-        entityId: rowData._id,
-        inStock: newValue,
-      })
-      init({ message: `Stock updated for zone: ${newValue ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
-    } catch (err) {
-      rowData.inStock = !newValue // Revert
-      init({ message: 'Failed to update zone stock', color: 'danger' })
-      console.error('Stock update failed', err)
-    } finally {
-      stockUpdating.value.delete(rowData._id)
+const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) => {
+  const key = `${rowData._id}_${zoneId}`
+  stockUpdating.value.add(key)
+  try {
+    const url = import.meta.env.VITE_API_BASE_URL
+    await axios.patch(`${url}/deliveryZones/${zoneId}/stock`, {
+      outletId: serviceStore.selectedRest,
+      entityType: 'MenuItem',
+      entityId: rowData._id,
+      inStock,
+    })
+    // Update local tracking
+    if (!rowSelectedZones[rowData._id]) rowSelectedZones[rowData._id] = []
+    if (inStock) {
+      if (!rowSelectedZones[rowData._id].includes(zoneId)) {
+        rowSelectedZones[rowData._id].push(zoneId)
+      }
+    } else {
+      rowSelectedZones[rowData._id] = rowSelectedZones[rowData._id].filter((id) => id !== zoneId)
     }
-  } else {
-    // Global update via PATCH /menuItems/:id
-    try {
-      const url = import.meta.env.VITE_API_BASE_URL
-      await axios.patch(`${url}/menuItems/${rowData._id}`, {
-        inStock: newValue,
-      })
-      init({ message: `Global stock updated: ${newValue ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
-    } catch (err) {
-      rowData.inStock = !newValue // Revert
-      init({ message: 'Failed to update global stock', color: 'danger' })
-      console.error('Global stock update failed', err)
-    } finally {
-      stockUpdating.value.delete(rowData._id)
-    }
+    const zone = props.deliveryZones.find((z: any) => z._id === zoneId)
+    const zoneName = zone ? zone.name : zoneId
+    init({ message: `${zoneName}: ${inStock ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
+  } catch (err) {
+    init({ message: 'Failed to update zone stock', color: 'danger' })
+    console.error('Stock update failed', err)
+  } finally {
+    stockUpdating.value.delete(key)
   }
 }
 const onImportClick = () => {
@@ -118,11 +124,23 @@ function onDocumentClick(e: MouseEvent) {
   showColumnsMenu.value = false
 }
 
+// Close all zone dropdown menus when clicking outside
+function onDocumentClickZone(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (target?.closest('.stock-zone-wrapper')) return
+  // Close all open zone menus by modifying the items
+  props.items.forEach((item: any) => {
+    if (item._showZoneMenu) item._showZoneMenu = false
+  })
+}
+
 onMounted(() => {
   document.addEventListener('click', onDocumentClick)
+  document.addEventListener('click', onDocumentClickZone)
 })
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
+  document.removeEventListener('click', onDocumentClickZone)
 })
 
 const allergenOptions = subCategoryStore.allergenOptions.map((e) => {
@@ -1005,28 +1023,62 @@ function openFileModal(data) {
 
         <!-- STOCK COLUMN -->
         <template #cell(stock)="{ rowData }">
-          <div class="flex justify-center items-center">
-            <!-- Loading spinner -->
-            <div v-if="stockUpdating.has(rowData._id)" class="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-            <!-- Stock toggle -->
-            <label v-else class="relative inline-block w-9 h-5 cursor-pointer">
-              <input
-                v-model="rowData.inStock"
-                type="checkbox"
-                class="sr-only"
-                @change="(e) => toggleStock(rowData, e)"
-              />
-              <!-- Track -->
-              <span
-                class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
-                :class="rowData.inStock ? 'bg-blue-500' : 'bg-slate-300'"
-              ></span>
-              <!-- Thumb -->
-              <span
-                class="absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out"
-                :class="rowData.inStock ? 'translate-x-4' : 'translate-x-1'"
-              ></span>
-            </label>
+          <div class="flex flex-col items-center gap-1" style="min-width: 140px">
+            <template v-if="deliveryZones.length > 0">
+              <div class="relative stock-zone-wrapper w-full">
+                <!-- Trigger button -->
+                <button
+                  class="flex items-center justify-between w-full px-2 py-1.5 text-xs rounded-lg border transition-all duration-200"
+                  :class="(rowSelectedZones[rowData._id] || []).length > 0
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'"
+                  @click.stop="rowData._showZoneMenu = !rowData._showZoneMenu"
+                >
+                  <span class="truncate">
+                    <template v-if="(rowSelectedZones[rowData._id] || []).length > 0">
+                      {{ (rowSelectedZones[rowData._id] || []).length }} Zone{{ (rowSelectedZones[rowData._id] || []).length > 1 ? 's' : '' }}
+                    </template>
+                    <template v-else>
+                      Select zone
+                    </template>
+                  </span>
+                  <svg class="w-3 h-3 flex-shrink-0 ml-1 transition-transform" :class="rowData._showZoneMenu ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+
+                <!-- Dropdown menu -->
+                <div
+                  v-if="rowData._showZoneMenu"
+                  class="absolute left-0 top-full mt-1 w-48 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-xl p-2 z-50"
+                >
+                  <div class="flex flex-col gap-0.5 max-h-[200px] overflow-auto">
+                    <label
+                      v-for="zone in deliveryZones"
+                      :key="zone._id"
+                      class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer hover:bg-slate-50 transition-colors"
+                    >
+                      <!-- Loading spinner for this specific zone+row -->
+                      <div
+                        v-if="stockUpdating.has(`${rowData._id}_${zone._id}`)"
+                        class="animate-spin w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full flex-shrink-0"
+                      ></div>
+                      <input
+                        v-else
+                        type="checkbox"
+                        class="accent-emerald-500 h-3.5 w-3.5 rounded flex-shrink-0"
+                        :checked="(rowSelectedZones[rowData._id] || []).includes(zone._id)"
+                        @change="(e) => toggleZoneStock(rowData, zone._id, e.target.checked)"
+                      />
+                      <span class="truncate text-slate-700">{{ zone.name }}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <span class="text-xs text-slate-400 italic">No zones</span>
+            </template>
           </div>
         </template>
 
