@@ -117,11 +117,12 @@ function resetColumnVisibility() {
   columns.forEach((c) => (columnVisibility[c.key] = true))
 }
 
-const emits = defineEmits(['getOptionGroups', 'editOptionGroup', 'sortBy', 'sortingOrder', 'updateOptionGroupModal'])
+const emits = defineEmits(['getOptionGroups', 'editOptionGroup', 'sortBy', 'sortingOrder', 'updateOptionGroupModal', 'getOptionGroupsForPagination', 'update:currentPage'])
 const props = defineProps({
   items: { type: Array, required: true },
   count: { type: Number, default: 0 },
   loading: { type: Boolean, default: false },
+  currentPage: { type: Number, default: 1 },
 })
 const { confirm } = useModal()
 const { init } = useToast()
@@ -129,6 +130,13 @@ const router = useRouter()
 const servicesStore = useServiceStore()
 const searchQuery = ref('')
 const searchTimeout = ref<number | null>(null)
+
+const pages = computed(() => Math.ceil(props.count / 50) || 1)
+
+function changePage(page: number) {
+  emits('update:currentPage', page)
+  emits('getOptionGroupsForPagination', { page, searchQuery: searchQuery.value })
+}
 
 watch(searchQuery, () => {
   // clear previous timer
@@ -614,6 +622,48 @@ function onButtonEditOptionGroupArticles(rowData) {
           </div>
         </template>
       </VaDataTable>
+
+      <!-- Bottom Pagination -->
+      <div v-if="pages > 1" class="flex justify-center py-3 border-t border-slate-200">
+        <VaPagination :model-value="props.currentPage" :pages="pages" buttons-preset="secondary" gapped="20" :visible-pages="3" @update:modelValue="changePage">
+          <template #firstPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹‹
+            </button>
+          </template>
+          <template #prevPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹
+            </button>
+          </template>
+          <template #nextPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ›
+            </button>
+          </template>
+          <template #lastPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ››
+            </button>
+          </template>
+        </VaPagination>
+      </div>
     </div>
 
     <!-- MODALS -->

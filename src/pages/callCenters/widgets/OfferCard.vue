@@ -1,8 +1,9 @@
 <template>
-  <div v-if="isOfferAvailable(item)" class="menu-item" @click="getOffers">
+  <div v-if="isOfferAvailable(item)" class="menu-item" :class="{ 'out-of-stock': item.inStock === false }" @click="getOffers">
     <div class="item-content">
       <div class="item-name">{{ item.name }}</div>
       <div class="item-price">€{{ parseFloat(item.price).toFixed(2) }}</div>
+      <div v-if="item.inStock === false" class="oos-label">Out of Stock</div>
     </div>
     <div v-if="item.imageUrl" class="item-image">
       <img :src="item.imageUrl" alt="icon" class="w-full h-full" />
@@ -69,6 +70,14 @@ function isOfferAvailable(item) {
 }
 
 function getOffers() {
+  // If offer is out of stock, show toast & stop
+  if (props.item.inStock === false) {
+    init({
+      message: 'This offer is out of stock!',
+      color: 'danger',
+    })
+    return
+  }
   // If offer is not available, show toast & stop
   if (!isOfferAvailable(props.item)) {
     init({
@@ -147,5 +156,23 @@ function closeOfferModal() {
   font-size: 16px;
   font-weight: 700;
   color: #2d5d2a;
+}
+
+.out-of-stock {
+  opacity: 0.5;
+  pointer-events: auto;
+  cursor: not-allowed;
+}
+
+.out-of-stock:hover {
+  box-shadow: none;
+  border-color: #e2e8f0;
+}
+
+.oos-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #dc2626;
+  margin-top: 4px;
 }
 </style>

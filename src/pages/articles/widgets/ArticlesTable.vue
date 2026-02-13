@@ -73,12 +73,20 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
   stockUpdating.value.add(key)
   try {
     const url = import.meta.env.VITE_API_BASE_URL
-    await axios.patch(`${url}/deliveryZones/${zoneId}/stock`, {
+    // Build updated inStockByZones array
+    const currentZones = Array.isArray(rowData.inStockByZones) ? [...rowData.inStockByZones] : []
+    const idx = currentZones.findIndex((z: any) => z.deliveryZoneId === zoneId)
+    if (idx >= 0) {
+      currentZones[idx] = { ...currentZones[idx], inStock }
+    } else {
+      currentZones.push({ deliveryZoneId: zoneId, inStock })
+    }
+    await axios.patch(`${url}/menuItems/${rowData._id}`, {
+      inStockByZones: currentZones,
       outletId: serviceStore.selectedRest,
-      entityType: 'MenuItem',
-      entityId: rowData._id,
-      inStock,
     })
+    // Update the row data in-place so it stays in sync
+    rowData.inStockByZones = currentZones
     // Update local tracking
     if (!rowSelectedZones[rowData._id]) rowSelectedZones[rowData._id] = []
     if (inStock) {
@@ -93,7 +101,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
     init({ message: `${zoneName}: ${inStock ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
   } catch (err) {
     init({ message: 'Failed to update zone stock', color: 'danger' })
-    console.error('Stock update failed', err)
+    console.error('[ArticlesTable] Stock update failed:', err)
   } finally {
     stockUpdating.value.delete(key)
   }
@@ -491,48 +499,6 @@ function openFileModal(data) {
           <Plus class="w-4 h-4" />
           <span class="hidden md:inline">Add Article</span>
         </button>
-
-        <!-- Pagination -->
-        <div class="flex items-center gap-2">
-          <VaPagination v-model="currentPage" :pages="pages" buttons-preset="secondary" gapped="20" :visible-pages="3">
-            <template #firstPageLink="{ onClick, disabled }">
-              <button
-                class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
-                :disabled="disabled"
-                @click="onClick"
-              >
-                ‹‹
-              </button>
-            </template>
-            <template #prevPageLink="{ onClick, disabled }">
-              <button
-                class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
-                :disabled="disabled"
-                @click="onClick"
-              >
-                ‹
-              </button>
-            </template>
-            <template #nextPageLink="{ onClick, disabled }">
-              <button
-                class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
-                :disabled="disabled"
-                @click="onClick"
-              >
-                ›
-              </button>
-            </template>
-            <template #lastPageLink="{ onClick, disabled }">
-              <button
-                class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
-                :disabled="disabled"
-                @click="onClick"
-              >
-                ››
-              </button>
-            </template>
-          </VaPagination>
-        </div>
       </div>
     </div>
 
@@ -1114,6 +1080,48 @@ function openFileModal(data) {
           </div>
         </template>
       </VaDataTable>
+
+      <!-- Bottom Pagination -->
+      <div v-if="pages > 1" class="flex justify-center py-3 border-t border-slate-200">
+        <VaPagination v-model="currentPage" :pages="pages" buttons-preset="secondary" gapped="20" :visible-pages="3">
+          <template #firstPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹‹
+            </button>
+          </template>
+          <template #prevPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹
+            </button>
+          </template>
+          <template #nextPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ›
+            </button>
+          </template>
+          <template #lastPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ››
+            </button>
+          </template>
+        </VaPagination>
+      </div>
     </div>
   </div>
 </template>

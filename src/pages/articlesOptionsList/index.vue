@@ -18,6 +18,9 @@ const sortBy = ref('name')
 const sortOrder = ref('asc')
 const deliveryZones = ref([])
 const initialStockMap = ref<Record<string, string[]>>({})
+const pageNumber = ref(1)
+const currentPage = ref(1)
+const count = ref(0)
 
 const fetchDeliveryZones = async () => {
   try {
@@ -36,30 +39,22 @@ const fetchDeliveryZones = async () => {
   }
 }
 
-// Fetch stock status for all delivery zones and build a map: optionId -> [zoneIds that are in stock]
-const fetchStockForZones = async () => {
+// Build stock map from inStockByZones on each option (returned inline by the API)
+const buildStockMapFromItems = () => {
   const stockMap: Record<string, string[]> = {}
-  const url = import.meta.env.VITE_API_BASE_URL
   try {
-    const promises = deliveryZones.value.map(async (zone) => {
-      try {
-        const res = await axios.get(`${url}/deliveryZones/${zone._id}/stock`, {
-          params: { outletId: servicesStore.selectedRest, entityType: 'ArticlesOptions' },
-        })
-        const entries = res.data?.data || res.data || []
-        entries.forEach((entry: any) => {
-          if (entry.inStock && entry.entityId) {
-            if (!stockMap[entry.entityId]) stockMap[entry.entityId] = []
-            stockMap[entry.entityId].push(zone._id)
-          }
-        })
-      } catch (err) {
-        console.warn(`Failed to fetch stock for zone ${zone._id}`, err)
+    items.value.forEach((item: any) => {
+      if (Array.isArray(item.inStockByZones)) {
+        const inStockZoneIds = item.inStockByZones
+          .filter((z: any) => z.inStock)
+          .map((z: any) => z.deliveryZoneId)
+        if (inStockZoneIds.length > 0) {
+          stockMap[item._id] = inStockZoneIds
+        }
       }
     })
-    await Promise.all(promises)
   } catch (error) {
-    console.error('Failed to fetch stock for zones', error)
+    console.error('[ArticleOptions] Failed to build stock map from items', error)
   }
   initialStockMap.value = stockMap
 }
@@ -70,16 +65,23 @@ const getOptions = async () => {
   try {
     const response = await axios.get(
       url +
-        `/articles-options?limit=100000&search=${encodeURIComponent(searchValue.value)}&sortKey=${encodeURIComponent(
+        `/articles-options?limit=50&page=${pageNumber.value}&search=${encodeURIComponent(searchValue.value)}&sortKey=${encodeURIComponent(
           sortBy.value,
         )}&sortValue=${encodeURIComponent(sortOrder.value)}&outletId=${encodeURIComponent(servicesStore.selectedRest)}`,
     )
     
-    // Handle both response structures (array directly or wrapped in result)
+    // Handle response structures: array directly, { items: [...] }, or { result: [...] }
     const rawData = response.data
-    const item = Array.isArray(rawData) ? rawData : (rawData.result || [])
-    
-    // console.log('Parsed active options:', item.length)
+    const item = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
+
+    // Extract total count from the response if available
+    if (rawData.totalNoRec !== undefined) {
+      count.value = Number(rawData.totalNoRec)
+    } else if (rawData.count !== undefined) {
+      count.value = Number(rawData.count)
+    } else if (rawData.total !== undefined) {
+      count.value = Number(rawData.total)
+    }
 
     items.value = item.map((e) => {
       return {
@@ -100,18 +102,34 @@ const getOptions = async () => {
     })
   } catch (error) {
     init({ message: 'Failed to load Options', color: 'danger' })
+    console.error('[ArticleOptions] Failed to load options:', error)
   } finally {
     isLoading.value = false
   }
+}
+
+const getOptionsCount = () => {
+  const url = import.meta.env.VITE_API_BASE_URL
+  axios
+    .get(`${url}/articles-options/count?outletId=${servicesStore.selectedRest}&search=${encodeURIComponent(searchValue.value)}`)
+    .then((response) => {
+      count.value = Number(response.data.data || response.data.totalNoRec || response.data.count || 0)
+    })
+    .catch((err) => {
+      console.error('[ArticleOptions] Failed to get count:', err)
+    })
 }
 
 
 watch(
   () => servicesStore.selectedRest,
   async () => {
+    pageNumber.value = 1
+    currentPage.value = 1
     await fetchDeliveryZones()
     await getOptions()
-    await fetchStockForZones()
+    buildStockMapFromItems()
+    getOptionsCount()
   },
   { immediate: true },
 )
@@ -119,22 +137,36 @@ watch(
 if (servicesStore.selectedRest) {
   fetchDeliveryZones().then(async () => {
     await getOptions()
-    await fetchStockForZones()
+    buildStockMapFromItems()
+    getOptionsCount()
   })
 }
 
 function getOptionsForSearch(search) {
   searchValue.value = search || ''
+  pageNumber.value = 1
+  currentPage.value = 1
+  getOptions()
+  getOptionsCount()
+}
+
+function getOptionsForPagination(payload) {
+  pageNumber.value = payload.page
+  searchValue.value = payload.searchQuery || ''
   getOptions()
 }
 
 function updateSortBy(payload) {
   sortBy.value = payload
+  pageNumber.value = 1
+  currentPage.value = 1
   getOptions()
 }
 
 function updateSortOrder(payload) {
   sortOrder.value = payload
+  pageNumber.value = 1
+  currentPage.value = 1
   getOptions()
 }
 </script>
@@ -146,12 +178,16 @@ function updateSortOrder(payload) {
         :items="items"
         :loading="isLoading"
         :search-query="searchValue"
+        :current-page="currentPage"
+        :count="count"
         :delivery-zones="deliveryZones"
         :initial-stock-map="initialStockMap"
         @update:searchValue="(val) => (searchValue = val)"
+        @update:currentPage="(val) => (currentPage = val)"
         @sortBy="updateSortBy"
         @sortingOrder="updateSortOrder"
         @getOptions="getOptionsForSearch"
+        @getOptionsForPagination="getOptionsForPagination"
       />
     </VaCardContent>
   </VaCard>

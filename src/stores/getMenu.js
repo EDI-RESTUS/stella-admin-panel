@@ -93,24 +93,46 @@ export const useMenuStore = defineStore('menu', {
     async updateStockStatus(payload) {
       if (!this.deliveryZoneId) return
       try {
-        await axios.patch(`${this.url}/deliveryZones/${this.deliveryZoneId}/stock`, {
+        const { entityType, entityId, inStock } = payload
+        // Determine endpoint based on entity type
+        const endpoint = entityType === 'MenuItem'
+          ? `${this.url}/menuItems/${entityId}`
+          : `${this.url}/articles-options/${entityId}`
+
+        // Find the current entity to get its inStockByZones
+        let currentZones = []
+        if (entityType === 'MenuItem') {
+          const item = this.unFilteredMenuItems.find(i => i._id === entityId)
+          currentZones = Array.isArray(item?.inStockByZones) ? [...item.inStockByZones] : []
+        }
+
+        // Update the specific zone in the array
+        const idx = currentZones.findIndex(z => z.deliveryZoneId === this.deliveryZoneId)
+        if (idx >= 0) {
+          currentZones[idx] = { ...currentZones[idx], inStock }
+        } else {
+          currentZones.push({ deliveryZoneId: this.deliveryZoneId, inStock })
+        }
+
+        await axios.patch(endpoint, {
+          inStockByZones: currentZones,
           outletId: this.restDetails?._id,
-          ...payload,
         })
-        // Optimized: update local state immediately instead of full refetch
-        // We can do a refetch in the background if needed, but immediate feedback is better
-        this.updateLocalStock(payload)
+        this.updateLocalStock({ entityType, entityId, inStock, inStockByZones: currentZones })
       } catch (error) {
-        console.error('Failed to update stock status:', error)
+        console.error('[MenuStore] Failed to update stock status:', error)
         throw error
       }
     },
-    updateLocalStock({ entityType, entityId, inStock }) {
+    updateLocalStock({ entityType, entityId, inStock, inStockByZones }) {
       // Helper to update stock in memory
       if (entityType === 'MenuItem') {
         const updateItem = (items) => {
           items.forEach((item) => {
-            if (item._id === entityId) item.inStock = inStock
+            if (item._id === entityId) {
+              item.inStock = inStock
+              if (inStockByZones) item.inStockByZones = inStockByZones
+            }
             if (item.subCategories) updateItem(item.subCategories)
             if (item.menuItems) updateItem(item.menuItems)
           })
@@ -121,7 +143,10 @@ export const useMenuStore = defineStore('menu', {
         })
         // Also update unFilteredMenuItems
         const unfiltered = this.unFilteredMenuItems.find(i => i._id === entityId)
-        if (unfiltered) unfiltered.inStock = inStock
+        if (unfiltered) {
+          unfiltered.inStock = inStock
+          if (inStockByZones) unfiltered.inStockByZones = inStockByZones
+        }
       } else if (entityType === 'ArticlesOptions') {
         // Options are nested deep in articlesOptionsGroups
         const updateOptions = (items) => {
@@ -129,7 +154,10 @@ export const useMenuStore = defineStore('menu', {
             // Check item's option groups
             item.articlesOptionsGroup?.forEach(group => {
               const option = group.articlesOptions?.find(o => o._id === entityId)
-              if (option) option.inStock = inStock
+              if (option) {
+                option.inStock = inStock
+                if (inStockByZones) option.inStockByZones = inStockByZones
+              }
             })
             if (item.subCategories) updateOptions(item.subCategories)
             if (item.menuItems) updateOptions(item.menuItems)

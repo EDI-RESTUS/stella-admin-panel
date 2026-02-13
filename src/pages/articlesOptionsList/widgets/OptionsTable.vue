@@ -18,11 +18,12 @@ const searchTimeout = ref<number | null>(null)
 const stockUpdating = ref(new Set()) // Track which rows are currently updating stock
 const rowSelectedZones = reactive<Record<string, string[]>>({}) // Track selected delivery zones per row
 
-const emits = defineEmits(['getOptions', 'editOption', 'cloneArticle', 'sortBy', 'sortingOrder', 'updateOptionModal'])
+const emits = defineEmits(['getOptions', 'editOption', 'cloneArticle', 'sortBy', 'sortingOrder', 'updateOptionModal', 'getOptionsForPagination', 'update:currentPage'])
 const props = defineProps({
   items: { type: Array, required: true },
   count: { type: Number, default: 0 },
   loading: { type: Boolean, default: false },
+  currentPage: { type: Number, default: 1 },
   deliveryZones: { type: Array, default: () => [] },
   initialStockMap: { type: Object, default: () => ({}) },
 })
@@ -31,6 +32,13 @@ const { confirm } = useModal()
 const { init } = useToast()
 const servicesStore = useServiceStore()
 const selectedRest = computed(() => servicesStore.selectedRest)
+
+const pages = computed(() => Math.ceil(props.count / 50) || 1)
+
+function changePage(page: number) {
+  emits('update:currentPage', page)
+  emits('getOptionsForPagination', { page, searchQuery: searchQuery.value })
+}
 
 const columns = defineVaDataTableColumns([
   { label: 'Image', key: 'imageUrl' },
@@ -204,12 +212,20 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
   stockUpdating.value.add(key)
   try {
     const url = import.meta.env.VITE_API_BASE_URL
-    await axios.patch(`${url}/deliveryZones/${zoneId}/stock`, {
+    // Build updated inStockByZones array
+    const currentZones = Array.isArray(rowData.inStockByZones) ? [...rowData.inStockByZones] : []
+    const idx = currentZones.findIndex((z: any) => z.deliveryZoneId === zoneId)
+    if (idx >= 0) {
+      currentZones[idx] = { ...currentZones[idx], inStock }
+    } else {
+      currentZones.push({ deliveryZoneId: zoneId, inStock })
+    }
+    await axios.patch(`${url}/articles-options/${rowData._id}`, {
+      inStockByZones: currentZones,
       outletId: selectedRest.value,
-      entityType: 'ArticlesOptions',
-      entityId: rowData._id,
-      inStock,
     })
+    // Update the row data in-place so it stays in sync
+    rowData.inStockByZones = currentZones
     // Update local tracking
     if (!rowSelectedZones[rowData._id]) rowSelectedZones[rowData._id] = []
     if (inStock) {
@@ -224,7 +240,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
     init({ message: `${zoneName}: ${inStock ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
   } catch (err) {
     init({ message: 'Failed to update zone stock', color: 'danger' })
-    console.error('Stock update failed', err)
+    console.error('[OptionsTable] Stock update failed:', err)
   } finally {
     stockUpdating.value.delete(key)
   }
@@ -725,6 +741,48 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
           </div>
         </template>
       </VaDataTable>
+
+      <!-- Bottom Pagination -->
+      <div v-if="pages > 1" class="flex justify-center py-3 border-t border-slate-200">
+        <VaPagination :model-value="props.currentPage" :pages="pages" buttons-preset="secondary" gapped="20" :visible-pages="3" @update:modelValue="changePage">
+          <template #firstPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹‹
+            </button>
+          </template>
+          <template #prevPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹
+            </button>
+          </template>
+          <template #nextPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ›
+            </button>
+          </template>
+          <template #lastPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ››
+            </button>
+          </template>
+        </VaPagination>
+      </div>
     </div>
 
     <EditArticleOptionModal

@@ -118,30 +118,22 @@ const fetchDeliveryZones = async () => {
   }
 }
 
-// Fetch stock status for all delivery zones and build a map: articleId -> [zoneIds that are in stock]
-const fetchStockForZones = async () => {
+// Build stock map from inStockByZones on each item (returned inline by the API)
+const buildStockMapFromItems = () => {
   const stockMap: Record<string, string[]> = {}
-  const url = import.meta.env.VITE_API_BASE_URL
   try {
-    const promises = deliveryZones.value.map(async (zone) => {
-      try {
-        const res = await axios.get(`${url}/deliveryZones/${zone._id}/stock`, {
-          params: { outletId: serviceStore.selectedRest, entityType: 'MenuItem' },
-        })
-        const entries = res.data?.data || res.data || []
-        entries.forEach((entry: any) => {
-          if (entry.inStock && entry.entityId) {
-            if (!stockMap[entry.entityId]) stockMap[entry.entityId] = []
-            stockMap[entry.entityId].push(zone._id)
-          }
-        })
-      } catch (err) {
-        console.warn(`Failed to fetch stock for zone ${zone._id}`, err)
+    items.value.forEach((item: any) => {
+      if (Array.isArray(item.inStockByZones)) {
+        const inStockZoneIds = item.inStockByZones
+          .filter((z: any) => z.inStock)
+          .map((z: any) => z.deliveryZoneId)
+        if (inStockZoneIds.length > 0) {
+          stockMap[item._id] = inStockZoneIds
+        }
       }
     })
-    await Promise.all(promises)
   } catch (error) {
-    console.error('Failed to fetch stock for zones', error)
+    console.error('[Articles] Failed to build stock map from items', error)
   }
   initialStockMap.value = stockMap
 }
@@ -153,7 +145,7 @@ watch(
       isInitialLoad.value = true
       await fetchDeliveryZones()
       await getArticles(serviceStore.selectedRest)
-      await fetchStockForZones()
+      buildStockMapFromItems()
       getArticlesCount(serviceStore.selectedRest)
       categoriesStore.getAll(serviceStore.selectedRest).then((response) => {
         categories.value = response.map((e) => {
