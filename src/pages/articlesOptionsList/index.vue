@@ -21,6 +21,7 @@ const initialStockMap = ref<Record<string, string[]>>({})
 const pageNumber = ref(1)
 const currentPage = ref(1)
 const count = ref(0)
+const activeOnly = ref(true)
 
 const fetchDeliveryZones = async () => {
   try {
@@ -67,7 +68,7 @@ const getOptions = async () => {
       url +
         `/articles-options?limit=50&page=${pageNumber.value}&search=${encodeURIComponent(searchValue.value)}&sortKey=${encodeURIComponent(
           sortBy.value,
-        )}&sortValue=${encodeURIComponent(sortOrder.value)}&outletId=${encodeURIComponent(servicesStore.selectedRest)}`,
+        )}&sortValue=${encodeURIComponent(sortOrder.value)}&outletId=${encodeURIComponent(servicesStore.selectedRest)}${activeOnly.value ? '&isActive=true' : ''}`,
     )
     
     // Handle response structures: array directly, { items: [...] }, or { result: [...] }
@@ -111,7 +112,7 @@ const getOptions = async () => {
 const getOptionsCount = () => {
   const url = import.meta.env.VITE_API_BASE_URL
   axios
-    .get(`${url}/articles-options/count?outletId=${servicesStore.selectedRest}&search=${encodeURIComponent(searchValue.value)}`)
+    .get(`${url}/articles-options/count?outletId=${servicesStore.selectedRest}&search=${encodeURIComponent(searchValue.value)}${activeOnly.value ? '&isActive=true' : ''}`)
     .then((response) => {
       count.value = Number(response.data.data || response.data.totalNoRec || response.data.count || 0)
     })
@@ -156,6 +157,14 @@ function getOptionsForPagination(payload) {
   getOptions()
 }
 
+function handleActiveOnlyChanged(val: boolean) {
+  activeOnly.value = val
+  pageNumber.value = 1
+  currentPage.value = 1
+  getOptions()
+  getOptionsCount()
+}
+
 function updateSortBy(payload) {
   sortBy.value = payload
   pageNumber.value = 1
@@ -188,6 +197,7 @@ function updateSortOrder(payload) {
         @sortingOrder="updateSortOrder"
         @getOptions="getOptionsForSearch"
         @getOptionsForPagination="getOptionsForPagination"
+        @activeOnlyChanged="handleActiveOnlyChanged"
       />
     </VaCardContent>
   </VaCard>

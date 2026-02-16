@@ -462,7 +462,9 @@ const getOptionGroups = async () => {
     const response = await axios.get(
       url + `/articles-options-groups?limit=100000&&sortKey=name&sortValue=asc&outletId=${props.outletId}`,
     )
-    const item = response.data.result
+    // Handle response structures: array directly, { items: [...] }, or { result: [...] }
+    const rawData = response.data
+    const item = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
     groups.value = item.map((e) => {
       return {
         ...e,

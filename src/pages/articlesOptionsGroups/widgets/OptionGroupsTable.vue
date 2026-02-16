@@ -117,7 +117,7 @@ function resetColumnVisibility() {
   columns.forEach((c) => (columnVisibility[c.key] = true))
 }
 
-const emits = defineEmits(['getOptionGroups', 'editOptionGroup', 'sortBy', 'sortingOrder', 'updateOptionGroupModal', 'getOptionGroupsForPagination', 'update:currentPage'])
+const emits = defineEmits(['getOptionGroups', 'editOptionGroup', 'sortBy', 'sortingOrder', 'updateOptionGroupModal', 'getOptionGroupsForPagination', 'update:currentPage', 'activeOnlyChanged'])
 const props = defineProps({
   items: { type: Array, required: true },
   count: { type: Number, default: 0 },
@@ -147,6 +147,11 @@ watch(searchQuery, () => {
     emits('getOptionGroups', searchQuery.value)
   }, 500) // 500ms delay
 })
+
+// Emit activeOnly changes so parent can re-fetch with server-side filter
+watch(activeOnly, (val) => {
+  emits('activeOnlyChanged', val)
+}, { immediate: true })
 
 async function updateData(rowData) {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -187,12 +192,7 @@ const cloneArticle = (article) => {
 }
 const items = toRef(props, 'items') // original prop
 
-const filteredItems = computed(() => {
-  if (activeOnly.value) {
-    return items.value.filter((item) => item.isActive)
-  }
-  return items.value
-})
+const filteredItems = computed(() => items.value)
 const activeTab = ref<'groups' | 'options'>('groups')
 // Modal open functions
 function onButtonEditOptionGroup(rowData) {
@@ -238,7 +238,7 @@ function onButtonEditOptionGroupArticles(rowData) {
 
         <!-- FE Counter Badge -->
         <div class="h-9 flex items-center px-3 text-sm font-medium rounded-xl bg-blue-100 text-blue-700">
-          {{ totalOptionGroupsCount }}
+          {{ props.count }}
         </div>
 
         <!-- Search Input -->

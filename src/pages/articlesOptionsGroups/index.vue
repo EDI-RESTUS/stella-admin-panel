@@ -15,6 +15,7 @@ const sortOrder = ref('asc')
 const pageNumber = ref(1)
 const currentPage = ref(1)
 const count = ref(0)
+const activeOnly = ref(true)
 
 const getOptionGroups = async () => {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -26,7 +27,7 @@ const getOptionGroups = async () => {
           searchValue.value,
         )}&sortKey=${encodeURIComponent(sortBy.value)}&sortValue=${encodeURIComponent(
           sortOrder.value,
-        )}&outletId=${encodeURIComponent(servicesStore.selectedRest)}`,
+        )}&outletId=${encodeURIComponent(servicesStore.selectedRest)}${activeOnly.value ? '&isActive=true' : ''}`,
     )
     const rawData = response.data
     const item = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
@@ -65,7 +66,7 @@ const getOptionGroups = async () => {
 const getOptionGroupsCount = () => {
   const url = import.meta.env.VITE_API_BASE_URL
   axios
-    .get(`${url}/articles-options-groups/count?outletId=${servicesStore.selectedRest}&search=${encodeURIComponent(searchValue.value)}`)
+    .get(`${url}/articles-options-groups/count?outletId=${servicesStore.selectedRest}&search=${encodeURIComponent(searchValue.value)}${activeOnly.value ? '&isActive=true' : ''}`)
     .then((response) => {
       count.value = Number(response.data.data || response.data.totalNoRec || response.data.count || 0)
     })
@@ -103,6 +104,14 @@ function getOptionGroupsForPagination(payload) {
   getOptionGroups()
 }
 
+function handleActiveOnlyChanged(val: boolean) {
+  activeOnly.value = val
+  pageNumber.value = 1
+  currentPage.value = 1
+  getOptionGroups()
+  getOptionGroupsCount()
+}
+
 function updateSortBy(payload) {
   sortBy.value = payload
   pageNumber.value = 1
@@ -133,6 +142,7 @@ function updateSortOrder(payload) {
         @sortingOrder="updateSortOrder"
         @getOptionGroups="getOptionGroupsForSearch"
         @getOptionGroupsForPagination="getOptionGroupsForPagination"
+        @activeOnlyChanged="handleActiveOnlyChanged"
       />
     </VaCardContent>
   </VaCard>

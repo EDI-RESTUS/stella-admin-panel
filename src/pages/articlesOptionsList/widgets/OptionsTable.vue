@@ -18,7 +18,7 @@ const searchTimeout = ref<number | null>(null)
 const stockUpdating = ref(new Set()) // Track which rows are currently updating stock
 const rowSelectedZones = reactive<Record<string, string[]>>({}) // Track selected delivery zones per row
 
-const emits = defineEmits(['getOptions', 'editOption', 'cloneArticle', 'sortBy', 'sortingOrder', 'updateOptionModal', 'getOptionsForPagination', 'update:currentPage'])
+const emits = defineEmits(['getOptions', 'editOption', 'cloneArticle', 'sortBy', 'sortingOrder', 'updateOptionModal', 'getOptionsForPagination', 'update:currentPage', 'activeOnlyChanged'])
 const props = defineProps({
   items: { type: Array, required: true },
   count: { type: Number, default: 0 },
@@ -122,6 +122,11 @@ watch(searchQuery, () => {
   searchTimeout.value = window.setTimeout(() => emits('getOptions', searchQuery.value), 500)
 })
 
+// Emit activeOnly changes so parent can re-fetch with server-side filter
+watch(activeOnly, (val) => {
+  emits('activeOnlyChanged', val)
+}, { immediate: true })
+
 // Update option
 async function updateData(rowData) {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -133,9 +138,7 @@ async function updateData(rowData) {
     init({ message: err.response?.data?.message || err.message, color: 'danger' })
   }
 }
-const filteredItems = computed(() => {
-  return activeOnly.value ? items.value.filter((item) => item.isActive) : items.value
-})
+const filteredItems = computed(() => items.value)
 // Delete & clone
 const onButtonOptionsDelete = async (payload) => {
   const result = await confirm({
@@ -277,7 +280,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
         <div
           class="h-9 flex items-center px-3 text-sm font-medium rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
         >
-          {{ filteredItems.length }}
+          {{ props.count }}
         </div>
         <!-- SEARCH -->
         <div
