@@ -44,12 +44,14 @@
           >
             <template #text>
               <span class="flex items-center gap-1 px-1">
-                {{ code }}
+                <span class="cursor-pointer hover:underline" @click="openAddressesModal(code)">
+                  {{ code }}
+                </span>
                 <VaIcon
                   name="close"
                   size="12px"
                   class="cursor-pointer hover:text-red-500"
-                  @click="removePostalCode(index)"
+                  @click.stop="removePostalCode(index)"
                 />
               </span>
             </template>
@@ -162,6 +164,11 @@
       </div>
     </template>
   </VaModal>
+  <PostalCodeAddressesModal
+    v-if="showAddressesModal"
+    :postal-code="selectedPostalCode"
+    @cancel="showAddressesModal = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -169,6 +176,7 @@ import { ref, watch } from 'vue'
 import axios from 'axios'
 import { useToast } from 'vuestic-ui'
 import { useServiceStore } from '@/stores/services'
+import PostalCodeAddressesModal from './PostalCodeAddressesModal.vue'
 
 const props = defineProps({
   rowData: {
@@ -191,6 +199,9 @@ const addedCodes = ref<string[]>([])
 const removedCodes = ref<string[]>([])
 const newPostalCode = ref('')
 const meetingPoints = ref<any[]>([])
+
+const showAddressesModal = ref(false)
+const selectedPostalCode = ref('')
 
 // Meeting point form state
 const mpLoading = ref(false)
@@ -235,6 +246,11 @@ async function fetchZoneDetails() {
 }
 
 fetchZoneDetails()
+
+function openAddressesModal(code: string) {
+  selectedPostalCode.value = code
+  showAddressesModal.value = true
+}
 
 // --- Postal code functions ---
 function addPostalCode() {
