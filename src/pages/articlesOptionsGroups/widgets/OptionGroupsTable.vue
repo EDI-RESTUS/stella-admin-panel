@@ -117,11 +117,12 @@ function resetColumnVisibility() {
   columns.forEach((c) => (columnVisibility[c.key] = true))
 }
 
-const emits = defineEmits(['getOptionGroups', 'editOptionGroup', 'sortBy', 'sortingOrder', 'updateOptionGroupModal'])
+const emits = defineEmits(['getOptionGroups', 'editOptionGroup', 'sortBy', 'sortingOrder', 'updateOptionGroupModal', 'getOptionGroupsForPagination', 'update:currentPage', 'activeOnlyChanged'])
 const props = defineProps({
   items: { type: Array, required: true },
   count: { type: Number, default: 0 },
   loading: { type: Boolean, default: false },
+  currentPage: { type: Number, default: 1 },
 })
 const { confirm } = useModal()
 const { init } = useToast()
@@ -129,6 +130,13 @@ const router = useRouter()
 const servicesStore = useServiceStore()
 const searchQuery = ref('')
 const searchTimeout = ref<number | null>(null)
+
+const pages = computed(() => Math.ceil(props.count / 50) || 1)
+
+function changePage(page: number) {
+  emits('update:currentPage', page)
+  emits('getOptionGroupsForPagination', { page, searchQuery: searchQuery.value })
+}
 
 watch(searchQuery, () => {
   // clear previous timer
@@ -139,6 +147,11 @@ watch(searchQuery, () => {
     emits('getOptionGroups', searchQuery.value)
   }, 500) // 500ms delay
 })
+
+// Emit activeOnly changes so parent can re-fetch with server-side filter
+watch(activeOnly, (val) => {
+  emits('activeOnlyChanged', val)
+}, { immediate: true })
 
 async function updateData(rowData) {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -179,12 +192,7 @@ const cloneArticle = (article) => {
 }
 const items = toRef(props, 'items') // original prop
 
-const filteredItems = computed(() => {
-  if (activeOnly.value) {
-    return items.value.filter((item) => item.isActive)
-  }
-  return items.value
-})
+const filteredItems = computed(() => items.value)
 const activeTab = ref<'groups' | 'options'>('groups')
 // Modal open functions
 function onButtonEditOptionGroup(rowData) {
@@ -230,7 +238,7 @@ function onButtonEditOptionGroupArticles(rowData) {
 
         <!-- FE Counter Badge -->
         <div class="h-9 flex items-center px-3 text-sm font-medium rounded-xl bg-blue-100 text-blue-700">
-          {{ totalOptionGroupsCount }}
+          {{ props.count }}
         </div>
 
         <!-- Search Input -->
@@ -614,6 +622,48 @@ function onButtonEditOptionGroupArticles(rowData) {
           </div>
         </template>
       </VaDataTable>
+
+      <!-- Bottom Pagination -->
+      <div v-if="pages > 1" class="flex justify-center py-3 border-t border-slate-200">
+        <VaPagination :model-value="props.currentPage" :pages="pages" buttons-preset="secondary" gapped="20" :visible-pages="3" @update:modelValue="changePage">
+          <template #firstPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹‹
+            </button>
+          </template>
+          <template #prevPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹
+            </button>
+          </template>
+          <template #nextPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ›
+            </button>
+          </template>
+          <template #lastPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ››
+            </button>
+          </template>
+        </VaPagination>
+      </div>
     </div>
 
     <!-- MODALS -->

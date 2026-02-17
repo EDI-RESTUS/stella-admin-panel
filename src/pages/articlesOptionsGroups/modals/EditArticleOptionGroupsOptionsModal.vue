@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, defineEmits, watch, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useServiceStore } from '@/stores/services'
 import ConfigurationModal from './ConfigurationModal.vue'
 import axios from 'axios'
@@ -60,22 +60,26 @@ const getOptions = async () => {
   try {
     const response = await axios.get(url + '/articles-options?limit=10000&outletId=' + servicesStore.selectedRest)
 
-    items.value = response.data.result
+    // Handle response structures: array directly, { items: [...] }, or { result: [...] }
+    const rawData = response.data
+    const data = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
+
+    items.value = data
       .map((e) => {
         return {
           isChecked: props.selectedOptions.options?.includes(e._id) || false,
           ...e,
-          isOriginalChecked: props.selectedOptions.options.includes(e._id),
+          isOriginalChecked: props.selectedOptions.options?.includes(e._id) || false,
         }
       })
       .sort((a, b) => (a.isOriginalChecked === b.isOriginalChecked ? 0 : a.isOriginalChecked ? -1 : 1))
   } catch (error) {
+    console.error('[Options Modal] Failed to load options:', error)
     init({ message: 'Failed to load Options', color: 'danger' })
   } finally {
     isLoading.value = false
   }
 }
-getOptions()
 
 const setDefaultOptions = async () => {
   const url = import.meta.env.VITE_API_BASE_URL

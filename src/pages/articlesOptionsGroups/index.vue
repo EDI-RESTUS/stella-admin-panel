@@ -12,6 +12,10 @@ const isLoading = ref(false)
 const searchValue = ref('')
 const sortBy = ref('name')
 const sortOrder = ref('asc')
+const pageNumber = ref(1)
+const currentPage = ref(1)
+const count = ref(0)
+const activeOnly = ref(true)
 
 const getOptionGroups = async () => {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -19,13 +23,23 @@ const getOptionGroups = async () => {
   try {
     const response = await axios.get(
       url +
-        `/articles-options-groups?limit=100000&search=${encodeURIComponent(
+        `/articles-options-groups?limit=50&page=${pageNumber.value}&search=${encodeURIComponent(
           searchValue.value,
         )}&sortKey=${encodeURIComponent(sortBy.value)}&sortValue=${encodeURIComponent(
           sortOrder.value,
-        )}&outletId=${encodeURIComponent(servicesStore.selectedRest)}`,
+        )}&outletId=${encodeURIComponent(servicesStore.selectedRest)}${activeOnly.value ? '&isActive=true' : ''}`,
     )
-    const item = response.data.result
+    const rawData = response.data
+    const item = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
+
+    // Extract total count from the response if available
+    if (rawData.totalNoRec !== undefined) {
+      count.value = Number(rawData.totalNoRec)
+    } else if (rawData.count !== undefined) {
+      count.value = Number(rawData.count)
+    } else if (rawData.total !== undefined) {
+      count.value = Number(rawData.total)
+    }
     items.value = item.map((e) => {
       return {
         ...e,
@@ -49,29 +63,66 @@ const getOptionGroups = async () => {
   }
 }
 
+const getOptionGroupsCount = () => {
+  const url = import.meta.env.VITE_API_BASE_URL
+  axios
+    .get(`${url}/articles-options-groups/count?outletId=${servicesStore.selectedRest}&search=${encodeURIComponent(searchValue.value)}${activeOnly.value ? '&isActive=true' : ''}`)
+    .then((response) => {
+      count.value = Number(response.data.data || response.data.totalNoRec || response.data.count || 0)
+    })
+    .catch((err) => {
+      console.error('[OptionGroups] Failed to get count:', err)
+    })
+}
+
 watch(
   () => servicesStore.selectedRest,
   () => {
+    pageNumber.value = 1
+    currentPage.value = 1
     getOptionGroups()
+    getOptionGroupsCount()
   },
 )
 
 if (servicesStore.selectedRest) {
   getOptionGroups()
+  getOptionGroupsCount()
 }
 
 function getOptionGroupsForSearch(search) {
   searchValue.value = search || ''
+  pageNumber.value = 1
+  currentPage.value = 1
   getOptionGroups()
+  getOptionGroupsCount()
+}
+
+function getOptionGroupsForPagination(payload) {
+  pageNumber.value = payload.page
+  searchValue.value = payload.searchQuery || ''
+  getOptionGroups()
+}
+
+function handleActiveOnlyChanged(val: boolean) {
+  activeOnly.value = val
+  pageNumber.value = 1
+  currentPage.value = 1
+  getOptionGroups()
+  getOptionGroupsCount()
 }
 
 function updateSortBy(payload) {
   sortBy.value = payload
+  pageNumber.value = 1
+  currentPage.value = 1
   getOptionGroups()
 }
 
 function updateSortOrder(payload) {
   sortOrder.value = payload
+  pageNumber.value = 1
+  currentPage.value = 1
   getOptionGroups()
 }
 </script>
@@ -83,10 +134,15 @@ function updateSortOrder(payload) {
         :items="items"
         :loading="isLoading"
         :search-query="searchValue"
+        :current-page="currentPage"
+        :count="count"
         @update:searchValue="(val) => (searchValue = val)"
+        @update:currentPage="(val) => (currentPage = val)"
         @sortBy="updateSortBy"
         @sortingOrder="updateSortOrder"
         @getOptionGroups="getOptionGroupsForSearch"
+        @getOptionGroupsForPagination="getOptionGroupsForPagination"
+        @activeOnlyChanged="handleActiveOnlyChanged"
       />
     </VaCardContent>
   </VaCard>

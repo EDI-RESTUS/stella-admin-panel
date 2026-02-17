@@ -14,7 +14,7 @@
               <!-- CATEGORY LINKS -->
               <div class="flex flex-wrap gap-2">
                 <a
-                  v-if="offers.length"
+                  v-if="filteredOffers.length"
                   class="text-white px-4 py-2 rounded-2xl category-link"
                   href="#offers"
                   :style="{
@@ -65,12 +65,17 @@
           </div>
 
           <div class="menu-scroll">
+            <!-- Offers loading spinner -->
+            <div v-if="loadingOffers" class="flex justify-center items-center py-8">
+              <div class="animate-spin w-6 h-6 border-3 border-slate-300 border-t-slate-600 rounded-full"></div>
+              <span class="ml-2 text-sm text-slate-500">Loading offers...</span>
+            </div>
             <MenuSection
-              v-if="offers.length"
+              v-else-if="filteredOffers.length"
               id="offers"
               :category="{ _id: 'offers', name: 'OFFERS' }"
               title="OFFERS"
-              :items="offers"
+              :items="filteredOffers"
               :outlet="outlet"
             />
 
@@ -191,6 +196,7 @@ const activeSubCategories = ref([])
 const currentTime = ref('')
 const forceRemount = ref(0)
 const offers = ref([])
+const loadingOffers = ref(false)
 
 const selectCategory = (category) => {
   if (category === 'offers') {
@@ -219,11 +225,22 @@ const selectSubCategory = (subId) => {
 
 const getOffers = async () => {
   const url = import.meta.env.VITE_API_BASE_URL
-
-  const response = await axios.get(url + '/offers?outletId=' + serviceStore.selectedRest)
-  orderStore.offers = response.data.data
-  offers.value = response.data.data
+  const params = new URLSearchParams({ outletId: serviceStore.selectedRest })
+  if (menuStore.deliveryZoneId) {
+    params.append('deliveryZoneId', menuStore.deliveryZoneId)
+  }
+  loadingOffers.value = true
+  try {
+    const response = await axios.get(url + '/offers?' + params.toString())
+    orderStore.offers = response.data.data
+    offers.value = response.data.data
+  } finally {
+    loadingOffers.value = false
+  }
 }
+
+// All offers shown; OfferCard handles disabling out-of-stock ones visually
+const filteredOffers = computed(() => offers.value)
 
 const updateContext = (ctx) => {
   customerDetailsId.value = ctx.customerDetailsId
@@ -421,6 +438,7 @@ watch(
     // Only refetch if we have a restaurant selected, otherwise let the initial load handle it
     if (serviceStore.selectedRest) {
       getMenu()
+      getOffers()
     }
   },
 )

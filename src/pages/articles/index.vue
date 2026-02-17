@@ -36,10 +36,6 @@ const getArticles = async (outletId) => {
   const url = import.meta.env.VITE_API_BASE_URL
   
   let queryString = `outletId=${outletId}&limit=50&page=${pageNumber.value}&search=${searchQuery.value}&sortKey=${sortBy.value}&sortValue=${sortOrder.value}`
-  
-  if (selectedDeliveryZoneId.value) {
-    queryString += `&deliveryZoneId=${selectedDeliveryZoneId.value}`
-  }
 
   try {
     const response = await axios.get(`${url}/menuItems?${queryString}`, { timeout: 60000 })
@@ -101,11 +97,8 @@ const updateArticleDirectly = (payload) => {
     })
 }
 
-// Removed duplicate watcher - the one below properly awaits fetchDeliveryZones first
-// Note: The immediate watcher on serviceStore.selectedRest handles initial load
-
 const deliveryZones = ref([])
-const selectedDeliveryZoneId = ref('')
+const initialStockMap = ref<Record<string, string[]>>({})
 const userStore = useUsersStore()
 
 const fetchDeliveryZones = async () => {
@@ -120,14 +113,29 @@ const fetchDeliveryZones = async () => {
     }
     
     deliveryZones.value = zones.sort((a, b) => Number(a.serviceZoneId) - Number(b.serviceZoneId))
-
-    // Auto-select if only one zone
-    if (deliveryZones.value.length === 1) {
-      selectedDeliveryZoneId.value = deliveryZones.value[0]._id
-    }
   } catch (error) {
     console.error('Failed to fetch delivery zones', error)
   }
+}
+
+// Build stock map from inStockByZones on each item (returned inline by the API)
+const buildStockMapFromItems = () => {
+  const stockMap: Record<string, string[]> = {}
+  try {
+    items.value.forEach((item: any) => {
+      if (Array.isArray(item.inStockByZones)) {
+        const inStockZoneIds = item.inStockByZones
+          .filter((z: any) => z.inStock)
+          .map((z: any) => z.deliveryZoneId)
+        if (inStockZoneIds.length > 0) {
+          stockMap[item._id] = inStockZoneIds
+        }
+      }
+    })
+  } catch (error) {
+    console.error('[Articles] Failed to build stock map from items', error)
+  }
+  initialStockMap.value = stockMap
 }
 
 watch(
@@ -135,9 +143,9 @@ watch(
   async (newId) => {
     if (newId) {
       isInitialLoad.value = true
-      selectedDeliveryZoneId.value = ''
       await fetchDeliveryZones()
       await getArticles(serviceStore.selectedRest)
+      buildStockMapFromItems()
       getArticlesCount(serviceStore.selectedRest)
       categoriesStore.getAll(serviceStore.selectedRest).then((response) => {
         categories.value = response.map((e) => {
@@ -153,13 +161,6 @@ watch(
   },
   { immediate: true },
 )
-
-watch(selectedDeliveryZoneId, () => {
-  // Skip during initial load to avoid race condition with main watcher
-  if (!isInitialLoad.value && serviceStore.selectedRest) {
-    getArticles(serviceStore.selectedRest)
-  }
-})
 
 async function deleteArticle(payload) {
   const data = {
@@ -215,19 +216,6 @@ const isImportArticleModalOpen = ref(false)
   <div>
     <VaCard class="mt-4">
       <VaCardContent>
-        <div class="mb-4" v-if="deliveryZones.length > 1">
-          <VaSelect
-            v-model="selectedDeliveryZoneId"
-            :options="deliveryZones"
-            text-by="name"
-            value-by="_id"
-            track-by="_id"
-            label="Select Delivery Zone"
-            placeholder="Select a zone to manage stock"
-            clearable
-            class="w-full sm:w-1/3"
-          />
-        </div>
         <ArticlesTable
           :items="items"
           :loading="isLoading"
@@ -237,7 +225,8 @@ const isImportArticleModalOpen = ref(false)
           :count="count"
           :sort-by="sortBy"
           :sort-order="sortOrder"
-          :selected-delivery-zone-id="selectedDeliveryZoneId"
+          :delivery-zones="deliveryZones"
+          :initial-stock-map="initialStockMap"
           @update:searchQuery="(val) => (searchQuery = val)"
           @update:currentPage="(val) => (currentPage = val)"
           @sortBy="updateSortBy"

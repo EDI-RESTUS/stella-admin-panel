@@ -125,8 +125,10 @@ export const getArticlesByOutlet = async (outletId) => {
       },
     })
 
-    // The API wraps data in `result`, so extract it safely
-    return Array.isArray(response.data.result) ? response.data.result : []
+    // Handle response structures: array directly, { items: [...] }, or { result: [...] }
+    const rawData = response.data
+    const data = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
+    return data
   } catch (error) {
     console.error('[getArticlesOptionsByOutlet] Error:', error)
     throw error
