@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ref, toRef } from 'vue'
 import { useServiceStore } from '@/stores/services'
 import PostCodeModal from '../modals/PostCodeModal.vue'
+import EditDeliveryZoneModal from '../modals/EditDeliveryZoneModal.vue'
 import axios from 'axios'
 const emits = defineEmits(['getDeliveryZones', 'openModal'])
 const props = defineProps({
@@ -36,6 +37,9 @@ const IsActive = ref(true)
 
 const showPostcodeModal = ref(false)
 const selectedRowData = ref('')
+
+const showEditModal = ref(false)
+const editRowData = ref(null)
 
 function openPostcodeModal(rowData) {
   selectedRowData.value = rowData
@@ -127,6 +131,19 @@ const onButtonDeliveryDelete = async (payload) => {
 function hidePostalCodeModal() {
   showPostcodeModal.value = false
   selectedRowData.value = ''
+  setTimeout(() => {
+    emits('getDeliveryZones')
+  }, 1000)
+}
+
+function openEditModal(rowData) {
+  editRowData.value = rowData
+  showEditModal.value = true
+}
+
+function hideEditModal() {
+  showEditModal.value = false
+  editRowData.value = null
   setTimeout(() => {
     emits('getDeliveryZones')
   }, 1000)
@@ -404,6 +421,13 @@ const items = toRef(props, 'items')
           <VaButton
             preset="primary"
             size="small"
+            color="primary"
+            icon="mso-edit"
+            @click="openEditModal(rowData)"
+          />
+          <VaButton
+            preset="primary"
+            size="small"
             color="danger"
             icon="mso-delete"
             @click="onButtonDeliveryDelete(rowData)"
@@ -413,6 +437,7 @@ const items = toRef(props, 'items')
     </VaDataTable>
   </div>
   <PostCodeModal v-if="showPostcodeModal" :row-data="selectedRowData" @cancel="hidePostalCodeModal" />
+  <EditDeliveryZoneModal v-if="showEditModal" :row-data="editRowData" @cancel="hideEditModal" />
 </template>
 
 <style lang="scss" scoped>
