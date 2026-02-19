@@ -1,3 +1,6 @@
+
+
+
 <template>
   <VaModal
     class="big-form"
@@ -14,15 +17,17 @@
     <VaForm ref="form" @submit.prevent="submit">
       <div class="flex items-center gap-x-10 mb-2">
         <VaInput v-model="formData.code" class="mb-1 max-w-[150px]" label="Code" placeholder="Code" type="text" />
-        <VaInput
-          v-model="formData.name"
-          :rules="[validators.required]"
-          class="mb-1 max-w-[230px]"
-          label="Name"
-          required-mark
-          placeholder="Name"
-          type="text"
-        />
+        <div class="flex flex-col gap-2">
+          <div v-for="lang in supportedLanguages" :key="lang + 'name'">
+             <VaInput
+              v-model="formData.name[lang]"
+              :label="`Name (${lang.toUpperCase()})`"
+              placeholder="Name"
+              type="text"
+              class="mb-1 max-w-[230px]"
+            />
+          </div>
+        </div>
 
         <VaSelect
           id="categories"
@@ -58,15 +63,17 @@
         />
       </div>
       <div class="flex-1">
-        <VaTextarea
-          v-model="formData.description"
-          label="Description"
-          placeholder="Description"
-          type="textarea"
-          :min-rows="4"
-          :max-rows="4"
-          class="mb-1 w-full"
-        />
+        <div v-for="lang in supportedLanguages" :key="lang + 'desc'" class="mb-2">
+          <VaTextarea
+            v-model="formData.description[lang]"
+            :label="`Description (${lang.toUpperCase()})`"
+            placeholder="Description"
+            type="textarea"
+            :min-rows="2"
+            :max-rows="4"
+            class="mb-1 w-full"
+          />
+        </div>
       </div>
       <div class="flex-1">
         <label
@@ -100,61 +107,125 @@
   </VaModal>
 </template>
 <script lang="ts" setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import axios from 'axios'
 import { validators } from '@/services/utils'
-import { useCategoryStore } from '@/stores/categories'
-import { useServiceStore } from '@/stores/services'
-import { useToast, useForm } from 'vuestic-ui'
 import { useSubCategoriesStore } from '@/stores/subCategories'
-import FileUpload from '@/components/file-uploader/FileUpload.vue'
-import ProfileDropdown from '@/components/navbar/components/dropdowns/ProfileDropdown.vue'
-const categoryStore = useCategoryStore()
-const categories = ref([])
-const emits = defineEmits(['cancel'])
+import { useServiceStore } from '@/stores/services'
+import { useCategoryStore } from '@/stores/categories'
+import { useToast } from 'vuestic-ui'
+import { useI18n } from 'vue-i18n'
+
 const props = defineProps({
   selectedCategory: {
-    type: Object || String,
-    default: () => '',
+    type: Object,
+    default: null,
   },
 })
-const { validate } = useForm('form')
+
+const emits = defineEmits(['cancel', 'submit'])
+
+const servicesStore = useServiceStore()
+const categoryStore = useCategoryStore()
 const { init } = useToast()
+
+const categories = ref<any[]>([])
 const formData = ref({
-  name: '',
+  name: {} as Record<string, string>,
   code: '',
   isDeleted: false,
   price: 0,
-  categories: [],
+  categories: [] as string[],
   isActive: true,
-  description: '',
+  description: {} as Record<string, string>,
   allergenIds: [],
   imageUrl: '',
   inStock: true,
   outletId: '',
-  subCategories: [],
+  subCategories: [] as string[],
+  assetId: '',
+  _id: '',
 })
+
+function validate() {
+  if (Object.keys(formData.value.name).length === 0) {
+    init({ message: 'Name is required', color: 'danger' })
+    return false
+  }
+  if (!formData.value.price && formData.value.price !== 0) {
+    init({ message: 'Price is required', color: 'danger' })
+    return false
+  }
+  if (formData.value.categories.length === 0) {
+    init({ message: 'Category is required', color: 'danger' })
+    return false
+  }
+  return true
+}
+
+const supportedLanguages = ref<string[]>([])
+const defaultLanguage = ref('en')
+
+const { locale } = useI18n()
+
+const getLocalizedValue = (value: any) => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  return value[locale.value] || value['en'] || Object.values(value)[0] || ''
+}
+
+const getOutletDetails = async () => {
+  try {
+    const response = await axios.get(
+      `${import.meta.env.VITE_API_BASE_URL}/outlets/${servicesStore.selectedRest}`
+    )
+    if (response.data?.supportedLanguages?.length) {
+      supportedLanguages.value = response.data.supportedLanguages
+    } else {
+      supportedLanguages.value = ['en']
+    }
+    if (response.data?.defaultLanguage) {
+      defaultLanguage.value = response.data.defaultLanguage
+    }
+  } catch (error) {
+    console.error('Failed to fetch outlet details', error)
+    supportedLanguages.value = ['en']
+  }
+}
+
 if (props.selectedCategory) {
   formData.value = {
     ...formData.value,
     ...props.selectedCategory,
+    name:
+      typeof props.selectedCategory.name === 'string'
+        ? { [defaultLanguage.value]: props.selectedCategory.name }
+        : { ...props.selectedCategory.name },
+    description:
+      typeof props.selectedCategory.description === 'string'
+        ? { [defaultLanguage.value]: props.selectedCategory.description }
+        : { ...props.selectedCategory.description },
     categories: props.selectedCategory.categories.map((e) => e.wCode),
     subCategories: props.selectedCategory.subCategories.map((e) => e.wCode),
     assetId: props.selectedCategory.assetId ? props.selectedCategory.assetId._id : null,
   }
 }
-const servicesStore = useServiceStore()
+
+onMounted(() => {
+  getOutletDetails()
+})
+
 
 const selectedRest = computed(() => servicesStore.selectedRest)
 categoryStore.getAll(servicesStore.selectedRest).then((response) => {
   categories.value = response.map((e) => {
     return {
       ...e,
-      text: e.name,
+      text: getLocalizedValue(e.name),
       value: e.wCode,
     }
   })
-  
+
   // Refined Logic:
   // Since the article object often only contains { id: "..." } or just "idstring" in its categories array,
   // we must find the corresponding category in the loaded list and extract its wCode.
@@ -205,7 +276,7 @@ const subCategories = computed(() => {
     const allSubCategories = selectedCategories.flatMap((category) =>
       (category.subCategories || []).map((sub) => ({
         ...sub,
-        text: sub.name,
+        text: getLocalizedValue(sub.name),
         value: sub.wCode,
         code: sub.wCode,
       })),
@@ -265,7 +336,7 @@ const submit = () => {
       if ((data.articlesOptionsGroup[0] as any).__parentArray) {
         data.articlesOptionsGroup = (data.articlesOptionsGroup[0] as any).__parentArray
       }
-      
+
       // Map to ensure we use clear objects (unwrapping _doc if present)
       data.articlesOptionsGroup = data.articlesOptionsGroup.map((group: any) => {
         const cleanGroup = group._doc ? group._doc : group

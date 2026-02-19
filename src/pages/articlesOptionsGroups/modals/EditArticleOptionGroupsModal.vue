@@ -14,14 +14,14 @@
 
     <VaForm ref="form" @submit.prevent="submit">
       <div class="grid grid-cols-1 md:grid-cols-1 gap-4">
-        <VaInput
-          v-model="formData.name"
-          :rules="[validators.required]"
-          label="Name"
-          required-mark
-          placeholder="Name"
-          type="text"
-        />
+        <div v-for="lang in supportedLanguages" :key="lang">
+          <VaInput
+            v-model="formData.name[lang]"
+            :label="`Name (${lang.toUpperCase()})`"
+            placeholder="Name"
+            type="text"
+          />
+        </div>
         <VaInput v-model="formData.internalName" label="Internal Name" placeholder="Internal Name" type="text" />
         <VaTextarea
           v-model="formData.description"
@@ -84,7 +84,6 @@
 <script lang="ts" setup>
 import { ref, computed } from 'vue'
 import axios from 'axios'
-import { validators } from '@/services/utils'
 import { useServiceStore } from '@/stores/services'
 import { useToast, useForm } from 'vuestic-ui'
 const emits = defineEmits(['cancel'])
@@ -99,9 +98,27 @@ const { init } = useToast()
 
 const servicesStore = useServiceStore()
 
+const supportedLanguages = ref(['en'])
+
+const getOutletDetails = async () => {
+  if (servicesStore.selectedRest) {
+    try {
+      const url = import.meta.env.VITE_API_BASE_URL
+      const response = await axios.get(`${url}/outlets/${servicesStore.selectedRest}`)
+      if (response.data && response.data.supportedLanguages) {
+        supportedLanguages.value = response.data.supportedLanguages
+      }
+    } catch (e) {
+      console.error('Failed to fetch outlet details', e)
+    }
+  }
+}
+
+getOutletDetails()
+
 const formData = ref({
   _id: '',
-  name: '',
+  name: {},
   internalName: '',
   description: '',
   singleChoice: false,
@@ -119,18 +136,18 @@ const isUpdating = computed(() => !!Object.keys(props.selectedOptionGroups).leng
 const isDuplicating = computed(() => Object.keys(props.selectedOptionGroups).length && !props.selectedOptionGroups._id)
 
 if (props.selectedOptionGroups && props.selectedOptionGroups._id) {
-  axios
-    .get(`${import.meta.env.VITE_API_BASE_URL}/articles-options-groups/${props.selectedOptionGroups._id}`)
-    .then((response) => {
-      formData.value = response.data.data
-    })
-    .catch((error) => {
-      init({ message: error.response.data.message, color: 'danger' })
-    })
+  formData.value = {
+    ...props.selectedOptionGroups,
+    name: typeof props.selectedOptionGroups.name === 'string'
+      ? { en: props.selectedOptionGroups.name }
+      : { ...props.selectedOptionGroups.name },
+  }
 } else if (props.selectedOptionGroups && !props.selectedOptionGroups._id) {
   formData.value = {
     _id: '',
-    name: props.selectedOptionGroups.name || '',
+    name: typeof props.selectedOptionGroups.name === 'string'
+      ? { en: props.selectedOptionGroups.name }
+      : { ...props.selectedOptionGroups.name },
     internalName: props.selectedOptionGroups.internalName || '',
     description: props.selectedOptionGroups.description || '',
     singleChoice: props.selectedOptionGroups.singleChoice || false,

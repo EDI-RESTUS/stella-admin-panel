@@ -3,7 +3,19 @@ import { defineVaDataTableColumns, useModal } from 'vuestic-ui'
 import { useRouter } from 'vue-router'
 import { ref, computed, toRef, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { useServiceStore } from '@/stores/services'
+import { useI18n } from 'vue-i18n'
 import { Funnel, Columns3, Import, Plus, Pencil, CirclePlus, Copy, Search } from 'lucide-vue-next'
+
+const { locale } = useI18n()
+
+function getLocalizedValue(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  if (typeof val === 'object') {
+    return val[locale.value] || val['en'] || Object.values(val)[0] || ''
+  }
+  return ''
+}
 
 const emits = defineEmits([
   'updateCategoryModal',
@@ -131,7 +143,7 @@ const filteredItems = computed(() => {
   const query = searchQuery.value.toLowerCase()
   return items.value
     .filter((item) => !activeOnly.value || item.isActive)
-    .filter((item) => item.wCode?.toLowerCase().includes(query) || item.name?.toLowerCase().includes(query))
+    .filter((item) => item.wCode?.toLowerCase().includes(query) || getLocalizedValue(item.name)?.toLowerCase().includes(query))
 })
 
 const onButtonCategoryDelete = async (payload) => {
@@ -269,23 +281,16 @@ const onButtonCategoryDelete = async (payload) => {
         <!-- NAME -->
         <template #cell(name)="{ rowData }">
           <div class="editable-field relative group">
-            <input
-              v-if="rowData.editName"
-              v-model="rowData.name"
-              class="editable-input"
-              autofocus
-              @blur="(rowData.editName = false), emits('updateCategory', { name: rowData.name, _id: rowData._id })"
-            />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
-              <span>{{ rowData.name || '' }}</span>
-              <Pencil
-                v-if="rowData.name"
-                class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
-              />
+            <div class="editable-text cursor-pointer" @click="emits('updateCategoryModal', rowData)">
+              <span v-if="rowData.name">{{
+                  typeof rowData.name === 'object'
+                    ? (rowData.name.en || Object.values(rowData.name)[0] || '')
+                    : (rowData.name || '')
+                }}</span>
               <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors"
-                @click.stop="rowData.editName = true"
+                @click.stop="emits('updateCategoryModal', rowData)"
               />
             </div>
           </div>
@@ -294,18 +299,8 @@ const onButtonCategoryDelete = async (payload) => {
         <!-- DESCRIPTION -->
         <template #cell(description)="{ rowData }">
           <div class="editable-field relative group">
-            <input
-              v-if="rowData.editDescription"
-              v-model="rowData.description"
-              class="editable-input"
-              autofocus
-              @blur="
-                (rowData.editDescription = false),
-                  emits('updateCategory', { description: rowData.description, _id: rowData._id })
-              "
-            />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
-              <span>{{ rowData.description || '' }}</span>
+            <div class="editable-text cursor-pointer" @click="emits('updateCategoryModal', rowData)">
+              <span v-if="rowData.description">{{ getLocalizedValue(rowData.description) }}</span>
 
               <!-- Pencil icon when text exists -->
               <Pencil
@@ -317,7 +312,7 @@ const onButtonCategoryDelete = async (payload) => {
               <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors ml-1"
-                @click.stop="rowData.editDescription = true"
+                @click.stop="emits('updateCategoryModal', rowData)"
               />
             </div>
           </div>

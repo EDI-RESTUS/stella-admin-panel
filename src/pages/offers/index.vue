@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import OfferTable from '@/pages/offers/widgets/OfferTable.vue'
 import OfferModal from './modals/OfferModal.vue'
 import { useServiceStore } from '../../stores/services'
@@ -12,7 +11,7 @@ const servicesStore = useServiceStore()
 const userStore = useUsersStore()
 const items = ref([])
 const forceReMount = ref(0)
-const selectedOffers = ref('')
+const selectedOffers = ref<Record<string, any> | null>(null)
 const isLoading = ref(false)
 const { init } = useToast()
 const deliveryZones = ref([])
@@ -64,7 +63,7 @@ const getOffers = async () => {
   const url = import.meta.env.VITE_API_BASE_URL
   isLoading.value = true
   try {
-    const response = await axios.get(url + '/offers/?outletId=' + servicesStore.selectedRest)
+    const response = await axios.get(url + '/offers/?outletId=' + servicesStore.selectedRest + '&rawname=true')
     const item = response.data.data
     forceReMount.value++
     items.value = item.map((e) => {
@@ -125,7 +124,7 @@ if (servicesStore.selectedRest) {
     <OfferModal
       v-if="isOfferModalOpen"
       :selected-option="selectedOffers"
-      @cancel="(isOfferModalOpen = false), (selectedOffers = ''), getOffers()"
+      @cancel="(isOfferModalOpen = false), (selectedOffers = null), getOffers()"
     />
   </div>
 </template>

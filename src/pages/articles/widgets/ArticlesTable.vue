@@ -44,9 +44,18 @@ const emits = defineEmits([
   'importArticle',
 ])
 
-const activeOnly = ref(true)
 const { confirm } = useModal()
 const { init } = useToast()
+import { useI18n } from 'vue-i18n'
+const { locale } = useI18n()
+
+const getLocalizedValue = (value: any) => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  return value[locale.value] || value['en'] || Object.values(value)[0] || ''
+}
+
+const activeOnly = ref(true)
 const currentPage = ref(1)
 const searchQuery = ref('')
 const stockUpdating = ref(new Set()) // Track which rows are currently updating stock
@@ -182,18 +191,18 @@ const getCategoryName = (cat: any) => {
   // If it's a string (ID), look it up
   if (typeof cat === 'string') {
     const found = props.categories.find((c: any) => (c._id === cat || c.id === cat))
-    return found ? found.name : cat
+    return found ? getLocalizedValue(found.name) : cat
   }
-  
+
   // If it's an object and has a name, use it
-  if (cat?.name && cat.name !== 'SIZE') return cat.name
+  if (cat?.name && cat.name !== 'SIZE') return getLocalizedValue(cat.name)
 
   // If it's an object but missing name, try looking it up by ID
   // Prioritize 'id' (foreign key) over '_id' (subdocument id)
   const id = cat?.id || cat?._id
   if (id) {
     const found = props.categories.find((c: any) => (c._id === id || c.id === id))
-    return found ? found.name : ''
+    return found ? getLocalizedValue(found.name) : ''
   }
 
   return ''
@@ -585,66 +594,46 @@ function openFileModal(data) {
 
         <!-- NAME COLUMN -->
         <template #cell(name)="{ rowData }">
-          <div class="editable-field relative group">
-            <!-- Editable textarea when editing -->
-            <textarea
-              v-if="rowData.editing === 'name'"
-              v-model="rowData.name"
-              class="editable-textarea"
-              autofocus
-              rows="3"
-              @blur="
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage }),
-                  (rowData.editing = '')
-              "
+          <div
+            class="editable-field relative group cursor-pointer"
+            @click="
+              emits('updateArticleModal', {
+                ...rowData,
+                updating: 'name',
+                searchQuery: searchQuery,
+                page: currentPage,
+              })
+            "
+          >
+            <span>{{ getLocalizedValue(rowData.name) }}</span>
+            <Pencil
+              class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
             />
-
-            <!-- Display value when not editing -->
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'name'">
-              <span>{{ rowData.name || '' }}</span>
-
-              <!-- Pencil icon, appears only on hover -->
-              <Pencil
-                v-if="rowData.name"
-                class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
-              />
-            </div>
           </div>
         </template>
 
         <!-- DESCRIPTION COLUMN -->
         <template #cell(description)="{ rowData }">
-          <div class="editable-field relative group">
-            <!-- Editable textarea -->
-            <textarea
-              v-if="rowData.editing === 'description'"
-              v-model="rowData.description"
-              class="editable-textarea"
-              autofocus
-              rows="3"
-              @blur="
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage }),
-                  (rowData.editing = '')
-              "
+          <div
+            class="editable-field relative group cursor-pointer"
+            @click="
+              emits('updateArticleModal', {
+                ...rowData,
+                updating: 'description',
+                searchQuery: searchQuery,
+                page: currentPage,
+              })
+            "
+          >
+            <span class="line-clamp-3">{{ getLocalizedValue(rowData.description) || '' }}</span>
+            <Pencil
+              v-if="getLocalizedValue(rowData.description)"
+              class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
             />
-
-            <!-- Display value when not editing -->
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'description'">
-              <span>{{ rowData.description || '' }}</span>
-
-              <!-- Pencil icon for existing description -->
-              <Pencil
-                v-if="rowData.description"
-                class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
-              />
-
-              <!-- Plus icon for empty field -->
-              <CirclePlus
+             <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors"
-                @click.stop="rowData.editing = 'description'"
               />
-            </div>
           </div>
         </template>
 
@@ -804,7 +793,7 @@ function openFileModal(data) {
                   }"
                   @click="(selectedCategoryFilter = cat._id || cat.id), (showCategoryFilterMenu = false)"
                 >
-                  {{ cat.name }}
+                  {{ getLocalizedValue(cat.name) }}
                 </button>
               </div>
             </div>
@@ -1005,8 +994,8 @@ function openFileModal(data) {
                       {{ (rowSelectedZones[rowData._id] || []).length }} Zone{{ (rowSelectedZones[rowData._id] || []).length > 1 ? 's' : '' }}
                     </template>
                     <template v-else>
-                      Select zone
-                    </template>
+                    Select zone
+                  </template>
                   </span>
                   <svg class="w-3 h-3 flex-shrink-0 ml-1 transition-transform" :class="rowData._showZoneMenu ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />

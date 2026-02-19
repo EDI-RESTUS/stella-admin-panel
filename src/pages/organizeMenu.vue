@@ -5,10 +5,19 @@ import { useCategoryStore } from '../stores/categories'
 import { useServiceStore } from '@/stores/services'
 import { useToast } from 'vuestic-ui'
 import axios from 'axios'
+import { useI18n } from 'vue-i18n'
 
 const serviceStore = useServiceStore()
 const categoriesStore = useCategoryStore()
 const { init } = useToast()
+const { locale } = useI18n()
+
+const getLocalizedValue = (value: any) => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  return value[locale.value] || value['en'] || Object.values(value)[0] || ''
+}
+
 const isLoading = ref(true)
 const loading = ref(false)
 const categories = ref([])
@@ -301,7 +310,7 @@ const sharedGroupNotice = computed(() => {
                 getArticles()
             "
           >
-            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ cat.name }}
+            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ getLocalizedValue(cat.name) }}
           </div>
         </VueDraggableNext>
       </div>
@@ -335,7 +344,7 @@ const sharedGroupNotice = computed(() => {
             :class="['item-card', selectedSubcategory?._id === sub._id ? 'selected' : '']"
             @click="(selectedSubcategory = sub), (selectedArticle = null), (selectedGroup = null), getArticles()"
           >
-            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ sub.name }}
+            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ getLocalizedValue(sub.name) }}
           </div>
         </VueDraggableNext>
       </div>
@@ -372,7 +381,7 @@ const sharedGroupNotice = computed(() => {
             :class="['item-card', selectedArticle?._id === art._id ? 'selected' : '']"
             @click="(selectedArticle = art), (selectedGroup = null)"
           >
-            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ art.name }}
+            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ getLocalizedValue(art.name) }}
           </div>
         </VueDraggableNext>
       </div>
@@ -406,7 +415,7 @@ const sharedGroupNotice = computed(() => {
             :class="['item-card', selectedGroup?._id === grp._id ? 'selected' : '']"
             @click="selectedGroup = grp"
           >
-            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ grp.name }}
+            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ getLocalizedValue(grp.name) }}
           </div>
         </VueDraggableNext>
       </div>
@@ -439,7 +448,7 @@ const sharedGroupNotice = computed(() => {
         </div>
         <VueDraggableNext :list="filteredOptions" @change="movedArticleOption">
           <div v-for="opt in filteredOptions" :key="opt._id" class="item-card">
-            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ opt.name }}
+            <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ getLocalizedValue(opt.name) }}
           </div>
         </VueDraggableNext>
       </div>

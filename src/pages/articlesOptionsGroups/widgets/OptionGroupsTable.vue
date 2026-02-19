@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { defineVaDataTableColumns, useModal, useToast } from 'vuestic-ui'
-import { useRouter } from 'vue-router'
 import { ref, computed, toRef, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { useServiceStore } from '@/stores/services'
 import EditArticleOptionGroupsModal from '../modals/EditArticleOptionGroupsModal.vue'
@@ -18,12 +17,6 @@ const isEditOptionGroupArticlesModal = ref(false)
 const selectedOptions = ref('')
 const selectedItems = ref('')
 const activeOnly = ref(true)
-const totalOptionGroupsCount = computed(() => {
-  if (activeOnly.value) {
-    return props.items.filter((i) => i.isActive).length
-  }
-  return props.items.length
-})
 const typeOptions = [
   { key: 'singleChoice', label: 'Single Choice' },
   { key: 'multipleChoice', label: 'Multiple Choice' },
@@ -34,19 +27,6 @@ function getTypeLabel(row) {
   if (row.multipleChoice) return 'Multiple Choice'
   if (row.multipleChoiceNoQty) return 'Multiple (No Qty)'
   return ''
-}
-function changeType(row, selectedKey) {
-  // Reset all types
-  row.singleChoice = false
-  row.multipleChoice = false
-  row.multipleChoiceNoQty = false
-  row[selectedKey] = true
-
-  // Close dropdown
-  row.showTypeDropdown = false
-
-  // Persist change
-  updateData(row)
 }
 onMounted(() => {
   const handleClickOutside = (e: MouseEvent) => {
@@ -126,7 +106,6 @@ const props = defineProps({
 })
 const { confirm } = useModal()
 const { init } = useToast()
-const router = useRouter()
 const servicesStore = useServiceStore()
 const searchQuery = ref('')
 const searchTimeout = ref<number | null>(null)
@@ -193,19 +172,19 @@ const cloneArticle = (article) => {
 const items = toRef(props, 'items') // original prop
 
 const filteredItems = computed(() => items.value)
-const activeTab = ref<'groups' | 'options'>('groups')
 // Modal open functions
 function onButtonEditOptionGroup(rowData) {
   isEditArticleOptionsModal.value = true
   selectedOptions.value = rowData
 }
-function onButtonEditOptionGroupItems(rowData) {
-  isEditArticleOptionGroupsItemsModal.value = true
-  selectedItems.value = rowData
-}
 function onButtonEditOptionGroupArticles(rowData) {
   isEditOptionGroupArticlesModal.value = true
   selectedItems.value = rowData
+}
+
+const openEditGroupModal = (group) => {
+  selectedOptionGroups.value = group
+  isEditArticleOptionGroupsModal.value = true
 }
 </script>
 
@@ -349,26 +328,24 @@ function onButtonEditOptionGroupArticles(rowData) {
         <!-- NAME -->
         <template #cell(name)="{ rowData }">
           <div class="editable-field relative group">
-            <input
-              v-if="rowData.editName"
-              v-model="rowData.name"
-              class="editable-input"
-              autofocus
-              @blur="
-                rowData.editName = false;
-                updateData(rowData)
-              "
-            />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
-              <span>{{ rowData.name || '' }}</span>
-              <Pencil
-                v-if="rowData.name"
-                class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
-              />
+            <div class="editable-text cursor-pointer" @click="openEditGroupModal(rowData)">
+              <span
+                v-if="
+                  typeof rowData.name === 'object'
+                    ? rowData.name.en || Object.values(rowData.name)[0]
+                    : rowData.name
+                "
+              >
+                {{
+                  typeof rowData.name === 'object'
+                    ? rowData.name.en || Object.values(rowData.name)[0] || ''
+                    : rowData.name || ''
+                }}
+              </span>
               <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 hover:text-blue-500 transition-colors"
-                @click.stop="rowData.editName = true"
+                @click.stop="openEditGroupModal(rowData)"
               />
             </div>
           </div>

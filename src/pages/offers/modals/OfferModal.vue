@@ -14,33 +14,45 @@
     <VaForm ref="form" @submit.prevent="submit">
       <div class="grid grid-cols-1 gap-4">
         <div class="grid gap-4">
-          <div class="grid md:grid-cols-3 gap-4">
-            <VaInput
-              v-model="formData.name"
-              label="Name"
-              :rules="[validators.required]"
-              required-mark
-              placeholder="Enter offer name"
-            />
-            <VaInput
-              v-model="formData.price"
-              :rules="[validators.required]"
-              required-mark
-              label="Price"
-              placeholder="Enter price"
-              type="number"
-            />
-            <VaInput v-model="formData.code" label="Code" placeholder="Enter code" type="text" />
+          <div class="grid md:grid-cols-2 gap-4">
+            <!-- Name per language -->
+            <div class="flex flex-col gap-2">
+              <div v-for="lang in supportedLanguages" :key="lang + 'name'">
+                <VaInput
+                  v-model="formData.name[lang]"
+                  :label="`Name (${lang.toUpperCase()})`"
+                  :rules="lang === primaryLanguage ? [validators.required] : []"
+                  :required-mark="lang === primaryLanguage"
+                  placeholder="Enter offer name"
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <VaInput
+                v-model="formData.price"
+                :rules="[validators.required]"
+                required-mark
+                label="Price"
+                placeholder="Enter price"
+                type="number"
+              />
+              <VaInput v-model="formData.code" label="Code" placeholder="Enter code" type="text" />
+            </div>
           </div>
-          <VaTextarea
-            v-model="formData.description"
-            label="Description"
-            :rules="[validators.required]"
-            required-mark
-            placeholder="Short description"
-            rows="3"
-            class="w-full"
-          />
+
+          <!-- Description per language -->
+          <div class="flex flex-col gap-2">
+            <div v-for="lang in supportedLanguages" :key="lang + 'desc'">
+              <VaTextarea
+                v-model="formData.description[lang]"
+                :label="`Description (${lang.toUpperCase()})`"
+                placeholder="Short description"
+                rows="3"
+                class="w-full"
+              />
+            </div>
+          </div>
         </div>
 
         <div class="grid md:grid-cols-2 gap-4">
@@ -77,10 +89,7 @@
         </div>
 
         <div class="flex flex-col gap-2">
-          <label
-            class="va-input-label va-input-wrapper__label va-input-wrapper__label--outer text-primary font-semibold"
-            >Image</label
-          >
+          <label class="va-input-label va-input-wrapper__label va-input-wrapper__label--outer text-primary font-semibold">Image</label>
           <FileUpload
             :selected-rest="selectedRest"
             @uploadSuccess="(data) => ((formData.imageUrl = data.url), (formData.assetId = data._id))"
@@ -115,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, toRef, nextTick } from 'vue'
+import { ref, watch, computed, toRef, nextTick, onMounted } from 'vue'
 import axios from 'axios'
 import { useForm, useToast } from 'vuestic-ui'
 import { validators } from '@/services/utils'
@@ -141,24 +150,51 @@ const servicesStore = useServiceStore()
 const { validate } = useForm('form')
 const { init } = useToast()
 
+// ----- Supported Languages (same pattern as Articles) -----
+const supportedLanguages = ref<string[]>(['en'])
+const primaryLanguage = ref('en')
+
+const getOutletDetails = async () => {
+  try {
+    const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/outlets/${servicesStore.selectedRest}`)
+    if (response.data?.supportedLanguages?.length) {
+      supportedLanguages.value = response.data.supportedLanguages
+    } else {
+      supportedLanguages.value = ['en']
+    }
+    if (response.data?.defaultLanguage) {
+      primaryLanguage.value = response.data.defaultLanguage
+    }
+  } catch {
+    supportedLanguages.value = ['en']
+  }
+}
+
+onMounted(() => {
+  getOutletDetails()
+})
+
+// Helper: normalise name/description from the API — may come back as string or Record
+function toLocaleRecord(val: any, fallbackLang = 'en'): Record<string, string> {
+  if (!val) return { [fallbackLang]: '' }
+  if (typeof val === 'string') return { [fallbackLang]: val }
+  return { ...val }
+}
+
+// ----- Form state -----
 const formData = ref({
   _id: '',
-  name: '',
-  description: '',
-  price: '',
+  name: {} as Record<string, string>,
+  description: {} as Record<string, string>,
+  price: '' as string | number,
   code: '',
   imageUrl: '',
-  dateOffer: {
-    startDate: '',
-    endDate: '',
-  },
-  timeOffer: {
-    startTime: '',
-    endTime: '',
-  },
-  weeklyOffer: [],
-  orderType: [],
-  selections: [],
+  assetId: '',
+  dateOffer: { startDate: '', endDate: '' },
+  timeOffer: { startTime: '', endTime: '' },
+  weeklyOffer: [] as string[],
+  orderType: [] as string[],
+  selections: [] as any[],
   isActive: true,
 })
 
@@ -178,7 +214,6 @@ watch(
       nextTick(() => (isAutoSelecting = false))
     } else {
       const isPartial = allDays.some((day) => !newVal.includes(day))
-
       if (!isPartial && newVal.length === allDays.length + 1) {
         formData.value.weeklyOffer = newVal.filter((d) => d !== 'All Days')
       }
@@ -197,16 +232,17 @@ watch(
     if (!val) return
 
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/offers/${val._id}`)
+      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/offers/${val._id}?rawname=true`)
       const data = response.data.data
 
       formData.value = {
         _id: data._id || '',
-        name: data.name || '',
-        description: data.description || '',
+        name: toLocaleRecord(data.name, primaryLanguage.value),
+        description: toLocaleRecord(data.description, primaryLanguage.value),
         price: data.price || 0,
         code: data.code || '',
         imageUrl: data.imageUrl || '',
+        assetId: data.assetId || '',
         dateOffer: {
           startDate: data.dateOffer?.startDate?.slice(0, 10) || '',
           endDate: data.dateOffer?.endDate?.slice(0, 10) || '',
@@ -222,7 +258,7 @@ watch(
       }
 
       selectionsJson.value = JSON.stringify(data.selections || [], null, 2)
-    } catch (error) {
+    } catch (error: any) {
       init({ message: error.response?.data?.message || 'Failed to load offer', color: 'danger' })
     }
   },
@@ -230,7 +266,6 @@ watch(
 )
 
 const submit = async () => {
-  console.log('Submitting form data:', formData.value)
   if (validate()) {
     const data = JSON.parse(JSON.stringify(formData.value))
 
@@ -269,6 +304,7 @@ const submit = async () => {
     }
   }
 }
+
 const selectedRest = toRef(servicesStore.selectedRest)
 
 const deleteAsset = () => {

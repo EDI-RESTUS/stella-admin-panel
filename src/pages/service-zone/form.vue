@@ -81,6 +81,30 @@
               <VaInput id="website" v-model="restaurantData.website" label="Website" name="Website" type="url" />
               <VaInput id="tripadvisor" v-model="restaurantData.tripadvisor" label="TripAdvisor" name="tripadvisor" />
             </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4">
+              <div class="col-span-1">
+                <VaSelect
+                  v-model="restaurantData.supportedLanguages"
+                  label="Supported Languages"
+                  :options="languages"
+                  multiple
+                  track-by="value"
+                  value-by="value"
+                  searchable
+                  clearable
+                />
+              </div>
+              <div class="col-span-1">
+                <VaSelect
+                  v-model="restaurantData.defaultLanguage"
+                  label="Default Language"
+                  :options="filteredLanguages"
+                  track-by="value"
+                  value-by="value"
+                  :rules="[(v) => !!v || 'Default language is required']"
+                />
+              </div>
+            </div>
           </div>
         </VaCardContent>
       </VaCard>
@@ -611,11 +635,13 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import { useToast, useForm } from 'vuestic-ui'
-const { validate } = useForm()
+import { useToast } from 'vuestic-ui'
+
 import FileUpload from '@/components/file-uploader/FileUpload.vue'
 import { validators, removeNulls } from '../../services/utils.ts'
 import { useServiceStore } from '@/stores/services'
+import { languages } from '@/services/languages'
+
 export default {
   components: {
     FileUpload,
@@ -696,6 +722,7 @@ export default {
       init,
       validators,
       addNewOption,
+      languages,
     }
   },
   data() {
@@ -831,6 +858,8 @@ export default {
         hideHeader: '',
         hideLogo: '',
         hideDetails: '',
+        supportedLanguages: ['en'],
+        defaultLanguage: 'en',
       },
       active: true,
       isGalleryViewEnabled: true,
@@ -849,8 +878,23 @@ export default {
     selectedRest() {
       return this.serviceStore.selectedRest
     },
+    filteredLanguages() {
+      if (!this.restaurantData.supportedLanguages || this.restaurantData.supportedLanguages.length === 0) {
+        return []
+      }
+      return this.languages.filter((lang) => this.restaurantData.supportedLanguages.includes(lang.value))
+    },
   },
   watch: {
+    'restaurantData.supportedLanguages'(newVal) {
+      if (!newVal || newVal.length === 0) {
+        this.restaurantData.defaultLanguage = ''
+        return
+      }
+      if (!newVal.includes(this.restaurantData.defaultLanguage)) {
+        this.restaurantData.defaultLanguage = newVal[0]
+      }
+    },
     selectedRest() {
       this.$router.push({
         name: this.$route.name,
@@ -1095,6 +1139,8 @@ export default {
                 sunday: { opens: '', closes: '' },
               }
             }
+            res.supportedLanguages = res.supportedLanguages || ['en']
+            res.defaultLanguage = res.defaultLanguage || 'en'
           }
           this.restaurantData = res
           this.loading = false
@@ -1308,6 +1354,8 @@ export default {
         hideHeader: this.restaurantData.hideHeader || false,
         hideLogo: this.restaurantData.hideLogo || false,
         hideDetails: this.restaurantData.hideDetails || false,
+        supportedLanguages: this.restaurantData.supportedLanguages || ['en'],
+        defaultLanguage: this.restaurantData.defaultLanguage || 'en',
       }
       return data
     },

@@ -33,7 +33,7 @@ const fetchDeliveryZones = async () => {
     if (allowed && allowed.length > 0) {
       zones = zones.filter((zone) => allowed.includes(zone._id) || allowed.includes(zone.id))
     }
-    
+
     deliveryZones.value = zones.sort((a, b) => Number(a.serviceZoneId) - Number(b.serviceZoneId))
   } catch (error) {
     console.error('Failed to fetch delivery zones', error)
@@ -66,11 +66,15 @@ const getOptions = async () => {
   try {
     const response = await axios.get(
       url +
-        `/articles-options?limit=50&page=${pageNumber.value}&search=${encodeURIComponent(searchValue.value)}&sortKey=${encodeURIComponent(
-          sortBy.value,
-        )}&sortValue=${encodeURIComponent(sortOrder.value)}&outletId=${encodeURIComponent(servicesStore.selectedRest)}${activeOnly.value ? '&isActive=true' : ''}`,
+        `/articles-options?limit=50&page=${pageNumber.value}&search=${encodeURIComponent(
+          searchValue.value,
+        )}&sortKey=${encodeURIComponent(sortBy.value)}&sortValue=${encodeURIComponent(
+          sortOrder.value,
+        )}&outletId=${encodeURIComponent(servicesStore.selectedRest)}${
+          activeOnly.value ? '&isActive=true' : ''
+        }&rawName=true`,
     )
-    
+
     // Handle response structures: array directly, { items: [...] }, or { result: [...] }
     const rawData = response.data
     const item = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
