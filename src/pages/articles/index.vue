@@ -34,12 +34,16 @@ const getArticles = async (outletId) => {
   originalItems.value = []
   isLoading.value = true
   const url = import.meta.env.VITE_API_BASE_URL
-  
+
   let queryString = `outletId=${outletId}&limit=50&page=${pageNumber.value}&search=${searchQuery.value}&sortKey=${sortBy.value}&sortValue=${sortOrder.value}`
 
   try {
     const response = await axios.get(`${url}/menuItems?${queryString}`, { timeout: 60000 })
-    items.value = response.data
+    items.value = response.data.map((item: any) => ({
+      editName: false,
+      editDescription: false,
+      ...item,
+    }))
     originalItems.value = JSON.parse(JSON.stringify(response.data))
   } finally {
     isLoading.value = false
@@ -111,7 +115,7 @@ const fetchDeliveryZones = async () => {
     if (allowed && allowed.length > 0) {
       zones = zones.filter((zone) => allowed.includes(zone._id) || allowed.includes(zone.id))
     }
-    
+
     deliveryZones.value = zones.sort((a, b) => Number(a.serviceZoneId) - Number(b.serviceZoneId))
   } catch (error) {
     console.error('Failed to fetch delivery zones', error)

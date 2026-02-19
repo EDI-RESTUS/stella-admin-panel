@@ -55,6 +55,21 @@ const getLocalizedValue = (value: any) => {
   return value[locale.value] || value['en'] || Object.values(value)[0] || ''
 }
 
+const getEditableLocaleValue = (value: any): string => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  return value[locale.value] || value['en'] || ''
+}
+
+const setLocaleKey = (obj: any, field: string, newVal: string) => {
+  const lang = locale.value || 'en'
+  if (!obj[field] || typeof obj[field] === 'string') {
+    obj[field] = { [lang]: newVal }
+  } else {
+    obj[field] = { ...obj[field], [lang]: newVal }
+  }
+}
+
 const activeOnly = ref(true)
 const currentPage = ref(1)
 const searchQuery = ref('')
@@ -594,46 +609,53 @@ function openFileModal(data) {
 
         <!-- NAME COLUMN -->
         <template #cell(name)="{ rowData }">
-          <div
-            class="editable-field relative group cursor-pointer"
-            @click="
-              emits('updateArticleModal', {
-                ...rowData,
-                updating: 'name',
-                searchQuery: searchQuery,
-                page: currentPage,
-              })
-            "
-          >
-            <span>{{ getLocalizedValue(rowData.name) }}</span>
-            <Pencil
-              class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
+          <div class="editable-field relative group">
+            <input
+              v-if="rowData.editName"
+              :value="getEditableLocaleValue(rowData.name)"
+              class="editable-input"
+              autofocus
+              @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
+              @blur="
+                rowData.editName = false;
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value })
+              "
             />
+            <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
+              <span>{{ getLocalizedValue(rowData.name) }}</span>
+              <Pencil
+                class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
+              />
+            </div>
           </div>
         </template>
 
         <!-- DESCRIPTION COLUMN -->
         <template #cell(description)="{ rowData }">
-          <div
-            class="editable-field relative group cursor-pointer"
-            @click="
-              emits('updateArticleModal', {
-                ...rowData,
-                updating: 'description',
-                searchQuery: searchQuery,
-                page: currentPage,
-              })
-            "
-          >
-            <span class="line-clamp-3">{{ getLocalizedValue(rowData.description) || '' }}</span>
-            <Pencil
-              v-if="getLocalizedValue(rowData.description)"
-              class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
+          <div class="editable-field relative group">
+            <textarea
+              v-if="rowData.editDescription"
+              :value="getEditableLocaleValue(rowData.description)"
+              class="editable-input"
+              rows="2"
+              autofocus
+              @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
+              @blur="
+                rowData.editDescription = false;
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value })
+              "
             />
-             <CirclePlus
+            <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
+              <span class="line-clamp-3">{{ getLocalizedValue(rowData.description) || '' }}</span>
+              <Pencil
+                v-if="getLocalizedValue(rowData.description)"
+                class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
+              />
+              <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors"
               />
+            </div>
           </div>
         </template>
 
