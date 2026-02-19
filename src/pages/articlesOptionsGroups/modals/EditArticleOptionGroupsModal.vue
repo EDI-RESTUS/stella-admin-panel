@@ -23,15 +23,16 @@
           />
         </div>
         <VaInput v-model="formData.internalName" label="Internal Name" placeholder="Internal Name" type="text" />
-        <VaTextarea
-          v-model="formData.description"
-          label="Description"
-          placeholder="Description"
-          type="textarea"
-          :min-rows="3"
-          :max-rows="3"
-          class="mb-1 w-full"
-        />
+        <div v-for="lang in supportedLanguages" :key="lang + 'desc'">
+          <VaTextarea
+            v-model="formData.description[lang]"
+            :label="`Description (${lang.toUpperCase()})`"
+            placeholder="Description"
+            :min-rows="3"
+            :max-rows="3"
+            class="mb-1 w-full"
+          />
+        </div>
         <div class="flex flex-col sm:flex-row gap-4">
           <VaInput
             v-model="formData.minimumChoices"
@@ -120,7 +121,7 @@ const formData = ref({
   _id: '',
   name: {},
   internalName: '',
-  description: '',
+  description: {} as Record<string, string>,
   singleChoice: false,
   multipleChoice: false,
   multipleChoiceNoQty: false,
@@ -141,6 +142,9 @@ if (props.selectedOptionGroups && props.selectedOptionGroups._id) {
     name: typeof props.selectedOptionGroups.name === 'string'
       ? { en: props.selectedOptionGroups.name }
       : { ...props.selectedOptionGroups.name },
+    description: typeof props.selectedOptionGroups.description === 'string'
+      ? { en: props.selectedOptionGroups.description }
+      : { ...(props.selectedOptionGroups.description || {}) },
   }
 } else if (props.selectedOptionGroups && !props.selectedOptionGroups._id) {
   formData.value = {
@@ -149,7 +153,9 @@ if (props.selectedOptionGroups && props.selectedOptionGroups._id) {
       ? { en: props.selectedOptionGroups.name }
       : { ...props.selectedOptionGroups.name },
     internalName: props.selectedOptionGroups.internalName || '',
-    description: props.selectedOptionGroups.description || '',
+    description: typeof props.selectedOptionGroups.description === 'string'
+      ? { en: props.selectedOptionGroups.description }
+      : { ...(props.selectedOptionGroups.description || {}) },
     singleChoice: props.selectedOptionGroups.singleChoice || false,
     multipleChoice: props.selectedOptionGroups.multipleChoice || false,
     multipleChoiceNoQty: props.selectedOptionGroups.multipleChoiceNoQty || false,
@@ -173,7 +179,8 @@ const submit = async () => {
     delete data.__v
     delete data.updating
 
-    if (data.description === '') {
+    const descIsEmpty = !data.description || Object.values(data.description).every((v) => !v)
+    if (descIsEmpty) {
       delete data.description
     }
     if (data.internalName === '') {

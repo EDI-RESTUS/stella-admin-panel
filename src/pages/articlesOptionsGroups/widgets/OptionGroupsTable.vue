@@ -8,6 +8,33 @@ import EditArticleOptionGroupsItemsModal from '../modals/EditArticleOptionGroups
 import EditOptionGroupArticlesModal from '../modals/EditOptionGroupArticlesModal.vue'
 import axios from 'axios'
 import { Pencil, CirclePlus, Search, Plus, Columns3, Copy } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
+
+const { locale } = useI18n()
+
+function getLocalizedValue(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  if (typeof val === 'object') {
+    return val[locale.value] || val['en'] || Object.values(val)[0] || ''
+  }
+  return ''
+}
+
+function getEditableLocaleValue(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  return val[locale.value] || val['en'] || ''
+}
+
+function setLocaleKey(obj: any, field: string, value: string) {
+  const lang = locale.value || 'en'
+  if (!obj[field] || typeof obj[field] === 'string') {
+    obj[field] = { [lang]: value }
+  } else {
+    obj[field] = { ...obj[field], [lang]: value }
+  }
+}
 
 const isEditArticleOptionGroupsModal = ref(false)
 const selectedOptionGroups = ref('')
@@ -328,24 +355,27 @@ const openEditGroupModal = (group) => {
         <!-- NAME -->
         <template #cell(name)="{ rowData }">
           <div class="editable-field relative group">
-            <div class="editable-text cursor-pointer" @click="openEditGroupModal(rowData)">
-              <span
-                v-if="
-                  typeof rowData.name === 'object'
-                    ? rowData.name.en || Object.values(rowData.name)[0]
-                    : rowData.name
-                "
-              >
-                {{
-                  typeof rowData.name === 'object'
-                    ? rowData.name.en || Object.values(rowData.name)[0] || ''
-                    : rowData.name || ''
-                }}
-              </span>
+            <input
+              v-if="rowData.editName"
+              :value="getEditableLocaleValue(rowData.name)"
+              class="editable-input"
+              autofocus
+              @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
+              @blur="
+                rowData.editName = false;
+                updateData(rowData)
+              "
+            />
+            <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
+              <span v-if="getLocalizedValue(rowData.name)">{{ getLocalizedValue(rowData.name) }}</span>
+              <Pencil
+                v-if="rowData.name"
+                class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
+              />
               <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 hover:text-blue-500 transition-colors"
-                @click.stop="openEditGroupModal(rowData)"
+                @click.stop="rowData.editName = true"
               />
             </div>
           </div>
@@ -381,19 +411,21 @@ const openEditGroupModal = (group) => {
 
         <!-- DESCRIPTION -->
         <template #cell(description)="{ rowData }">
-          <div class="editable-field relative group max-w-[200px] truncate" :title="rowData.description">
-            <input
+          <div class="editable-field relative group max-w-[200px] truncate" :title="getLocalizedValue(rowData.description)">
+            <textarea
               v-if="rowData.editDescription"
-              v-model="rowData.description"
+              :value="getEditableLocaleValue(rowData.description)"
               class="editable-input"
+              rows="2"
               autofocus
+              @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
                 rowData.editDescription = false;
                 updateData(rowData)
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
-              <span>{{ rowData.description || '' }}</span>
+              <span v-if="rowData.description">{{ getLocalizedValue(rowData.description) }}</span>
               <Pencil
                 v-if="rowData.description"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
