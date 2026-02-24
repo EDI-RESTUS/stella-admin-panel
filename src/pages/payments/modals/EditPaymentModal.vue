@@ -25,8 +25,11 @@
           :options="paymentGateway"
         />
 
-        <!-- Payment Gateway Config Inputs -->
-        <div v-if="formData.paymentGateway" class="grid md:grid-cols-1 gap-3">
+        <!-- Payment Gateway Config Inputs — hidden for WalleePOS (terminals managed via Configure Wallee) -->
+        <div
+          v-if="formData.paymentGateway && formData.paymentGateway !== 'WalleePOS'"
+          class="grid md:grid-cols-1 gap-3"
+        >
           <div
             v-for="e in paymentOptions.find((a) => a.paymentMethodName === formData.paymentGateway)?.inputConfig || []"
             :key="e.label"
@@ -168,6 +171,8 @@ getPaymentconfig()
 const isSubmitDisabled = computed(() => {
   if (!formData.value.name?.trim()) return true
   if (!formData.value.paymentGateway) return false
+  // WalleePOS config fields are hidden — skip their required-field validation
+  if (formData.value.paymentGateway === 'WalleePOS') return false
   const selectedGateway = paymentOptions.value.find((a) => a.paymentMethodName === formData.value.paymentGateway)
   if (!selectedGateway) return false
   const hasEmptyRequiredField = selectedGateway.inputConfig.some((input) => input.required && !input.value?.trim())
@@ -195,10 +200,13 @@ const submit = async () => {
       )
     }
 
+    const isNewWallee = !data._id && formData.value.paymentGateway === 'WalleePOS'
+
     data = {
       ...data,
       outletId: servicesStore.selectedRest,
-      paymentGatewayConfig: getConfig(selectedGateway),
+      // Don't send paymentGatewayConfig on new WalleePOS — backend would auto-create a terminal with deliveryZoneId:null
+      ...(!isNewWallee && { paymentGatewayConfig: getConfig(selectedGateway) }),
     }
 
     // Remove unnecessary fields
