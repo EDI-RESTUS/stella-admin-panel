@@ -69,6 +69,22 @@
               <VaInput id="phone" v-model="restaurantData.phone" label="Phone" name="phone" type="number" />
               <VaInput id="facebook" v-model="restaurantData.facebook" label="Facebook" name="Facebook" type="url" />
             </div>
+
+            <div class="grid grid-cols-4 gap-8 w-full mt-4">
+              <VaInput
+                id="brevoSenderEmail"
+                v-model="restaurantData.brevoSenderEmail"
+                label="Brevo Sender Email"
+                name="brevoSenderEmail"
+                type="email"
+              />
+              <VaInput
+                id="brevoSenderName"
+                v-model="restaurantData.brevoSenderName"
+                label="Brevo Sender Name"
+                name="brevoSenderName"
+              />
+            </div>
             <div class="grid grid-cols-4 gap-8 w-full mt-4">
               <VaInput
                 id="instagram"
@@ -474,6 +490,16 @@
               <div class="w-full">
                 <VaSwitch v-model="restaurantData.tips" :true-value="true" label="Tips" left-label size="small" />
               </div>
+
+              <div class="w-full">
+                <VaSwitch
+                  v-model="restaurantData.useKioskWalleeTerminals"
+                  :true-value="true"
+                  label="Use Kiosk Wallee Terminals"
+                  left-label
+                  size="small"
+                />
+              </div>
             </div>
           </div>
         </VaCardContent>
@@ -505,27 +531,29 @@
               <VaColorInput v-model="restaurantData.textColor" label="Text Color" placeholder="#000" class="w-28" />
               <VaColorInput v-model="restaurantData.headerColor" label="Header Color" placeholder="#000" class="w-28" />
               <VaColorInput v-model="restaurantData.footerColor" label="Footer Color" placeholder="#000" class="w-28" />
-              <VaSwitch
-                v-model="restaurantData.hideHeader"
-                :true-value="true"
-                label="Hide Header"
-                left-label
-                size="small"
-              />
-              <VaSwitch
-                v-model="restaurantData.hideLogo"
-                :true-value="true"
-                label="Hide Logo"
-                left-label
-                size="small"
-              />
-              <VaSwitch
-                v-model="restaurantData.hideDetails"
-                :true-value="true"
-                label="Hide Outlet details"
-                left-label
-                size="small"
-              />
+              <div class="flex items-center gap-4">
+                <VaSwitch
+                  v-model="restaurantData.hideHeader"
+                  :true-value="true"
+                  label="Hide Header"
+                  left-label
+                  size="small"
+                />
+                <VaSwitch
+                  v-model="restaurantData.hideLogo"
+                  :true-value="true"
+                  label="Hide Logo"
+                  left-label
+                  size="small"
+                />
+                <VaSwitch
+                  v-model="restaurantData.hideDetails"
+                  :true-value="true"
+                  label="Hide Outlet details"
+                  left-label
+                  size="small"
+                />
+              </div>
             </div>
             <div class="flex flex-col sm:flex-row w-full gap-1">
               <div class="flex-1">
@@ -609,6 +637,82 @@
               </div>
             </div>
           </div>
+        </VaCardContent>
+      </VaCard>
+
+      <!-- Email Settings -->
+      <VaCard class="mt-6">
+        <VaCardContent>
+          <h2 class="font-bold text-base mb-4">Email Settings</h2>
+
+          <!-- Basic settings -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
+            <VaInput v-model="restaurantData.emailSettings.replyTo" label="Reply-To Email" type="email" />
+            <VaInput v-model="restaurantData.emailSettings.supportEmail" label="Support Email" type="email" />
+            <VaInput v-model="restaurantData.emailSettings.supportPhone" label="Support Phone" />
+            <VaInput v-model="restaurantData.emailSettings.websiteUrl" label="Website URL" type="url" />
+            <div class="col-span-2 md:col-span-4">
+              <VaInput v-model="restaurantData.emailSettings.logoUrl" label="Logo URL" type="url" class="w-full" />
+            </div>
+            <div class="col-span-2 md:col-span-4">
+              <VaTextarea
+                v-model="restaurantData.emailSettings.legalFooterHtml"
+                label="Legal Footer HTML"
+                :min-rows="2"
+                :max-rows="4"
+                class="w-full"
+              />
+            </div>
+          </div>
+
+          <!-- Templates -->
+          <h3 class="font-semibold text-sm mt-6 mb-3 text-gray-600 uppercase tracking-wide">Email Templates</h3>
+
+          <!-- Helper to show variable chips -->
+          <template v-for="tpl in emailTemplates" :key="tpl.key">
+            <div class="border rounded-lg p-4 mb-4">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-sm">{{ tpl.label }}</span>
+                <div class="flex flex-wrap gap-1">
+                  <VaBadge
+                    v-for="v in tpl.vars"
+                    :key="v"
+                    :text="v"
+                    color="info"
+                    class="text-xs cursor-pointer select-none"
+                    title="Click to insert variable"
+                    @click="insertVar(tpl.key, v)"
+                  />
+                </div>
+              </div>
+              <div class="grid grid-cols-1 gap-3">
+                <VaInput
+                  v-model="restaurantData.emailSettings.templates[tpl.key].subject"
+                  :label="'Subject'"
+                  :placeholder="tpl.subjectPlaceholder"
+                />
+                <div class="relative w-full">
+                  <label class="va-input-label va-input-wrapper__label va-input-wrapper__label--outer" style="color: var(--va-primary)">
+                    HTML Body
+                    <span class="ml-1 text-gray-400 font-normal normal-case text-xs">(outer &lt;div&gt; added automatically)</span>
+                  </label>
+                  <textarea
+                    :ref="'htmlarea-' + tpl.key"
+                    v-model="restaurantData.emailSettings.templates[tpl.key].html"
+                    :placeholder="tpl.htmlPlaceholder"
+                    rows="5"
+                    class="w-full mt-1 p-2 border border-gray-300 rounded text-sm font-mono focus:outline-none focus:ring-1 focus:ring-blue-400 resize-y"
+                  />
+                </div>
+                <VaInput
+                  v-if="tpl.hasToOverride"
+                  v-model="restaurantData.emailSettings.templates[tpl.key]._toOverrideRaw"
+                  label="To Override (comma-separated emails)"
+                  placeholder="admin@example.com, ops@example.com"
+                />
+              </div>
+            </div>
+          </template>
         </VaCardContent>
       </VaCard>
     </VaForm>
@@ -847,6 +951,7 @@ export default {
         takeawayConfirmationMessage: '',
         tabs: false,
         tips: false,
+        useKioskWalleeTerminals: false,
         primaryColor: '',
         secondaryColor: '',
         backgroundColor: '',
@@ -860,6 +965,23 @@ export default {
         hideDetails: '',
         supportedLanguages: ['en'],
         defaultLanguage: 'en',
+        brevoSenderEmail: '',
+        brevoSenderName: '',
+        emailSettings: {
+          replyTo: '',
+          logoUrl: '',
+          supportPhone: '',
+          supportEmail: '',
+          websiteUrl: '',
+          legalFooterHtml: '',
+          templates: {
+            registrationConfirmation: { subject: '', html: '' },
+            orderConfirmation: { subject: '', html: '' },
+            complaintReceived: { subject: '', html: '' },
+            careerApplicationReceived: { subject: '', html: '' },
+            winmaxFailureAlert: { subject: '', html: '', toOverride: [], _toOverrideRaw: '' },
+          },
+        },
       },
       active: true,
       isGalleryViewEnabled: true,
@@ -869,6 +991,48 @@ export default {
       uploadLogoText: 'Upload Logo',
       uploadHeaderText: 'Upload Header',
       colorPicker: '#FF002',
+      emailTemplates: [
+        {
+          key: 'registrationConfirmation',
+          label: 'Registration Confirmation',
+          vars: ['{{customerName}}'],
+          subjectPlaceholder: 'Welcome {{customerName}}',
+          htmlPlaceholder: '<div>Hi {{customerName}}, welcome!</div>',
+          hasToOverride: false,
+        },
+        {
+          key: 'orderConfirmation',
+          label: 'Order Confirmation',
+          vars: ['{{customerName}}', '{{orderNo}}', '{{total}}'],
+          subjectPlaceholder: 'Order Confirmation #{{orderNo}}',
+          htmlPlaceholder: '<div>Hi {{customerName}}, your order <b>#{{orderNo}}</b> total €{{total}}</div>',
+          hasToOverride: false,
+        },
+        {
+          key: 'complaintReceived',
+          label: 'Complaint Received',
+          vars: ['{{orderNo}}'],
+          subjectPlaceholder: 'Complaint received - Order {{orderNo}}',
+          htmlPlaceholder: '<div>We received your complaint regarding order {{orderNo}}.</div>',
+          hasToOverride: false,
+        },
+        {
+          key: 'careerApplicationReceived',
+          label: 'Career Application Received',
+          vars: ['{{firstName}}', '{{position}}'],
+          subjectPlaceholder: 'Application received - {{position}}',
+          htmlPlaceholder: '<div>Thank you {{firstName}} for applying for {{position}}.</div>',
+          hasToOverride: false,
+        },
+        {
+          key: 'winmaxFailureAlert',
+          label: 'Winmax Failure Alert',
+          vars: ['{{orderNo}}'],
+          subjectPlaceholder: 'WINMAX FAILED - {{orderNo}}',
+          htmlPlaceholder: '<div>Order {{orderNo}} failed to send to Winmax.</div>',
+          hasToOverride: true,
+        },
+      ],
     }
   },
   computed: {
@@ -943,6 +1107,22 @@ export default {
       } else if (type === 'font') {
         this.restaurantData.fontUrl = data.url
       }
+    },
+    insertVar(templateKey, variable) {
+      const refKey = 'htmlarea-' + templateKey
+      const el = this.$refs[refKey]
+      const textarea = Array.isArray(el) ? el[0] : el
+      if (!textarea) return
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const current = this.restaurantData.emailSettings.templates[templateKey].html || ''
+      this.restaurantData.emailSettings.templates[templateKey].html =
+        current.slice(0, start) + variable + current.slice(end)
+      this.$nextTick(() => {
+        textarea.focus()
+        const pos = start + variable.length
+        textarea.setSelectionRange(pos, pos)
+      })
     },
     deleteAsset(type) {
       const image = this.restaurantData.assetIds.find((a) => a.assetType === type)
@@ -1141,6 +1321,34 @@ export default {
             }
             res.supportedLanguages = res.supportedLanguages || ['en']
             res.defaultLanguage = res.defaultLanguage || 'en'
+            // Ensure emailSettings and template defaults exist
+            if (!res.emailSettings) res.emailSettings = {}
+            if (!res.emailSettings.templates) res.emailSettings.templates = {}
+            const tplDefaults = {
+              registrationConfirmation: { subject: '', html: '' },
+              orderConfirmation: { subject: '', html: '' },
+              complaintReceived: { subject: '', html: '' },
+              careerApplicationReceived: { subject: '', html: '' },
+              winmaxFailureAlert: { subject: '', html: '', toOverride: [], _toOverrideRaw: '' },
+            }
+            Object.keys(tplDefaults).forEach((key) => {
+              res.emailSettings.templates[key] = {
+                ...tplDefaults[key],
+                ...res.emailSettings.templates[key],
+              }
+            })
+            // Convert toOverride array → comma-separated raw string for the UI
+            const wfa = res.emailSettings.templates.winmaxFailureAlert
+            wfa._toOverrideRaw = Array.isArray(wfa.toOverride) ? wfa.toOverride.join(', ') : ''
+            // Strip outer <div>…</div> wrapper added on save so the textarea shows clean inner content
+            const stripOuterDiv = (html) => {
+              if (!html) return ''
+              const m = html.trim().match(/^<div>([\s\S]*)<\/div>$/i)
+              return m ? m[1].trim() : html
+            }
+            Object.keys(tplDefaults).forEach((key) => {
+              res.emailSettings.templates[key].html = stripOuterDiv(res.emailSettings.templates[key].html)
+            })
           }
           this.restaurantData = res
           this.loading = false
@@ -1354,8 +1562,48 @@ export default {
         hideHeader: this.restaurantData.hideHeader || false,
         hideLogo: this.restaurantData.hideLogo || false,
         hideDetails: this.restaurantData.hideDetails || false,
+        useKioskWalleeTerminals: this.restaurantData.useKioskWalleeTerminals || false,
         supportedLanguages: this.restaurantData.supportedLanguages || ['en'],
         defaultLanguage: this.restaurantData.defaultLanguage || 'en',
+        brevoSenderEmail: this.restaurantData.brevoSenderEmail || '',
+        brevoSenderName: this.restaurantData.brevoSenderName || '',
+        emailSettings: (() => {
+          const es = this.restaurantData.emailSettings || {}
+          const tpl = es.templates || {}
+          const wrapHtml = (raw) => {
+            const trimmed = (raw || '').trim()
+            if (!trimmed) return ''
+            // Don't double-wrap if the admin already opened with a root <div>
+            if (/^<div[\s>]/i.test(trimmed)) return trimmed
+            return `<div>${trimmed}</div>`
+          }
+          const mapTpl = (key, extras) => ({
+            subject: tpl[key]?.subject || '',
+            html: wrapHtml(tpl[key]?.html),
+            ...extras,
+          })
+          return {
+            replyTo: es.replyTo || '',
+            logoUrl: es.logoUrl || '',
+            supportPhone: es.supportPhone || '',
+            supportEmail: es.supportEmail || '',
+            websiteUrl: es.websiteUrl || '',
+            legalFooterHtml: es.legalFooterHtml || '',
+            templates: {
+              registrationConfirmation: mapTpl('registrationConfirmation'),
+              orderConfirmation: mapTpl('orderConfirmation'),
+              complaintReceived: mapTpl('complaintReceived'),
+              careerApplicationReceived: mapTpl('careerApplicationReceived'),
+              winmaxFailureAlert: {
+                ...mapTpl('winmaxFailureAlert'),
+                toOverride: (tpl.winmaxFailureAlert?._toOverrideRaw || '')
+                  .split(',')
+                  .map((e) => e.trim())
+                  .filter(Boolean),
+              },
+            },
+          }
+        })(),
       }
       return data
     },
