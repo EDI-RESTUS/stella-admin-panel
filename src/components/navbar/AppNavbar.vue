@@ -16,7 +16,25 @@
       </div>
     </template>
     <template #right>
-      <div class="flex items-center">
+      <div class="flex items-center gap-3">
+        <!-- Language picker (only when outlet has multiple languages) -->
+        <div
+          v-if="outletLanguages.length > 1"
+          class="relative"
+        >
+          <select
+            v-model="selectedLanguage"
+            class="lang-select appearance-none pl-3 pr-7 py-1.5 rounded-xl text-sm font-semibold uppercase bg-white/60 border border-slate-200 shadow-sm hover:shadow-md hover:bg-white/80 backdrop-blur-md transition-all duration-200 cursor-pointer text-slate-700 focus:outline-none"
+          >
+            <option v-for="lang in outletLanguages" :key="lang" :value="lang">
+              {{ lang.toUpperCase() }}
+            </option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+          </div>
+        </div>
+
         <VaSelect
           v-model="selectedRest"
           :options="restOptions"
@@ -35,6 +53,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useColors } from 'vuestic-ui'
+import { useI18n } from 'vue-i18n'
 import VaIconMenuCollapsed from '../icons/VaIconMenuCollapsed.vue'
 import { storeToRefs } from 'pinia'
 import { useGlobalStore } from '../../stores/global-store'
@@ -48,6 +67,7 @@ defineProps({
   isMobile: { type: Boolean, default: false },
 })
 
+const { locale } = useI18n()
 const GlobalStore = useGlobalStore()
 
 const selectedRest = ref('')
@@ -55,6 +75,23 @@ const restOptions = ref([])
 const restlist = ref([])
 const { isSidebarMinimized } = storeToRefs(GlobalStore)
 const { getColor } = useColors()
+
+// Language selector
+const outletLanguages = computed(() => {
+  const details = servicesStore.restDetails as any
+  if (details && Array.isArray(details.supportedLanguages) && details.supportedLanguages.length) {
+    return details.supportedLanguages
+  }
+  return ['en']
+})
+const selectedLanguage = ref(locale.value || 'en')
+watch(selectedLanguage, (lang) => { locale.value = lang })
+// When outlet changes, sync locale to first supported language
+watch(outletLanguages, (langs) => {
+  if (langs.length && !langs.includes(selectedLanguage.value)) {
+    selectedLanguage.value = langs[0]
+  }
+})
 
 const collapseIconColor = computed(() => getColor('secondary'))
 const getOutlets = () => {

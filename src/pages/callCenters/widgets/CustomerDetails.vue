@@ -1138,7 +1138,11 @@ async function handleDeliveryZoneFetch() {
         // Filter by allowedDeliveryZoneIds if present
         const allowed = userStore.userDetails?.allowedDeliveryZoneIds
         if (allowed && allowed.length > 0) {
-          return allowed.includes(zone._id) || allowed.includes(zone.id)
+          return (
+            allowed.includes(zone._id) ||
+            allowed.includes(zone.id) ||
+            allowed.some((val) => String(val).toLowerCase() === String(zone.name).toLowerCase())
+          )
         }
         return true
       })

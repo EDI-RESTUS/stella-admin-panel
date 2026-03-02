@@ -3,7 +3,36 @@ import { defineVaDataTableColumns, useModal } from 'vuestic-ui'
 import { useRouter } from 'vue-router'
 import { ref, computed, toRef, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { useServiceStore } from '@/stores/services'
+import { useI18n } from 'vue-i18n'
 import { Funnel, Columns3, Import, Plus, Pencil, CirclePlus, Copy, Search } from 'lucide-vue-next'
+
+const { locale } = useI18n()
+
+function getLocalizedValue(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  if (typeof val === 'object') {
+    return val[locale.value] || val['en'] || Object.values(val)[0] || ''
+  }
+  return ''
+}
+
+/** Returns the value for the current locale (for inline edit initial value) */
+function getEditableLocaleValue(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  return val[locale.value] || val['en'] || ''
+}
+
+/** Updates only the current locale key in a locale record */
+function setLocaleKey(obj: any, field: string, value: string) {
+  const lang = locale.value || 'en'
+  if (!obj[field] || typeof obj[field] === 'string') {
+    obj[field] = { [lang]: value }
+  } else {
+    obj[field] = { ...obj[field], [lang]: value }
+  }
+}
 
 const emits = defineEmits([
   'updateCategoryModal',
@@ -131,7 +160,7 @@ const filteredItems = computed(() => {
   const query = searchQuery.value.toLowerCase()
   return items.value
     .filter((item) => !activeOnly.value || item.isActive)
-    .filter((item) => item.wCode?.toLowerCase().includes(query) || item.name?.toLowerCase().includes(query))
+    .filter((item) => item.wCode?.toLowerCase().includes(query) || getLocalizedValue(item.name)?.toLowerCase().includes(query))
 })
 
 const onButtonCategoryDelete = async (payload) => {
@@ -271,13 +300,17 @@ const onButtonCategoryDelete = async (payload) => {
           <div class="editable-field relative group">
             <input
               v-if="rowData.editName"
-              v-model="rowData.name"
+              :value="getEditableLocaleValue(rowData.name)"
               class="editable-input"
               autofocus
-              @blur="(rowData.editName = false), emits('updateCategory', { name: rowData.name, _id: rowData._id })"
+              @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
+              @blur="
+                rowData.editName = false;
+                emits('updateCategory', { name: rowData.name, _id: rowData._id })
+              "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
-              <span>{{ rowData.name || '' }}</span>
+              <span v-if="rowData.name">{{ getLocalizedValue(rowData.name) }}</span>
               <Pencil
                 v-if="rowData.name"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -294,30 +327,27 @@ const onButtonCategoryDelete = async (payload) => {
         <!-- DESCRIPTION -->
         <template #cell(description)="{ rowData }">
           <div class="editable-field relative group">
-            <input
+            <textarea
               v-if="rowData.editDescription"
-              v-model="rowData.description"
+              :value="getEditableLocaleValue(rowData.description)"
               class="editable-input"
+              rows="2"
               autofocus
+              @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
-                (rowData.editDescription = false),
-                  emits('updateCategory', { description: rowData.description, _id: rowData._id })
+                rowData.editDescription = false;
+                emits('updateCategory', { description: rowData.description, _id: rowData._id })
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
-              <span>{{ rowData.description || '' }}</span>
-
-              <!-- Pencil icon when text exists -->
+              <span class="line-clamp-3">{{ getLocalizedValue(rowData.description) || '' }}</span>
               <Pencil
-                v-if="rowData.description"
+                v-if="getLocalizedValue(rowData.description)"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
               />
-
-              <!-- Plus icon inline left when empty -->
               <CirclePlus
                 v-else
-                class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors ml-1"
-                @click.stop="rowData.editDescription = true"
+                class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors"
               />
             </div>
           </div>

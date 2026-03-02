@@ -26,6 +26,7 @@ const getCategories = (outletId) => {
     items.value = categoriesStore.items.map((item) => ({
       editCode: false,
       editName: false,
+      editDescription: false,
       editArea: false,
       editSchedule: false,
       _id: item._id || '',

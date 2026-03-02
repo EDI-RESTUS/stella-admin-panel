@@ -14,14 +14,16 @@
 
     <VaForm ref="form" @submit.prevent="submit">
       <div class="grid grid-cols-1 md:grid-cols-1 gap-3">
-        <VaInput
-          v-model="formData.name"
-          :rules="[validators.required]"
-          label="Name"
-          required-mark
-          placeholder="Name"
-          type="text"
-        />
+        <div class="flex flex-col gap-2 mb-1">
+          <div v-for="lang in supportedLanguages" :key="lang">
+            <VaInput
+              v-model="formData.name[lang]"
+              :label="`Name (${lang.toUpperCase()})`"
+              placeholder="Name"
+              type="text"
+            />
+          </div>
+        </div>
         <VaInput v-model="formData.posName" label="POS Name" placeholder="POS Name" type="text" />
         <VaInput v-model="formData.code" label="Code" placeholder="Code" type="text" />
         <VaSelect
@@ -103,9 +105,27 @@ const { init } = useToast()
 
 const servicesStore = useServiceStore()
 
+const supportedLanguages = ref(['en'])
+
+const getOutletDetails = async () => {
+  if (servicesStore.selectedRest) {
+    try {
+      const url = import.meta.env.VITE_API_BASE_URL
+      const response = await axios.get(`${url}/outlets/${servicesStore.selectedRest}`)
+      if (response.data && response.data.supportedLanguages) {
+        supportedLanguages.value = response.data.supportedLanguages
+      }
+    } catch (e) {
+      console.error('Failed to fetch outlet details', e)
+    }
+  }
+}
+
+getOutletDetails()
+
 const formData = ref({
   _id: '',
-  name: '',
+  name: {},
   posName: '',
   code: '',
   type: '',
@@ -128,18 +148,18 @@ const types = [
 ]
 
 if (props.selectedOption && props.selectedOption._id) {
-  axios
-    .get(`${import.meta.env.VITE_API_BASE_URL}/articles-options/${props.selectedOption._id}`)
-    .then((response) => {
-      formData.value = response.data.data
-    })
-    .catch((error) => {
-      init({ message: error.response.data.message, color: 'danger' })
-    })
+  formData.value = {
+    ...props.selectedOption,
+    name: typeof props.selectedOption.name === 'string'
+      ? { en: props.selectedOption.name }
+      : { ...props.selectedOption.name },
+  }
 } else if (props.selectedOption && !props.selectedOption._id) {
   formData.value = {
     _id: '',
-    name: props.selectedOption.name || '',
+    name: typeof props.selectedOption.name === 'string'
+      ? { en: props.selectedOption.name }
+      : { ...props.selectedOption.name },
     posName: props.selectedOption.posName || '',
     code: props.selectedOption.code || '',
     type: props.selectedOption.type || '',

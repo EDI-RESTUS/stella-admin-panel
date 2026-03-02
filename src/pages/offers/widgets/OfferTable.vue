@@ -7,7 +7,39 @@ import { useUsersStore } from '@/stores/users'
 import FileUpload from '@/components/file-uploader/FileUpload.vue'
 import AddSelectionModal from '../modals/AddSelectionModal.vue'
 import axios from 'axios'
+import { useI18n } from 'vue-i18n'
 import { Plus, Search, CirclePlus, Pencil, Columns3 } from 'lucide-vue-next'
+
+const { locale } = useI18n()
+
+// Resolve a localized name/description field (may be string or Record<lang, string>)
+function getLocalizedValue(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  if (typeof val === 'object') {
+    return val[locale.value] || val['en'] || Object.values(val)[0] || ''
+  }
+  return ''
+}
+
+// Get the inline-edit string for a locale field (edits the primary/en key)
+function getEditableValue(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  return val[locale.value] || val['en'] || ''
+}
+
+// Write back inline edits to the correct key on a locale object
+function setLocaleValue(obj: any, field: string, value: string) {
+  if (typeof obj[field] === 'string') {
+    obj[field] = value
+  } else if (obj[field] && typeof obj[field] === 'object') {
+    const lang = locale.value || 'en'
+    obj[field] = { ...obj[field], [lang]: value }
+  } else {
+    obj[field] = value
+  }
+}
 
 const emits = defineEmits(['getOffers', 'editOffers', 'openOfferModal'])
 const props = defineProps({
@@ -223,7 +255,7 @@ watch(
     // Search filter
     if (lowerQuery) {
       mappedItems = mappedItems.filter((item) =>
-        [item.name, item.code].filter(Boolean).some((field) => field.toLowerCase().includes(lowerQuery)),
+        [getLocalizedValue(item.name), item.code].filter(Boolean).some((field) => field.toLowerCase().includes(lowerQuery)),
       )
     }
 
@@ -617,16 +649,17 @@ function formatReadableDate(dateStr: string): string {
           <div class="editable-field relative group">
             <input
               v-if="rowData.editName"
-              v-model="rowData.name"
+              :value="getEditableValue(rowData.name)"
               class="editable-input"
               autofocus
+              @input="(e) => setLocaleValue(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
                 rowData.editName = false;
                 updateData(rowData)
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
-              <span>{{ rowData.name || '' }}</span>
+              <span>{{ getLocalizedValue(rowData.name) || '' }}</span>
               <Pencil
                 v-if="rowData.name"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -645,17 +678,18 @@ function formatReadableDate(dateStr: string): string {
           <div class="editable-field relative group">
             <textarea
               v-if="rowData.editDescription"
-              v-model="rowData.description"
+              :value="getEditableValue(rowData.description)"
               class="editable-input"
               rows="3"
               autofocus
+              @input="(e) => setLocaleValue(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
                 rowData.editDescription = false;
                 updateData(rowData)
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
-              <span>{{ rowData.description || '' }}</span>
+              <span>{{ getLocalizedValue(rowData.description) || '' }}</span>
               <Pencil
                 v-if="rowData.description"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"

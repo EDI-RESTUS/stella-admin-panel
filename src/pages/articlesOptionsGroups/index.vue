@@ -27,7 +27,9 @@ const getOptionGroups = async () => {
           searchValue.value,
         )}&sortKey=${encodeURIComponent(sortBy.value)}&sortValue=${encodeURIComponent(
           sortOrder.value,
-        )}&outletId=${encodeURIComponent(servicesStore.selectedRest)}${activeOnly.value ? '&isActive=true' : ''}`,
+        )}&outletId=${encodeURIComponent(servicesStore.selectedRest)}${
+          activeOnly.value ? '&isActive=true' : ''
+        }&rawName=true`,
     )
     const rawData = response.data
     const item = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])

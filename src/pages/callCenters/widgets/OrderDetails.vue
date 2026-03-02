@@ -284,7 +284,7 @@
         <div class="px-4 pb-4">
           <div class="w-full relative">
             <!-- Overlay for disabled state to allow clicks for error message (optional, but requested 'pop up') -->
-            <div 
+            <div
                v-if="isServiceRestricted"
                class="absolute inset-0 z-10 cursor-not-allowed"
                @click="showRestrictedMessage"
@@ -516,7 +516,7 @@ function openCheckoutModal() {
     init({ color: 'danger', message: msg })
     return
   }
-  
+
   // Check if delivery is selected but no delivery zone is selected
   if (props.orderType === 'delivery' && !props.isDeliveryZoneSelected) {
     confirm({
@@ -528,7 +528,7 @@ function openCheckoutModal() {
     })
     return
   }
-  
+
   // Check if delivery is selected but no address is provided
   if (props.orderType === 'delivery' && !orderStore.address) {
     confirm({
@@ -540,7 +540,7 @@ function openCheckoutModal() {
     })
     return
   }
-  
+
   showCheckoutModal.value = true
 }
 
@@ -1101,18 +1101,18 @@ onMounted(async () => {
       if (res.data?.data) {
         const order = res.data.data
         console.log('[PaymentRetry] Order data:', order)
-        
+
         // Check if SPECIFIC menu items are loaded
         const requiredItemIds = (order.menuItems || []).map(i => i.menuItem)
         console.log('[PaymentRetry] Required Item IDs:', requiredItemIds)
 
         let retries = 0
         let allItemsFound = false
-        
+
         while (!allItemsFound && retries < 40) { // Increased retries to 40 (20s)
            const loadedIds = new Set(menuStore.unFilteredMenuItems.map(m => m._id))
            const missing = requiredItemIds.filter(id => !loadedIds.has(id))
-           
+
            if (missing.length === 0) {
              allItemsFound = true
              console.log('[PaymentRetry] All required menu items found.')
@@ -1134,26 +1134,26 @@ onMounted(async () => {
         // 2. Restore cart
         await orderStore.restoreCartFromOrder(order, menuStore)
         console.log('[PaymentRetry] Cart restored. Cart items:', orderStore.cartItems)
-        
+
         // 2b. Emit context to parent (index.vue) to update props
         emit('restore-context', {
           customerDetailsId: order.customerDetailId,
-          orderType: (order.orderType || '').toLowerCase(), 
+          orderType: (order.orderType || '').toLowerCase(),
           deliveryFee: Number(order.deliveryFee || 0),
           isDeliveryZoneSelected: !!order.deliveryZoneId,
           dateSelected: order.orderDateTime || order.createdAt
         })
 
-        // 3. Set local state to match order 
+        // 3. Set local state to match order
         // Note: Props are passed from parent, so we might need to emit or rely on store
         // For CheckOutModal, we pass 'existingOrderId'
         existingOrderId.value = oid
         orderStore.orderDateTime = order.orderDateTime || order.createdAt
-        
+
         // 4. Open modal
         console.log('[OrderDetails] Setting showCheckoutModal = true. Cart items LEN:', orderStore.cartItems.length)
         showCheckoutModal.value = true
-        
+
         // 5. Clean URL
         const q = { ...route.query }
         delete q.payment

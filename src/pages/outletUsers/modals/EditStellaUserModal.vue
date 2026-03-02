@@ -197,6 +197,16 @@ const getDeliveryZones = (outletId) => {
     .get(`${url}/deliveryZones/${outletId}`)
     .then((response) => {
       deliveryZones.value = response.data.data
+      // Normalize allowedDeliveryZoneIds: resolve name strings → IDs, drop stale IDs
+      if (formData.value.allowedDeliveryZoneIds?.length) {
+        formData.value.allowedDeliveryZoneIds = formData.value.allowedDeliveryZoneIds
+          .map((val) => {
+            if (deliveryZones.value.find((z) => z._id === val)) return val
+            const byName = deliveryZones.value.find((z) => z.name.toLowerCase() === String(val).toLowerCase())
+            return byName ? byName._id : null
+          })
+          .filter(Boolean)
+      }
     })
     .catch(() => {
       deliveryZones.value = []

@@ -14,15 +14,16 @@
     <VaForm ref="form" @submit.prevent="submit">
       <div v-if="formData.updating === '' || formData.updating === 'all'" class="flex items-center gap-x-10">
         <VaInput v-model="formData.wCode" class="mb-1 max-w-[150px]" label="Code" placeholder="Code" type="text" />
-        <VaInput
-          v-model="formData.name"
-          :rules="[validators.required]"
-          class="mb-1 max-w-[300px]"
-          label="Name"
-          required-mark
-          placeholder="Name"
-          type="text"
-        />
+        <div class="flex flex-col gap-2 mb-1 max-w-[300px]">
+             <div v-for="lang in supportedLanguages" :key="lang">
+                 <VaInput
+                  v-model="formData.name[lang]"
+                  :label="`Name (${lang.toUpperCase()})`"
+                  placeholder="Name"
+                  type="text"
+                />
+            </div>
+        </div>
         <VaSelect
           id="area"
           v-model="formData.areaId"
@@ -35,14 +36,17 @@
           class="mb-1 max-w-[430px]"
         />
       </div>
-      <VaTextarea
-        v-model="formData.description"
-        label="Description"
-        placeholder="Description"
-        type="textarea"
-        rows="5"
-        class="mb-1 w-full"
-      />
+      <div class="flex flex-col gap-2 mb-1">
+        <div v-for="lang in supportedLanguages" :key="lang + 'desc'">
+          <VaTextarea
+            v-model="formData.description[lang]"
+            :label="`Description (${lang.toUpperCase()})`"
+            placeholder="Description"
+            rows="3"
+            class="mb-1 w-full"
+          />
+        </div>
+      </div>
       <div
         v-if="formData.updating === '' || formData.updating === 'all' || formData.updating === 'subCategory'"
         class="cursor-pointer text-primary font-semibold underline flex justify-end items-center"
@@ -215,6 +219,22 @@ const { init } = useToast()
 
 const servicesStore = useServiceStore()
 const areas = ref([])
+const supportedLanguages = ref(['en'])
+
+const getOutletDetails = async () => {
+  if (servicesStore.selectedRest) {
+    try {
+      const url = import.meta.env.VITE_API_BASE_URL
+      const response = await axios.get(`${url}/outlets/${servicesStore.selectedRest}`)
+      if (response.data && response.data.supportedLanguages) {
+        supportedLanguages.value = response.data.supportedLanguages
+      }
+    } catch (e) {
+      console.error('Failed to fetch outlet details', e)
+    }
+  }
+}
+
 servicesStore.getAreas().then((response) => {
   areas.value = response.data.map((e) => {
     return {
@@ -232,12 +252,14 @@ servicesStore.getAreas().then((response) => {
   }
 })
 
+getOutletDetails()
+
 const formData = ref({
-  name: '',
+  name: {},
   wCode: '',
   areaId: [],
   isActive: true,
-  description: '',
+  description: {} as Record<string, string>,
   sortOrder: 0,
   outletId: '',
   subCategories: [],
@@ -286,6 +308,12 @@ if (props.selectedCategory) {
   formData.value = {
     ...formData.value,
     ...props.selectedCategory,
+    name: typeof props.selectedCategory.name === 'string'
+        ? { en: props.selectedCategory.name }
+        : { ...props.selectedCategory.name },
+    description: typeof props.selectedCategory.description === 'string'
+        ? { en: props.selectedCategory.description }
+        : { ...(props.selectedCategory.description || {}) },
     updating: '',
     schedule: {
       ...formData.value.schedule,
@@ -329,7 +357,7 @@ const submit = () => {
       }
       axios
         .patch(`${url}/menuCategories/${formData.value._id}`, data)
-        .then((response) => {
+        .then(() => {
           init({ message: "You've successfully updated", color: 'success' })
           emits('cancel')
         })
@@ -339,7 +367,7 @@ const submit = () => {
     } else {
       axios
         .post(`${url}/menuCategories`, data)
-        .then((response) => {
+        .then(() => {
           init({ message: "You've successfully created", color: 'success' })
           emits('cancel')
         })

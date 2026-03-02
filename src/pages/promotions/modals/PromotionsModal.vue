@@ -12,7 +12,7 @@
       <!-- HEADER -->
       <template #header>
         <div class="py-4 px-6 border-b font-bold text-xl gradient-header">
-          {{ isUpdating ? 'Edit Promotion' : 'Add New Promotion' }}
+          {{ isUpdating ? `Edit Promotion - ${formData.name}` : 'Add New Promotion' }}
         </div>
       </template>
 
@@ -339,7 +339,13 @@ import { useForm, useToast } from 'vuestic-ui'
 import { validators } from '@/services/utils'
 import { useServiceStore } from '@/stores/services'
 import FileUpload from '@/components/file-uploader/FileUpload.vue'
-import { createPromotion, updatePromotion, getPromotionById, getMenuItemsByOutlet, generatePromotionCodes } from '../services/promotionService'
+import {
+  createPromotion,
+  updatePromotion,
+  getPromotionById,
+  getMenuItemsByOutlet,
+  generatePromotionCodes,
+} from '../services/promotionService'
 import AddSelectionModal from './AddSelectionModal.vue'
 
 const emits = defineEmits(['update:isVisible', 'submitted', 'open-selection-modal', 'getPromotions'])
