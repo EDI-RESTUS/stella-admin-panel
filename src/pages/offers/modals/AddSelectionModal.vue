@@ -62,7 +62,7 @@
                           <VaCheckbox
                             v-model="item.selected"
                             :true-value="item._id"
-                            :label="item.code + ' - ' + item.name"
+                            :label="item.code + ' - ' + localName(item.name)"
                             class="check"
                           />
 
@@ -192,7 +192,7 @@
                           <VaCheckbox
                             v-model="item.selected"
                             :true-value="item._id"
-                            :label="item.internalName ? `${item.name} - ${item.internalName}` : item.name"
+                            :label="item.internalName ? `${localName(item.name)} - ${item.internalName}` : localName(item.name)"
                             class="w-full"
                           />
                           <div class="w-12">
@@ -234,7 +234,7 @@
                           <VaCheckbox
                             v-model="item.selected"
                             :true-value="item._id"
-                            :label="item.internalName ? `${item.name} - ${item.internalName}` : item.name"
+                            :label="item.internalName ? `${localName(item.name)} - ${item.internalName}` : localName(item.name)"
                             class="w-full"
                           />
                           <div class="w-12">
@@ -297,7 +297,7 @@
                           <VaCheckbox
                             v-model="item.selected"
                             :true-value="item.id"
-                            :label="item.posName ? `${item.name} - ${item.posName}` : item.name"
+                            :label="item.posName ? `${localName(item.name)} - ${item.posName}` : localName(item.name)"
                           />
                           <div class="flex items-center gap-1">
                             <div class="w-12">
@@ -377,7 +377,7 @@
                           <VaCheckbox
                             v-model="item.selected"
                             :true-value="item.id"
-                            :label="item.posName ? `${item.name} - ${item.posName}` : item.name"
+                            :label="item.posName ? `${localName(item.name)} - ${item.posName}` : localName(item.name)"
                           />
                           <div class="flex items-center gap-1">
                             <div class="w-12">
@@ -472,6 +472,30 @@ const isLoading = ref(false)
 const items = ref([])
 const sortBy = ref('name')
 const sortOrder = ref('asc')
+
+// Outlet default language (same pattern as OfferModal)
+const primaryLanguage = ref('en')
+
+const getOutletDetails = async () => {
+  try {
+    const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/outlets/${servicesStore.selectedRest}`)
+    if (response.data?.defaultLanguage) {
+      primaryLanguage.value = response.data.defaultLanguage
+    }
+  } catch {
+    primaryLanguage.value = 'en'
+  }
+}
+
+/** Extract the localised string from a name that may be a plain string or a { lang: string } object */
+function localName(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  if (typeof val === 'object') {
+    return val[primaryLanguage.value] || val['en'] || Object.values(val)[0] || ''
+  }
+  return String(val)
+}
 
 const isVisible = ref(true)
 const isUpdating = ref(false)
@@ -589,7 +613,7 @@ const groupWorker = new Worker(
                     }),
                   };
                 })
-              };    
+              };
             })
         self.postMessage(filtered);
       }
@@ -632,7 +656,7 @@ if (props.isEditSelection) {
   isUpdating.value = true
   formData.value = {
     ...formData.value,
-    name: props.offerSelection.name,
+    name: localName(props.offerSelection.name),
     min: props.offerSelection.min.toString(),
     max: props.offerSelection.max.toString(),
     isRequired: props.offerSelection.isRequired || false,
@@ -695,12 +719,13 @@ const getArticles = async () => {
   items.value.sort((a: any, b: any) => {
     if (!!a.selected && !b.selected) return -1
     if (!a.selected && !!b.selected) return 1
-    return a.name.localeCompare(b.name)
+    return localName(a.name).localeCompare(localName(b.name))
   })
   isLoading.value = false
 }
 
 onMounted(() => {
+  getOutletDetails()
   getArticles()
 })
 

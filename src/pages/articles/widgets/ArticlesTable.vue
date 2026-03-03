@@ -892,7 +892,7 @@ function openFileModal(data) {
               >
                 <template v-for="opt in getActiveOptions(rowData)" :key="opt.id">
                   <span class="px-2 py-1 rounded text-sm bg-green-50 text-green-700 text-center w-full">
-                    {{ opt.name }}
+                    {{ getLocalizedValue(opt.name) }}
                   </span>
                 </template>
               </div>

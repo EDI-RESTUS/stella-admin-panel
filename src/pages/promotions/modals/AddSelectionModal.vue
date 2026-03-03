@@ -49,7 +49,7 @@
                     <td class="p-2">
                       <VaCheckbox
                         :model-value="isChecked(item._id)"
-                        :label="item.code + ' - ' + item.name + (props.type === 'options' ? ' - ' + item.posName : '')"
+                        :label="item.code + ' - ' + localName(item.name) + (props.type === 'options' ? ' - ' + item.posName : '')"
                         @update:modelValue="toggleSelection(String(item._id))"
                       />
                     </td>
@@ -60,7 +60,7 @@
                     <td class="p-2">
                       <VaCheckbox
                         :model-value="isChecked(item._id)"
-                        :label="item.code + ' - ' + item.name + (props.type === 'options' ? ' - ' + item.posName : '')"
+                        :label="item.code + ' - ' + localName(item.name) + (props.type === 'options' ? ' - ' + item.posName : '')"
                         @update:modelValue="toggleSelection(String(item._id))"
                       />
                     </td>
@@ -192,6 +192,14 @@ import { ref, computed, onMounted, toRef, watch, nextTick, onBeforeUnmount } fro
 import { useToast } from 'vuestic-ui'
 import axios from 'axios'
 import { getPromotionById, updatePromotion, getArticlesByOutlet } from '../services/promotionService'
+import { useI18n } from 'vue-i18n'
+const { locale } = useI18n()
+const localName = (val: any): string => {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  if (typeof val === 'object') return val[locale.value] || val['en'] || Object.values(val)[0] as string || ''
+  return String(val)
+}
 
 /* Emits */
 const emits = defineEmits(['cancel', 'promotionUpdated', 'save-pending-selections'])
@@ -227,7 +235,7 @@ const filteredAndSortedList = (list: any[]) => {
   const searchTerm = searchQuery.value.toLowerCase().trim()
   return list.filter((item) => {
     if (!item) return false
-    const name = (item.name || '').toLowerCase()
+    const name = localName(item.name || '').toLowerCase()
     const code = (item.code || '').toLowerCase()
     const posName = (item.posName || '').toLowerCase()
     return searchTerm === '' || name.includes(searchTerm) || code.includes(searchTerm) || posName.includes(searchTerm)
@@ -272,7 +280,7 @@ const filteredList = computed(() => {
     if (!item) return false
 
     // Create the same display text that's shown in the UI
-    const displayText = `${item.code} - ${item.name}${props.type === 'options' ? ' - ' + item.posName : ''}`
+    const displayText = `${item.code} - ${localName(item.name)}${props.type === 'options' ? ' - ' + item.posName : ''}`
       .toLowerCase()
       .trim()
 
