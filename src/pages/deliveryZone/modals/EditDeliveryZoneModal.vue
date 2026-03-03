@@ -174,7 +174,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import axios from 'axios'
-import { useToast } from 'vuestic-ui'
+import { useToast, useModal } from 'vuestic-ui'
 import { useServiceStore } from '@/stores/services'
 import PostalCodeAddressesModal from './PostalCodeAddressesModal.vue'
 
@@ -188,6 +188,7 @@ const props = defineProps({
 const emits = defineEmits(['cancel'])
 
 const { init } = useToast()
+const { confirm } = useModal()
 const servicesStore = useServiceStore()
 
 const isVisible = ref(true)
@@ -270,8 +271,17 @@ function addPostalCode() {
   newPostalCode.value = ''
 }
 
-function removePostalCode(index: number) {
+async function removePostalCode(index: number) {
   const code = postalCodes.value[index]
+
+  const isConfirmed = await confirm({
+    message: `Are you sure you want to remove postal code ${code}?`,
+    title: 'Confirm Deletion',
+    okText: 'Delete',
+    cancelText: 'Cancel',
+  })
+  if (!isConfirmed) return
+
   postalCodes.value.splice(index, 1)
   const addedIndex = addedCodes.value.indexOf(code)
   if (addedIndex !== -1) {
