@@ -409,16 +409,23 @@ const phoneNumber = computed({
   },
   set(val) {
      const raw = String(val || '').replace(/\D/g, '')
+     if (!raw) {
+       phoneLocal.value = ''
+       return
+     }
+     // Short internal codes 1-15: keep +357 prefix, don't try to match country codes
+     // (otherwise "15" would match +1 (US) and leave local = "5")
+     const num = Number(raw)
+     if (raw.length <= 2 && num >= 1 && num <= 15) {
+       phonePrefix.value = '357'
+       phoneLocal.value = raw
+       return
+     }
      const found = countryPrefixes.find(p => raw.startsWith(p.value))
      if (found) {
         phonePrefix.value = found.value
         phoneLocal.value = raw.slice(found.value.length)
      } else {
-        // If empty, keep default? or clear?
-        if (!raw) {
-             phoneLocal.value = ''
-             return
-        }
         // Assume default 357 if no match
         phonePrefix.value = '357'
         phoneLocal.value = raw
@@ -975,12 +982,12 @@ function selectUser(user) {
   }
 }
 
-// Auto-select location when phone number is 1-15 based on customer name
+// Auto-select location when phone number is 1-15 by matching serviceZoneId to phone number
 function autoSelectLocationForShortPhone() {
-  const phone = String(phoneNumber.value || '').trim()
+  const phone = String(phoneLocal.value || '').trim()
   const phoneNum = Number(phone)
 
-  // Only apply for phone numbers 1-15
+  // Only apply for phone numbers 1-15 (no country prefix involved)
   if (phone.length <= 2 && phoneNum >= 1 && phoneNum <= 15) {
     // Wait for delivery zones to be loaded
     if (!deliveryZoneOptions.value.length) {
@@ -988,18 +995,10 @@ function autoSelectLocationForShortPhone() {
       return
     }
 
-    const customerName = (name.value || '').toLowerCase().trim()
-
-    // Find matching zone by name
-    const matchingZone = deliveryZoneOptions.value.find((zone) => {
-      const zoneId = Number(zone.serviceZoneId)
-      if (zoneId >= 1 && zoneId <= 15) {
-        const locationName = (zone.name || '').toLowerCase().trim()
-        // Check if customer name contains location name or vice versa
-        return customerName.includes(locationName) || locationName.includes(customerName)
-      }
-      return false
-    })
+    // Match zone directly by serviceZoneId == phone number (e.g. phone 15 → Deftera)
+    const matchingZone = deliveryZoneOptions.value.find(
+      (zone) => Number(zone.serviceZoneId) === phoneNum,
+    )
 
     if (matchingZone) {
       selectDeliveryZone(matchingZone)
@@ -1010,8 +1009,9 @@ function autoSelectLocationForShortPhone() {
 const deliveryZoneOptions = ref([])
 
 // Check if location should be locked (for phone numbers 1-15)
+// Use phoneLocal (no country prefix) so "15" stays "15" instead of "35715"
 const isLocationLocked = computed(() => {
-  const phone = String(phoneNumber.value || '').trim()
+  const phone = String(phoneLocal.value || '').trim()
   const phoneNum = Number(phone)
   return phone.length <= 2 && phoneNum >= 1 && phoneNum <= 15
 })
@@ -1020,22 +1020,15 @@ const isLocationLocked = computed(() => {
 const filteredDeliveryZones = computed(() => {
   if (!deliveryZoneOptions.value.length) return []
 
-  const phone = String(phoneNumber.value || '').trim()
+  // Use phoneLocal (no country prefix) so "15" stays "15" instead of "35715"
+  const phone = String(phoneLocal.value || '').trim()
   const phoneNum = Number(phone)
 
-  // For phone numbers 1-15, filter by matching customer name with location name
+  // For phone numbers 1-15, only show the matching zone (by serviceZoneId)
   if (phone.length <= 2 && phoneNum >= 1 && phoneNum <= 15) {
-    const customerName = (name.value || '').toLowerCase().trim()
-
-    return deliveryZoneOptions.value.filter((zone) => {
-      const zoneId = Number(zone.serviceZoneId)
-      if (zoneId >= 1 && zoneId <= 15) {
-        const locationName = (zone.name || '').toLowerCase().trim()
-        // Only show zones where customer name matches location name
-        return customerName.includes(locationName) || locationName.includes(customerName)
-      }
-      return false
-    })
+    return deliveryZoneOptions.value.filter(
+      (zone) => Number(zone.serviceZoneId) === phoneNum,
+    )
   }
 
   // For regular phone numbers, show all zones
@@ -1127,6 +1120,10 @@ watch(selectedTab, (newTab) => {
 async function handleDeliveryZoneFetch() {
   const servicesStore = useServiceStore()
   if (deliveryZoneOptions.value.length) {
+    // Zones already cached – still try auto-select for short phone numbers
+    if (selectedUser.value) {
+      autoSelectLocationForShortPhone()
+    }
     return
   }
   try {
@@ -1345,6 +1342,7 @@ watch(
     }
 
     if (selectedUser.value) {
+      // handleDeliveryZoneFetch will auto-select for short phones (1-15) if zones cached
       handleDeliveryZoneFetch()
     }
     emits('setCustomerDetailsId', selectedUser.value._id || selectedUser.value.id)
