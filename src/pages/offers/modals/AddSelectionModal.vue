@@ -257,7 +257,18 @@
 
           <!-- Options -->
           <div>
-            <div class="text-sm font-semibold text-blue-600 uppercase tracking-wide mb-2">Options</div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-sm font-semibold text-blue-600 uppercase tracking-wide">Options</div>
+              <button
+                class="text-xs font-medium px-2 py-0.5 rounded-full border transition-colors duration-150"
+                :class="allVisibleOptionsSelected
+                  ? 'bg-red-50 text-red-600 border-red-300 hover:bg-red-100'
+                  : 'bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100'"
+                @click="toggleAllVisibleOptions"
+              >
+                {{ allVisibleOptionsSelected ? 'Deselect All' : 'Select All' }}
+              </button>
+            </div>
 
             <!-- Static Search Bar -->
             <VaInput v-model="optionSearchQuery" placeholder="Search..." size="small" class="w-full mb-2" />
@@ -514,6 +525,29 @@ const optionSearchQuery = ref('')
 const defaultOptions = ref([])
 const defaultArticles = ref([])
 const debouncedSearch = ref('')
+
+// All currently-visible options (respects group search + option search)
+const visibleOptions = computed(() => {
+  const articleFilter = (a: any) => a.isVisible || a.selected
+  const groupFilter = (g: any) => groupSearchQuery.value ? g.display : g.selected
+  return items.value
+    .filter(articleFilter)
+    .flatMap((a: any) => a.articlesOptionsGroup)
+    .filter(groupFilter)
+    .flatMap((g: any) => g.articlesOptions)
+    .filter((o: any) => o.display)
+})
+
+const allVisibleOptionsSelected = computed(() =>
+  visibleOptions.value.length > 0 && visibleOptions.value.every((o: any) => !!o.selected)
+)
+
+function toggleAllVisibleOptions() {
+  const shouldSelect = !allVisibleOptionsSelected.value
+  visibleOptions.value.forEach((opt: any) => {
+    opt.selected = shouldSelect ? opt.id : false
+  })
+}
 
 function debounce(fn, delay) {
   let timeout
