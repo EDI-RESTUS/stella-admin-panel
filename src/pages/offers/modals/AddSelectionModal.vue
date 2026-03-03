@@ -269,7 +269,7 @@
                   items
                     .filter((a) => a.isVisible)
                     .flatMap((item) => item.articlesOptionsGroup)
-                    .filter((a) => a.selected)
+                    .filter((a) => groupSearchQuery ? a.display : a.selected)
                     .flatMap((a) => a.articlesOptions).length
                 "
                 class="w-full text-sm"
@@ -282,7 +282,7 @@
                       items
                         .filter((a) => a.isVisible)
                         .flatMap((item) => item.articlesOptionsGroup)
-                        .filter((a) => a.selected)
+                        .filter((a) => groupSearchQuery ? a.display : a.selected)
                         .flatMap((a) => a.articlesOptions)
                         .filter((a) => a.display)
                     "
@@ -349,7 +349,7 @@
                   items
                     .filter((a) => a.selected)
                     .flatMap((item) => item.articlesOptionsGroup)
-                    .filter((a) => a.selected)
+                    .filter((a) => groupSearchQuery ? a.display : a.selected)
                     .flatMap((a) => a.articlesOptions).length
                 "
                 class="w-full text-sm"
@@ -362,7 +362,7 @@
                       items
                         .filter((a) => a.selected)
                         .flatMap((item) => item.articlesOptionsGroup)
-                        .filter((a) => a.selected)
+                        .filter((a) => groupSearchQuery ? a.display : a.selected)
                         .flatMap((a) => a.articlesOptions)
                         .filter((a) => a.display)
                     "
@@ -588,22 +588,31 @@ const groupWorker = new Worker(
         const groupSearch = groupSearchQuery.toLowerCase();
         const optionSearch = debouncedSearch.toLowerCase();
         const search = searchQuery.toLowerCase();
+
+        // Extract a plain string from a possibly-multilingual name object
+        function localStr(val) {
+          if (!val) return '';
+          if (typeof val === 'string') return val;
+          if (typeof val === 'object') return val['en'] || Object.values(val)[0] || '';
+          return String(val);
+        }
+
         const filtered = items
           .map(a => {
-            const nameMatch = a.name?.toLowerCase().includes(search);
+            const nameMatch = localStr(a.name).toLowerCase().includes(search);
               const internalNameMatch = a.code?.toLowerCase().includes(search);
               return {
                 ...a,
                 isVisible: a.isVisible,
                 display: nameMatch || internalNameMatch || !searchQuery,
                 articlesOptionsGroup: a.articlesOptionsGroup.map(g => {
-                  const nameMatch = g.name?.toLowerCase().includes(groupSearch);
+                  const nameMatch = localStr(g.name).toLowerCase().includes(groupSearch);
                   const internalNameMatch = g.internalName?.toLowerCase().includes(groupSearch);
                   return {
                     ...g,
                     display: nameMatch || internalNameMatch || !groupSearch,
                     articlesOptions: g.articlesOptions.map(opt => {
-                      const optNameMatch = opt.name?.toLowerCase().includes(optionSearch);
+                      const optNameMatch = localStr(opt.name).toLowerCase().includes(optionSearch);
                       const optPosNameMatch = opt.posName?.toLowerCase().includes(optionSearch);
                       return {
                         ...opt,
