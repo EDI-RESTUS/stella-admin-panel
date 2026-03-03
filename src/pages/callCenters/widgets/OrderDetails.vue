@@ -1144,17 +1144,13 @@ onMounted(async () => {
           dateSelected: order.orderDateTime || order.createdAt
         })
 
-        // 3. Set local state to match order
-        // Note: Props are passed from parent, so we might need to emit or rely on store
-        // For CheckOutModal, we pass 'existingOrderId'
+
         existingOrderId.value = oid
         orderStore.orderDateTime = order.orderDateTime || order.createdAt
 
-        // 4. Open modal
         console.log('[OrderDetails] Setting showCheckoutModal = true. Cart items LEN:', orderStore.cartItems.length)
         showCheckoutModal.value = true
 
-        // 5. Clean URL
         const q = { ...route.query }
         delete q.payment
         delete q.orderId
