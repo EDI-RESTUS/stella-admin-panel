@@ -159,7 +159,8 @@
     </div>
 
     <template #footer>
-      <div class="flex justify-end mt-4">
+      <div class="flex justify-between mt-4">
+        <VaButton color="danger" @click="deleteZone" :disabled="loading">Delete Delivery Zone</VaButton>
         <VaButton @click="save" :disabled="loading">Update</VaButton>
       </div>
     </template>
@@ -391,6 +392,35 @@ async function save() {
     isVisible.value = false
   } catch (error: any) {
     const message = error?.response?.data?.message || 'Failed to update delivery zone'
+    init({ message, color: 'danger' })
+  } finally {
+    loading.value = false
+  }
+}
+
+// --- Delete Delivery Zone ---
+async function deleteZone() {
+  const isConfirmed = await confirm({
+    message: `Are you sure you want to delete the "${zoneName.value}" delivery zone?`,
+    title: 'Delete Delivery Zone',
+    okText: 'Delete',
+    cancelText: 'Cancel',
+    size: 'medium'
+  })
+
+  if (!isConfirmed) return
+
+  loading.value = true
+  try {
+    const data = {
+      ...props.rowData,
+      isDeleted: true
+    }
+    await axios.patch(`${url}/deliveryZones/${props.rowData._id}`, data)
+    init({ message: 'Delivery zone deleted successfully', color: 'success' })
+    isVisible.value = false
+  } catch (error: any) {
+    const message = error?.response?.data?.message || 'Failed to delete delivery zone'
     init({ message, color: 'danger' })
   } finally {
     loading.value = false
