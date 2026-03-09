@@ -152,9 +152,23 @@
                 <span class="text-green-600">PAID AMOUNT: {{ orderStore.editOrder.editOrderTotal.toFixed(2) }} €</span>
               </span>
               <span v-else>Total:</span>
-              <span v-if="orderStore.editOrder">Balance {{ getTotalPrice }} €</span>
+              <span v-if="orderStore.editOrder && promoTotal">
+                {{ (orderStore.editOrder.editOrderTotal + promoTotal.updatedTotal).toFixed(2) }} €
+              </span>
+              <span v-else-if="orderStore.editOrder">
+                {{ (orderStore.editOrder.editOrderTotal + totalAmount + deliveryFee).toFixed(2) }} €
+              </span>
               <span v-else-if="!promoTotal">{{ (totalAmount + deliveryFee).toFixed(2) }} €</span>
               <span v-else>{{ promoTotal.updatedTotal.toFixed(2) }} €</span>
+            </div>
+            <div v-if="orderStore.editOrder" class="total-row text-sm">
+              <span class="text-gray-600">Difference:</span>
+              <span v-if="promoTotal" class="font-semibold text-red-600">
+                {{ promoTotal.updatedTotal.toFixed(2) }} €
+              </span>
+              <span v-else class="font-semibold text-red-600">
+                {{ (totalAmount + deliveryFee).toFixed(2) }} €
+              </span>
             </div>
           </div>
         </div>
@@ -249,12 +263,12 @@
         <div class="flex-grow relative py-16">
           <iframe :src="redirectUrl" width="100%" height="100%" class="border-none"/>
           <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
-            
+
           </div>
         </div>
         <div class="p-4 border-t border-gray-200 flex justify-between items-center bg-gray-50">
           <span class="text-sm text-gray-500 flex items-center gap-2">
-            
+
           </span>
           <div class="flex gap-2">
             <button
@@ -412,8 +426,8 @@ const getTotalPrice = computed(() => {
 onMounted(() => {
   console.log('[CheckOutModal] Mounted. Cart items LEN:', orderStore.cartItems.length)
   console.log('[CheckOutModal] Mounted. Offer items LEN:', orderStore.offerItems.length)
-  console.log('[CheckOutModal] Store ID ref:', orderStore.$id) 
-  
+  console.log('[CheckOutModal] Store ID ref:', orderStore.$id)
+
   if (serviceStore.selectedRest) {
     getPaymentOptions()
   }
@@ -1125,16 +1139,16 @@ async function createOrder() {
   } catch (err: any) {
     console.error('[CheckOutModal] Payment failed. Error details:', err)
     console.error('[CheckOutModal] Response data:', err.response?.data)
-    
+
     // Build error message, including out of stock items if applicable
     let errorMessage = err.response?.data?.message || 'Order failed, please try again.'
     const errorData = err.response?.data
-    
+
     // Check for OUT_OF_STOCK error and append item names
     if (errorData?.code === 'OUT_OF_STOCK' && Array.isArray(errorData?.outOfStockItems) && errorData.outOfStockItems.length) {
       errorMessage = `${errorMessage} Items: ${errorData.outOfStockItems.join(', ')}`
     }
-    
+
     init({
       color: 'danger',
       message: errorMessage,
@@ -1664,8 +1678,8 @@ const promoOfferItemPrice = (item: any, index: number) => {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.1s ease;
-  height: 100%;     
-  width: 100%;      
+  height: 100%;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;

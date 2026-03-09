@@ -243,11 +243,19 @@
             <div class="flex justify-between font-bold text-xs pt-1 border-t">
               <span v-if="orderStore.editOrder">
                 Total
-                <span class="text-green-600"> · PAID €{{ (orderStore.editOrder.editOrderTotal || 0).toFixed(2) }}</span>
+                <span class="text-green-600">
+                  · PAID €{{ (orderStore.editOrder.editOrderTotal || 0).toFixed(2) }}
+                </span>
               </span>
               <span v-else>Total</span>
-              <span v-if="orderStore.editOrder">€{{ getTotalPrice }}</span>
+              <span v-if="orderStore.editOrder">
+                €{{ ((orderStore.editOrder.editOrderTotal || 0) + total).toFixed(2) }}
+              </span>
               <span v-else>€{{ total.toFixed(2) }}</span>
+            </div>
+            <div v-if="orderStore.editOrder" class="flex justify-between text-xs pt-0.5">
+              <span class="text-gray-600">Difference</span>
+              <span class="font-semibold text-red-600">€{{ total.toFixed(2) }}</span>
             </div>
           </template>
 
@@ -272,11 +280,21 @@
             <div class="flex justify-between font-bold text-xs pt-1 border-t">
               <span v-if="orderStore.editOrder">
                 Total
-                <span class="text-green-600"> · PAID €{{ (orderStore.editOrder.editOrderTotal || 0).toFixed(2) }}</span>
+                <span class="text-green-600">
+                  · PAID €{{ (orderStore.editOrder.editOrderTotal || 0).toFixed(2) }}
+                </span>
               </span>
               <span v-else>Total</span>
-              <span v-if="orderStore.editOrder">€{{ getTotalPrice }}</span>
+              <span v-if="orderStore.editOrder">
+                €{{ ((orderStore.editOrder.editOrderTotal || 0) + promoTotal.updatedTotal).toFixed(2) }}
+              </span>
               <span v-else>€{{ promoTotal.updatedTotal.toFixed(2) }}</span>
+            </div>
+            <div v-if="orderStore.editOrder" class="flex justify-between text-xs pt-0.5">
+              <span class="text-gray-600">Difference</span>
+              <span class="font-semibold text-red-600">
+                €{{ promoTotal.updatedTotal.toFixed(2) }}
+              </span>
             </div>
           </template>
         </div>
