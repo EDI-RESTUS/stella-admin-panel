@@ -86,7 +86,7 @@ const columns = defineVaDataTableColumns([
   { label: 'Selections', key: 'selections', thAlign: 'center' },
   { label: 'In Stock', key: 'inStock', thAlign: 'center' },
   { label: 'Active', key: 'isActive', thAlign: 'center' },
-  { label: 'Actions', key: 'actions' },
+  { label: 'Actions', key: 'actions', width: '100px' },
 ])
 const columnsVisibility = reactive<Record<string, boolean>>({})
 
@@ -359,6 +359,22 @@ async function deleteOffer(payload) {
     .catch((err) => {
       init({ message: err.response?.data?.error || 'Delete failed', color: 'danger' })
     })
+}
+
+async function duplicateOffer(payload) {
+  try {
+    const { _id, __v, createdAt, updatedAt, ...rest } = payload
+    const duplicate = {
+      ...rest,
+      code: (rest.code || '') + '_COPY',
+      isActive: false,
+    }
+    await axios.post(`${import.meta.env.VITE_API_BASE_URL}/offers`, duplicate)
+    init({ message: 'Offer duplicated successfully', color: 'success' })
+    emits('getOffers')
+  } catch (err) {
+    init({ message: err.response?.data?.error || 'Duplicate failed', color: 'danger' })
+  }
 }
 
 async function deleteSelection(payload) {
@@ -1061,6 +1077,15 @@ function formatReadableDate(dateStr: string): string {
               @click="emits('editOffers', rowData)"
             >
               <Pencil class="w-3.5 h-3.5" />
+            </button>
+
+            <!-- Duplicate -->
+            <button
+              class="flex items-center justify-center w-7 h-7 rounded-lg text-blue-600 hover:bg-blue-100 transition-colors duration-150 active:scale-95"
+              title="Duplicate Offer"
+              @click="duplicateOffer(rowData)"
+            >
+              <VaIcon name="mso-content_copy" class="w-4.5 h-4.5 block" />
             </button>
 
             <!-- Delete -->

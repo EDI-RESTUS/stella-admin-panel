@@ -257,7 +257,18 @@
 
           <!-- Options -->
           <div>
-            <div class="text-sm font-semibold text-blue-600 uppercase tracking-wide mb-2">Options</div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-sm font-semibold text-blue-600 uppercase tracking-wide">Options</div>
+              <button
+                class="text-xs font-medium px-2 py-0.5 rounded-full border transition-colors duration-150"
+                :class="allVisibleOptionsSelected
+                  ? 'bg-red-50 text-red-600 border-red-300 hover:bg-red-100'
+                  : 'bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100'"
+                @click="toggleAllVisibleOptions"
+              >
+                {{ allVisibleOptionsSelected ? 'Deselect All' : 'Select All' }}
+              </button>
+            </div>
 
             <!-- Static Search Bar -->
             <VaInput v-model="optionSearchQuery" placeholder="Search..." size="small" class="w-full mb-2" />
@@ -515,6 +526,29 @@ const defaultOptions = ref([])
 const defaultArticles = ref([])
 const debouncedSearch = ref('')
 
+// All currently-visible options (respects group search + option search)
+const visibleOptions = computed(() => {
+  const articleFilter = (a: any) => a.isVisible || a.selected
+  const groupFilter = (g: any) => groupSearchQuery.value ? g.display : g.selected
+  return items.value
+    .filter(articleFilter)
+    .flatMap((a: any) => a.articlesOptionsGroup)
+    .filter(groupFilter)
+    .flatMap((g: any) => g.articlesOptions)
+    .filter((o: any) => o.display)
+})
+
+const allVisibleOptionsSelected = computed(() =>
+  visibleOptions.value.length > 0 && visibleOptions.value.every((o: any) => !!o.selected)
+)
+
+function toggleAllVisibleOptions() {
+  const shouldSelect = !allVisibleOptionsSelected.value
+  visibleOptions.value.forEach((opt: any) => {
+    opt.selected = shouldSelect ? opt.id : false
+  })
+}
+
 function debounce(fn, delay) {
   let timeout
   return (...args) => {
@@ -686,8 +720,43 @@ const getArticles = async () => {
       sortValue: sortOrder.value,
     },
   })
-  items.value = res.data.map((e) => {
-    const selected = props.offerSelection?.menuItems?.find((item) => item.menuItemId === e._id)
+
+  // When editing a selection that has the same menuItemId more than once (e.g. the
+  // same pizza chosen twice with different toppings), we expand the raw API list so
+  // there is one row for every saved occurrence.  Each duplicated row gets a unique
+  // `_instanceId` so Vue can track them independently.
+  let expandedData = res.data as any[]
+
+  if (props.isEditSelection && props.offerSelection?.menuItems) {
+    const countMap: Record<string, number> = {}
+    props.offerSelection.menuItems.forEach((m: any) => {
+      countMap[m.menuItemId] = (countMap[m.menuItemId] ?? 0) + 1
+    })
+    const expanded: any[] = []
+    const usedMap: Record<string, number> = {}
+    res.data.forEach((e: any) => {
+      const count = countMap[e._id] ?? 1
+      for (let i = 0; i < count; i++) {
+        usedMap[e._id] = (usedMap[e._id] ?? 0)
+        expanded.push({ ...e, _instanceId: `${e._id}_${i}` })
+        usedMap[e._id]++
+      }
+    })
+    expandedData = expanded
+  }
+
+  // Track which occurrence of each menuItemId we have consumed so far
+  const menuItemOccurrenceIndex: Record<string, number> = {}
+
+  items.value = expandedData.map((e: any) => {
+    // All saved entries for this menuItemId (may be >1 for duplicated entries)
+    const allMatches = props.offerSelection?.menuItems?.filter((item: any) => item.menuItemId === e._id) || []
+
+    // Determine which occurrence we are at for this menuItemId
+    const occIdx = menuItemOccurrenceIndex[e._id] ?? 0
+    const selected = allMatches[occIdx] || null
+    // Advance the counter so the next row with the same _id gets the next occurrence
+    menuItemOccurrenceIndex[e._id] = occIdx + 1
 
     return {
       ...e,
@@ -696,29 +765,28 @@ const getArticles = async () => {
       isFree: selected ? selected.isFree : false,
       selected: selected ? e._id : '',
       customPrice: selected ? selected.customPrice : 0,
-      articlesOptionsGroup: e.articlesOptionsGroup.map((e) => {
-        let groupSelected = false
+      articlesOptionsGroup: e.articlesOptionsGroup.map((g: any) => {
+        let groupSelected: any = false
         if (selected) {
-          groupSelected = selected.optionGroups.find((group) => group.optionGroupId === e.id)
+          groupSelected = selected.optionGroups.find((group: any) => group.optionGroupId === g.id)
         }
         return {
-          ...e,
+          ...g,
           display: true,
           customMaxChoices: groupSelected ? groupSelected.customMaxChoices : 0,
-          selected: groupSelected ? e._id : !props.isEditSelection ? e._id : '',
-          articlesOptions: e.articlesOptions.map((opt) => {
-            let optionSelected = false
+          selected: groupSelected ? g._id : !props.isEditSelection ? g._id : '',
+          articlesOptions: g.articlesOptions.map((opt: any) => {
+            let optionSelected: any = false
             if (groupSelected) {
-              optionSelected = groupSelected?.selectedOptions.find((option) => option.optionId === opt.id)
+              optionSelected = groupSelected.selectedOptions.find((option: any) => option.optionId === opt.id)
             }
-
             return {
               ...opt,
-              optionGroupId: e.id,
+              optionGroupId: g.id,
               display: true,
               selected: optionSelected ? opt.id : !props.isEditSelection ? opt.id : '',
               isFree: optionSelected?.isFree || false,
-              customPrice: optionSelected ? optionSelected?.customPrice : 0,
+              customPrice: optionSelected ? optionSelected.customPrice : 0,
             }
           }),
         }
