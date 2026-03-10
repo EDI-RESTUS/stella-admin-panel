@@ -1012,8 +1012,22 @@ async function updateOrderWithPromo(promoCodes: string[]) {
       ),
     }))
 
-    // Merge: original (cached) items + new items from cart
-    const menuItems = [...cachedMenuItems, ...newMenuItems]
+    // Merge: remove from cache only as many as exist in cart (edited items), keep the rest
+    const cartCountMap = new Map<string, number>()
+    for (const c of orderStore.cartItems as any[]) {
+      cartCountMap.set(c.itemId, (cartCountMap.get(c.itemId) || 0) + 1)
+    }
+    const removedCountMap = new Map<string, number>()
+    const untouchedCachedItems = cachedMenuItems.filter((ci: any) => {
+      const allowed = cartCountMap.get(ci.menuItem) || 0
+      const removed = removedCountMap.get(ci.menuItem) || 0
+      if (allowed > 0 && removed < allowed) {
+        removedCountMap.set(ci.menuItem, removed + 1)
+        return false // this one was edited, skip it
+      }
+      return true // keep untouched original
+    })
+    const menuItems = [...untouchedCachedItems, ...newMenuItems]
 
     const newOfferItems = orderStore.offerItems.map((offer: any) => ({
       offerId: offer.offerId,
@@ -1032,8 +1046,22 @@ async function updateOrderWithPromo(promoCodes: string[]) {
       ),
     }))
 
-    // Merge: original (cached) offers + new offers from cart
-    const offerMenuItems = [...cachedOfferItems, ...newOfferItems]
+    // Merge: count-based removal for offers too
+    const cartOfferCountMap = new Map<string, number>()
+    for (const o of orderStore.offerItems as any[]) {
+      cartOfferCountMap.set(o.offerId, (cartOfferCountMap.get(o.offerId) || 0) + 1)
+    }
+    const removedOfferCountMap = new Map<string, number>()
+    const untouchedCachedOffers = cachedOfferItems.filter((co: any) => {
+      const allowed = cartOfferCountMap.get(co.offerId) || 0
+      const removed = removedOfferCountMap.get(co.offerId) || 0
+      if (allowed > 0 && removed < allowed) {
+        removedOfferCountMap.set(co.offerId, removed + 1)
+        return false
+      }
+      return true
+    })
+    const offerMenuItems = [...untouchedCachedOffers, ...newOfferItems]
 
     const dateVal = props.dateSelected ? new Date(props.dateSelected) : new Date()
     const orderDateTime = !isNaN(dateVal.getTime()) ? dateVal.toISOString() : new Date().toISOString()
