@@ -1138,11 +1138,8 @@ const editSelected = async (orderId) => {
     })
   }
 
-  // Preview edit total
-  const total =
-    orderStore.cartItems.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0) +
-    orderStore.offerItems.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0)
-  order.editOrderTotal = total
+  // Use the original order's total as the paid amount
+  order.editOrderTotal = order.total || 0
 
   // Attach _editContext for OrderDetails.vue (delete→add later)
   const orderForStore = {
@@ -1832,7 +1829,7 @@ const addItemsToOrder = (orderId) => {
   // Attach _editContext (empty for pure add) and set as editOrder
   const orderForStore = {
     ...order,
-    editOrderTotal: order.totalAmount || 0, // Ensure this property exists as used in CheckOutModal
+    editOrderTotal: order.total || 0, // Original order total (paid amount)
     _editContext: {
       originalMenuItems: [],
       originalOffersToDelete: [],

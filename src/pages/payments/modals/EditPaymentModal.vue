@@ -45,8 +45,17 @@
           </div>
         </div>
 
-        <!-- Payment Type ID -->
-        <VaInput v-model="formData.paymentTypeId" label="Payment Type ID" placeholder="Payment Type ID" type="text" />
+        <!-- Payment Type ID + Auto Receipt + Receipt Format -->
+        <div class="grid md:grid-cols-3 gap-3 items-end">
+          <VaInput v-model="formData.paymentTypeId" label="Payment Type ID" placeholder="Payment Type ID" type="text" />
+          <VaCheckbox v-model="formData.autoReceipt" label="Auto Receipt" />
+          <VaSelect
+            v-model="formData.receiptFormat"
+            label="Receipt Format"
+            :options="receiptFormatOptions"
+            value-by="value"
+          />
+        </div>
 
         <!-- Options -->
         <div class="grid md:grid-cols-4 gap-3">
@@ -110,7 +119,15 @@ const formData = ref({
   delivery: false,
   takeaway: false,
   callCenter: false,
+  autoReceipt: false,
+  receiptFormat: 'NONE',
 })
+
+const receiptFormatOptions = [
+  { text: 'None', value: 'NONE' },
+  { text: 'Print', value: 'PRINT' },
+  { text: 'PDF', value: 'PDF' },
+]
 
 const isUpdating = computed(() => !!Object.keys(props.selectedPayment).length)
 
