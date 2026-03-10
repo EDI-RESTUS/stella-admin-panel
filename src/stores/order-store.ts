@@ -350,6 +350,10 @@ export const useOrderStore = defineStore('order', {
       const url = import.meta.env.VITE_API_BASE_URL
       return await axios.put(`${url}/orders/${orderId}/cancel`)
     },
+    async patchOrder(orderId: string, payload: any) {
+      const url = import.meta.env.VITE_API_BASE_URL
+      return await axios.patch(`${url}/orders/${orderId}/patch`, payload)
+    },
     async createPayment({ orderId: orderId, paymentTypeId: paymentTypeId }) {
       const url = import.meta.env.VITE_API_BASE_URL
       const next = window.location.href
