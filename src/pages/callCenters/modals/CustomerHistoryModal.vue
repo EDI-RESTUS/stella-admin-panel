@@ -438,20 +438,19 @@
                 </p>
 
                 <div class="flex flex-wrap gap-1 text-xs">
-                  <span
-                    v-for="addon in item.options || []"
-                    :key="addon.name"
-                    class="px-2 py-0.5 rounded-full"
-                    :class="{
-                      'bg-green-100 text-green-700': addon.type.toLowerCase() === 'extra',
-                      'bg-blue-100 text-blue-700': addon.type.toLowerCase() === 'article',
-                      'bg-red-100 text-red-700': addon.type.toLowerCase() === 'hold',
-                      'bg-amber-100 text-amber-700': addon.type.toLowerCase() === 'modifier',
-                    }"
-                  >
-                    {{ addon.name }}
-                    <span v-if="addon.price > 0">(€{{ addon.price.toFixed(2) }})</span>
-                  </span>
+  <span
+  v-for="addon in item.options || []"
+  :key="addon._id || addon.optionId || addon.name"
+  class="px-2 py-0.5 rounded-full"
+  :class="{
+    'bg-green-100 text-green-700': (addon.type || '').toLowerCase() === 'extra',
+    'bg-blue-100 text-blue-700': (addon.type || '').toLowerCase() === 'article',
+    'bg-red-100 text-red-700': (addon.type || '').toLowerCase() === 'hold',
+    'bg-amber-100 text-amber-700': (addon.type || '').toLowerCase() === 'modifier',
+  }"
+>
+  {{ addon.name }}
+</span>
                 </div>
               </div>
             </div>
@@ -526,22 +525,21 @@
               </p>
 
               <div class="flex flex-wrap gap-1 text-xs">
-                <span
-                  v-for="addon in item.articlesOptionsGroup
-                    .flatMap((a) => a.articlesOptions)
-                    .filter((a) => a.selected)"
-                  :key="addon._id || addon.optionId || addon.name"
-                  class="px-2 py-0.5 rounded-full"
-                  :class="{
-                    'bg-green-100 text-green-700': addon.type.toLowerCase() === 'extra',
-                    'bg-blue-100 text-blue-700': addon.type.toLowerCase() === 'article',
-                    'bg-red-100 text-red-700': addon.type.toLowerCase() === 'hold',
-                    'bg-amber-100 text-amber-700': addon.type.toLowerCase() === 'modifier',
-                  }"
-                >
-                  {{ addon.name }}
-                  <span v-if="addon.price > 0">(€{{ addon.price.toFixed(2) }})</span>
-                </span>
+<span
+  v-for="addon in item.articlesOptionsGroup
+    .flatMap((a) => a.articlesOptions)
+    .filter((a) => a.selected)"
+  :key="addon._id || addon.optionId || addon.name"
+  class="px-2 py-0.5 rounded-full"
+  :class="{
+    'bg-green-100 text-green-700': (addon.type || '').toLowerCase() === 'extra',
+    'bg-blue-100 text-blue-700': (addon.type || '').toLowerCase() === 'article',
+    'bg-red-100 text-red-700': (addon.type || '').toLowerCase() === 'hold',
+    'bg-amber-100 text-amber-700': (addon.type || '').toLowerCase() === 'modifier',
+  }"
+>
+  {{ addon.name }}
+</span>
               </div>
             </div>
             <span v-if="!item.overrideUnitPrice" class="font-bold">€ {{ getTotalPrice(item) }}</span>
@@ -726,6 +724,7 @@
     </div>
   </VaModal>
 </template>
+
 <script setup>
 import { ref, onMounted, reactive, computed } from 'vue'
 import {
@@ -738,6 +737,7 @@ import {
   Loader2,
   XCircle,
   ArrowRightLeft,
+  Ban,
 } from 'lucide-vue-next'
 import axios from 'axios'
 import { useUsersStore } from '@/stores/users.ts'
@@ -750,6 +750,7 @@ import { useToast } from 'vuestic-ui'
 import { useServiceStore } from '@/stores/services.ts'
 
 const { init } = useToast()
+
 const props = defineProps({
   customer: { type: Object, required: true },
   outlet: { type: Object, required: true },
@@ -761,8 +762,7 @@ const props = defineProps({
   selectedTab: { type: String, default: '' },
 })
 
-const emits = defineEmits(['close'])
-
+const emits = defineEmits(['close', 'repeat-order'])
 const liveStatus = ref(null)
 const showAddNoteModal = ref(false)
 const showComplaintModal = ref(false)
@@ -774,7 +774,6 @@ const showAddressModal = ref(false)
 const addressModalCustomer = ref(null)
 const pendingSwitchOrderId = ref(null)
 
-// Reschedule state
 const showRescheduleModal = ref(false)
 const pendingRescheduleOrderId = ref(null)
 const rescheduleDateTime = ref('')
@@ -795,7 +794,6 @@ const confirmOrderId = ref(null)
 const url = import.meta.env.VITE_API_BASE_URL
 const coordurl = import.meta.env.VITE_COORD_API_URL
 
-// ---------- Small utils ----------
 const eur = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' })
 const toNum = (v) => (v == null || v === '' ? 0 : Number(v))
 const first = (...vals) => vals.find((v) => toNum(v) > 0) ?? 0
@@ -804,8 +802,6 @@ const titleize = (s = '') =>
     .replace(/[_-]+/g, ' ')
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase())
-const idOf = (x) => x?._id || x?.id || x
-const optId = (o) => o?.option?._id || o?.option?.id || o?.optionId || o?._id || o?.id || o?.option
 
 const TYPE_LABELS = {
   TAKE_X_PAY_Y: 'Take X Pay Y',
@@ -813,7 +809,13 @@ const TYPE_LABELS = {
   VALUE_DISCOUNT: 'Value Discount',
 }
 
-// ---------- Complaint / Note handlers ----------
+// -------------------- Logs --------------------
+const OFFER_LOG = true
+const offerLog = (...args) => {
+  if (OFFER_LOG) console.log('[offer-edit]', ...args)
+}
+
+// -------------------- Complaint / Note handlers --------------------
 const editComplaint = (orderId, text) => {
   showComplaintModal.value = false
   complaintToEdit.value = null
@@ -823,11 +825,13 @@ const editComplaint = (orderId, text) => {
     showComplaintModal.value = true
   }, 0)
 }
+
 const openComplaint = (orderId) => {
   selectedOrderId.value = orderId
   complaintToEdit.value = null
   showComplaintModal.value = true
 }
+
 const openNote = (orderId, note) => {
   selectedOrderId.value = orderId
   noteToEdit.value = note ? { orderId, text: note } : null
@@ -836,48 +840,54 @@ const openNote = (orderId, note) => {
 
 const handleComplaintSaved = async ({ orderId, text }) => {
   const order = orders.value.find((o) => o._id === orderId)
-  if (order) {
-    await axios.patch(`${url}/orders/${orderId}/complaint`, { complaint: text })
-    init({ message: 'Complaint updated successfully', color: 'success' })
-    fetchOrders()
-  }
+  if (!order) return
+
+  await axios.patch(`${url}/orders/${orderId}/complaint`, { complaint: text })
+  init({ message: 'Complaint updated successfully', color: 'success' })
+  fetchOrders()
 }
+
 const handleComplaintUpdated = handleComplaintSaved
+
 const handleComplaintRemoved = async ({ orderId }) => {
   const order = orders.value.find((o) => o._id === orderId)
-  if (order) {
-    await axios.patch(`${url}/orders/${orderId}/complaint`, { complaint: '' })
-    init({ message: 'Complaint removed successfully', color: 'success' })
-    fetchOrders()
-  }
+  if (!order) return
+
+  await axios.patch(`${url}/orders/${orderId}/complaint`, { complaint: '' })
+  init({ message: 'Complaint removed successfully', color: 'success' })
+  fetchOrders()
 }
 
 const handleNoteSaved = async ({ orderId, text }) => {
   const order = orders.value.find((o) => o._id === orderId)
-  if (order) {
-    await axios.patch(`${url}/orders/${orderId}/note`, { note: text })
-    init({ message: 'Note added successfully', color: 'success' })
-    fetchOrders()
-  }
-}
-const handleNoteUpdated = handleNoteSaved
-const handleNoteRemoved = async ({ orderId }) => {
-  const order = orders.value.find((o) => o._id === orderId)
-  if (order) {
-    await axios.patch(`${url}/orders/${orderId}/note`, { note: '' })
-    init({ message: 'Note removed successfully', color: 'success' })
-    fetchOrders()
-  }
+  if (!order) return
+
+  await axios.patch(`${url}/orders/${orderId}/note`, { note: text })
+  init({ message: 'Note added successfully', color: 'success' })
+  fetchOrders()
 }
 
-// ---------- Confirm modal ----------
+const handleNoteUpdated = handleNoteSaved
+
+const handleNoteRemoved = async ({ orderId }) => {
+  const order = orders.value.find((o) => o._id === orderId)
+  if (!order) return
+
+  await axios.patch(`${url}/orders/${orderId}/note`, { note: '' })
+  init({ message: 'Note removed successfully', color: 'success' })
+  fetchOrders()
+}
+
+// -------------------- Confirm modal --------------------
 const openConfirm = (action, orderId) => {
   confirmAction.value = action
   confirmOrderId.value = orderId
   isConfirmOpen.value = true
 }
+
 const confirmYes = () => {
   if (!confirmAction.value || !confirmOrderId.value) return
+
   switch (confirmAction.value) {
     case 'remove':
       removeSelected(confirmOrderId.value)
@@ -898,32 +908,38 @@ const confirmYes = () => {
       switchOrderType(confirmOrderId.value)
       break
   }
+
   isConfirmOpen.value = false
 }
 
-// ---------- Selection helpers ----------
+// -------------------- Selection helpers --------------------
 const toggleItemSelect = (orderId, idx) => {
   if (!selectedItems[orderId]) selectedItems[orderId] = []
   const pos = selectedItems[orderId].indexOf(idx)
   if (pos > -1) selectedItems[orderId].splice(pos, 1)
   else selectedItems[orderId].push(idx)
 }
+
 const toggleOfferSelection = (orderId, idx) => {
   if (!selectedOfferItems[orderId]) selectedOfferItems[orderId] = []
   const pos = selectedOfferItems[orderId].indexOf(idx)
   if (pos > -1) selectedOfferItems[orderId].splice(pos, 1)
   else selectedOfferItems[orderId].push(idx)
 }
+
 const isItemSelected = (orderId, idx) => Array.isArray(selectedItems[orderId]) && selectedItems[orderId].includes(idx)
+
 const isOfferSelected = (orderId, idx) =>
   Array.isArray(selectedOfferItems[orderId]) && selectedOfferItems[orderId].includes(idx)
+
 const hasSelectedForOrder = (orderId) =>
   (Array.isArray(selectedItems[orderId]) && selectedItems[orderId].length > 0) ||
   (selectedOfferItems[orderId] && selectedOfferItems[orderId].length)
 
-// ---------- API wrapper ----------
+// -------------------- API wrapper --------------------
 const applyOrderEdit = async (orderId, action, tableNumber, payload = {}) => {
   const userStore = useUsersStore()
+
   try {
     const res = await axios.post(
       `${url}/order-edits/${orderId}/apply`,
@@ -937,6 +953,7 @@ const applyOrderEdit = async (orderId, action, tableNumber, payload = {}) => {
         },
       },
     )
+
     init({ message: res.data.message, color: res.data.status !== 'Failed' ? 'success' : 'danger' })
     return res.data
   } catch (err) {
@@ -946,12 +963,11 @@ const applyOrderEdit = async (orderId, action, tableNumber, payload = {}) => {
   }
 }
 
-// ---------- Delete (menu items + offers) ----------
+// -------------------- Delete helpers --------------------
 const buildOrderMenuItemsPayload = (items) => {
   const menuItems = []
 
   for (const raw of Array.isArray(items) ? items : []) {
-    // Prefer stable IDs from the spread menu item doc, then fall back
     const menuItemId =
       raw?._id ||
       raw?.id ||
@@ -959,12 +975,10 @@ const buildOrderMenuItemsPayload = (items) => {
       (raw?.menuItem && (raw.menuItem._id || raw.menuItem.id)) ||
       raw?.menuItem
 
-    // Guard against missing/label values
     if (!menuItemId || String(menuItemId).toLowerCase().includes('unknown')) continue
 
     let options = []
 
-    // Case 1: history payload already has flat options [{ option, quantity, ... }]
     if (Array.isArray(raw?.options) && raw.options.length) {
       options = raw.options.map((op) => ({
         option: String(
@@ -972,9 +986,7 @@ const buildOrderMenuItemsPayload = (items) => {
         ),
         quantity: Number(op?.quantity || 1),
       }))
-    }
-    // Case 2: UI-mapped structure -> groups -> articlesOptions with .selected flag
-    else if (Array.isArray(raw?.articlesOptionsGroup)) {
+    } else if (Array.isArray(raw?.articlesOptionsGroup)) {
       options = raw.articlesOptionsGroup
         .flatMap((g) => (Array.isArray(g?.articlesOptions) ? g.articlesOptions : []))
         .filter((op) => op && (op.selected || op.isSelected))
@@ -1003,33 +1015,396 @@ const removeSelected = async (orderId) => {
 
   if (!menuIdxs.length && !offerIdxs.length) return
 
-  // MENU ITEMS: delete each selected line (include options)
   for (const i of menuIdxs) {
     const line = order.menuItems?.[i]
     if (!line) continue
-    const payload = buildOrderMenuItemsPayload([line]) // -> { menuItems: [ { menuItem, quantity, options[] } ] }
+    const payload = buildOrderMenuItemsPayload([line])
     if (payload.menuItems.length) {
       await applyOrderEdit(orderId, 'delete', order.tableNumber, payload)
     }
   }
 
-  // OFFERS: delete whole offer by offerId (no items/options in payload)
   for (const j of offerIdxs) {
     const off = order.offerDetails?.[j]
     const oid = String(off?.offerId || off?._id || '')
     if (!oid) continue
+
     await applyOrderEdit(orderId, 'delete', order.tableNumber, {
       offerMenuItems: [{ offerId: oid, quantity: 1 }],
     })
   }
 
-  // Reset selection + refresh
   selectedItems[orderId] = []
   selectedOfferItems[orderId] = []
   fetchOrders()
 }
 
-// ---------- Edit (stash originals + preload) ----------
+// -------------------- Offer pricing helpers --------------------
+const findOfferGroups = (slotDef) => {
+  if (!slotDef) return []
+
+  return (
+    slotDef.articlesOptionsGroups ||
+    slotDef.articleOptionsGroups ||
+    slotDef.articlesOptionsGroup ||
+    slotDef.optionGroups ||
+    slotDef.groups ||
+    []
+  )
+}
+
+const findOfferGroup = (slotDef, groupId, fallbackGroupName = '') => {
+  const groups = findOfferGroups(slotDef)
+
+  let group = groups.find((g) => String(g?._id || g?.id || g?.groupId) === String(groupId))
+
+  if (!group && fallbackGroupName) {
+    group = groups.find((g) => String(g?.name || '').toLowerCase() === String(fallbackGroupName || '').toLowerCase())
+  }
+
+  offerLog('findOfferGroup', {
+    groupId,
+    fallbackGroupName,
+    found: !!group,
+    availableGroups: groups.map((g) => ({
+      id: g?._id || g?.id || g?.groupId,
+      name: g?.name,
+      keys: Object.keys(g || {}),
+    })),
+  })
+
+  return group || null
+}
+
+const findOfferOption = (group, optionId, fallbackOptionName = '') => {
+  if (!group) return null
+
+  const options = group.articlesOptions || group.options || group.items || []
+
+  let opt = options.find((o) => String(o?._id || o?.id || o?.optionId || o?.option) === String(optionId))
+
+  if (!opt && fallbackOptionName) {
+    opt = options.find((o) => String(o?.name || '').toLowerCase() === String(fallbackOptionName || '').toLowerCase())
+  }
+
+  offerLog('findOfferOption', {
+    optionId,
+    fallbackOptionName,
+    found: !!opt,
+    availableOptions: options.map((o) => ({
+      id: o?._id || o?.id || o?.optionId || o?.option,
+      name: o?.name,
+      price: o?.price,
+      customPrice: o?.customPrice,
+      isFree: o?.isFree,
+    })),
+  })
+
+  return opt || null
+}
+
+// Used for history mapping only.
+// Here we still allow history fallback so the historical modal can reflect saved data.
+const resolveOfferOptionPrice = (
+  slotDef,
+  groupId,
+  optionId,
+  fallbackOption,
+  fallbackGroupName = '',
+  fallbackOptionName = '',
+  historyOption = null,
+) => {
+  const historyPrice =
+    historyOption?.price !== undefined && historyOption?.price !== null
+      ? Number(historyOption.price)
+      : null
+
+  offerLog('resolveOfferOptionPrice -> start', {
+    slotDefKeys: Object.keys(slotDef || {}),
+    groupId,
+    optionId,
+    fallbackGroupName,
+    fallbackOptionName,
+    historyPrice,
+    fallbackPrice: fallbackOption?.price,
+  })
+
+  if (!slotDef) {
+    const finalPrice = historyPrice ?? Number(fallbackOption?.price || 0)
+
+    offerLog('resolveOfferOptionPrice -> no slotDef, using history/fallback', {
+      groupId,
+      optionId,
+      historyPrice,
+      fallbackPrice: fallbackOption?.price,
+      finalPrice,
+    })
+
+    return finalPrice
+  }
+
+  const group = findOfferGroup(slotDef, groupId, fallbackGroupName)
+
+  if (!group) {
+    const finalPrice = historyPrice ?? Number(fallbackOption?.price || 0)
+
+    offerLog('resolveOfferOptionPrice -> group not found, using history/fallback', {
+      groupId,
+      optionId,
+      historyPrice,
+      fallbackPrice: fallbackOption?.price,
+      finalPrice,
+    })
+
+    return finalPrice
+  }
+
+  const offerOpt = findOfferOption(group, optionId, fallbackOptionName)
+
+  if (!offerOpt) {
+    const finalPrice = historyPrice ?? Number(fallbackOption?.price || 0)
+
+    offerLog('resolveOfferOptionPrice -> option not found, using history/fallback', {
+      groupId,
+      optionId,
+      historyPrice,
+      fallbackPrice: fallbackOption?.price,
+      finalPrice,
+    })
+
+    return finalPrice
+  }
+
+  if (offerOpt.isFree) {
+    offerLog('resolveOfferOptionPrice -> offer option is free', {
+      groupId,
+      optionId,
+      optionName: offerOpt?.name,
+    })
+    return 0
+  }
+
+  const finalPrice = Number(
+    offerOpt.customPrice ??
+      offerOpt.price ??
+      historyPrice ??
+      fallbackOption?.price ??
+      0,
+  )
+
+  offerLog('resolveOfferOptionPrice -> resolved from offer', {
+    groupId,
+    optionId,
+    optionName: offerOpt?.name,
+    customPrice: offerOpt?.customPrice,
+    offerPrice: offerOpt?.price,
+    historyPrice,
+    fallbackPrice: fallbackOption?.price,
+    finalPrice,
+  })
+
+  return finalPrice
+}
+
+// Used ONLY during edit rebuild.
+// Key rule: if item belongs to an included offer slot, unmatched options must stay FREE (0),
+// not fallback to historical saved upgrade prices.
+const resolveOfferOptionPriceForEdit = ({
+  slotDef,
+  groupId,
+  optionId,
+  fallbackOption,
+  fallbackGroupName = '',
+  fallbackOptionName = '',
+  historyOption = null,
+}) => {
+  const historyPrice =
+    historyOption?.price !== undefined && historyOption?.price !== null
+      ? Number(historyOption.price)
+      : null
+
+  offerLog('resolveOfferOptionPriceForEdit -> start', {
+    slotDefKeys: Object.keys(slotDef || {}),
+    groupId,
+    optionId,
+    fallbackGroupName,
+    fallbackOptionName,
+    historyPrice,
+    fallbackPrice: fallbackOption?.price,
+  })
+
+  if (!slotDef) {
+    const finalPrice = historyPrice ?? Number(fallbackOption?.price || 0)
+
+    offerLog('resolveOfferOptionPriceForEdit -> no slotDef, using history/fallback', {
+      groupId,
+      optionId,
+      historyPrice,
+      fallbackPrice: fallbackOption?.price,
+      finalPrice,
+    })
+
+    return finalPrice
+  }
+
+  const group = findOfferGroup(slotDef, groupId, fallbackGroupName)
+
+const isSizeGroup = String(fallbackGroupName || '').trim().toLowerCase() === 'size'
+const isCrustGroup = String(fallbackGroupName || '').trim().toLowerCase() === 'crust'
+
+if (!group) {
+  let finalPrice = 0
+
+  if (isSizeGroup) {
+    finalPrice = 0
+  } else if (isCrustGroup) {
+    finalPrice = historyPrice > 0 ? historyPrice : 0
+  } else {
+    finalPrice = historyPrice > 0 ? historyPrice : 0
+  }
+
+  offerLog('resolveOfferOptionPriceForEdit -> group not found inside slot', {
+    groupId,
+    optionId,
+    fallbackGroupName,
+    historyPrice,
+    fallbackPrice: fallbackOption?.price,
+    finalPrice,
+    rule: isSizeGroup ? 'size-forced-zero' : isCrustGroup ? 'crust-preserve-history' : 'default-preserve-positive-history',
+  })
+
+  return finalPrice
+}
+
+const offerOpt = findOfferOption(group, optionId, fallbackOptionName)
+
+if (!offerOpt) {
+  let finalPrice = 0
+
+  if (isSizeGroup) {
+    finalPrice = 0
+  } else if (isCrustGroup) {
+    finalPrice = historyPrice > 0 ? historyPrice : 0
+  } else {
+    finalPrice = historyPrice > 0 ? historyPrice : 0
+  }
+
+  offerLog('resolveOfferOptionPriceForEdit -> option not found inside matched slot group', {
+    groupId,
+    optionId,
+    fallbackGroupName,
+    historyPrice,
+    fallbackPrice: fallbackOption?.price,
+    finalPrice,
+    rule: isSizeGroup ? 'size-forced-zero' : isCrustGroup ? 'crust-preserve-history' : 'default-preserve-positive-history',
+  })
+
+  return finalPrice
+}
+
+  if (offerOpt.isFree) {
+    offerLog('resolveOfferOptionPriceForEdit -> option explicitly free', {
+      groupId,
+      optionId,
+      optionName: offerOpt?.name,
+    })
+    return 0
+  }
+
+  if (offerOpt.customPrice != null || offerOpt.price != null) {
+    const finalPrice = Number(offerOpt.customPrice ?? offerOpt.price ?? 0)
+
+    offerLog('resolveOfferOptionPriceForEdit -> explicit offer price', {
+      groupId,
+      optionId,
+      optionName: offerOpt?.name,
+      customPrice: offerOpt?.customPrice,
+      offerPrice: offerOpt?.price,
+      finalPrice,
+    })
+
+    return finalPrice
+  }
+
+  const finalPrice = historyPrice > 0 ? historyPrice : 0
+
+  offerLog('resolveOfferOptionPriceForEdit -> matched option but no explicit offer price, preserving paid history only', {
+    groupId,
+    optionId,
+    optionName: offerOpt?.name,
+    historyPrice,
+    finalPrice,
+  })
+
+  return finalPrice
+}
+const resolveOfferItemBasePrice = (slotDef, addedItem, freshOfferItemDef) => {
+  if (!slotDef) {
+    const fallback = Number(freshOfferItemDef?.customPrice ?? freshOfferItemDef?.price ?? 0)
+    offerLog('resolveOfferItemBasePrice -> no slotDef, fallback', {
+      itemId: addedItem?.itemId,
+      fallback,
+    })
+    return fallback
+  }
+
+  if (slotDef.isFree) {
+    offerLog('resolveOfferItemBasePrice -> slot free', {
+      itemId: addedItem?.itemId,
+    })
+    return 0
+  }
+
+  const finalPrice = Number(slotDef.customPrice ?? slotDef.price ?? freshOfferItemDef?.customPrice ?? freshOfferItemDef?.price ?? 0)
+
+  offerLog('resolveOfferItemBasePrice -> resolved', {
+    itemId: addedItem?.itemId,
+    slotCustomPrice: slotDef?.customPrice,
+    slotPrice: slotDef?.price,
+    freshOfferItemPrice: freshOfferItemDef?.price,
+    finalPrice,
+  })
+
+  return finalPrice
+}
+
+// Used ONLY during edit rebuild.
+const resolveOfferItemBasePriceForEdit = (slotDef, addedItem, freshOfferItemDef) => {
+  if (!slotDef) {
+    const fallback = Number(freshOfferItemDef?.customPrice ?? freshOfferItemDef?.price ?? 0)
+    offerLog('resolveOfferItemBasePriceForEdit -> no slotDef, fallback', {
+      itemId: addedItem?.itemId,
+      fallback,
+    })
+    return fallback
+  }
+
+  if (slotDef.isFree) {
+    offerLog('resolveOfferItemBasePriceForEdit -> slot free', {
+      itemId: addedItem?.itemId,
+    })
+    return 0
+  }
+
+  if (slotDef.customPrice != null || slotDef.price != null) {
+    const finalPrice = Number(slotDef.customPrice ?? slotDef.price ?? 0)
+    offerLog('resolveOfferItemBasePriceForEdit -> explicit slot price', {
+      itemId: addedItem?.itemId,
+      slotCustomPrice: slotDef?.customPrice,
+      slotPrice: slotDef?.price,
+      finalPrice,
+    })
+    return finalPrice
+  }
+
+  // Included offer item with no explicit charge
+  offerLog('resolveOfferItemBasePriceForEdit -> included slot without explicit price, forcing 0', {
+    itemId: addedItem?.itemId,
+  })
+  return 0
+}
+
+// -------------------- Edit --------------------
 const editSelected = async (orderId) => {
   const order = orders.value.find((o) => o._id === orderId)
   if (!order) return
@@ -1041,9 +1416,9 @@ const editSelected = async (orderId) => {
 
   if (!items.length && !offersItems.length) return
 
-  // ORIGINALS for later delete→add
   const originalMenuItems = items.map((mi) => {
     const menuItemId = (mi?.menuItem && (mi.menuItem._id || mi.menuItem)) || mi?.menuItemId || mi?._id
+
     let options = []
     if (Array.isArray(mi?.options) && mi.options.length) {
       options = mi.options.map((o) => ({
@@ -1059,6 +1434,7 @@ const editSelected = async (orderId) => {
           quantity: Number(opt.quantity || 1),
         }))
     }
+
     return { menuItem: String(menuItemId), quantity: Number(mi.quantity || 1), options }
   })
 
@@ -1066,10 +1442,12 @@ const editSelected = async (orderId) => {
     .map((e) => ({ offerId: String(e.offerId || e._id), quantity: 1 }))
     .filter((x) => !!x.offerId)
 
-  // Prefill cart with selected MENU items only
   const orderStore = useOrderStore()
   orderStore.resetEditOrder()
   orderStore.setCartItems([])
+  orderStore.offerItems = []
+  orderStore.cartTotal = null
+  orderStore.validation = null
 
   const cartSeed = items.map((menuItem) => ({
     orderId,
@@ -1094,7 +1472,9 @@ const editSelected = async (orderId) => {
             type: opt.type,
             quantity: opt.quantity || 1,
           }))
+
         if (!selected.length) return null
+
         return {
           groupId: group._id,
           groupName: group.name,
@@ -1112,36 +1492,182 @@ const editSelected = async (orderId) => {
     orderStore.calculateItemTotal(newIndex)
   })
 
-  // Preload OFFERS visually
   if (offersItems.length) {
-    offersItems.forEach((e) => {
+    const menuStore = useMenuStore()
+
+    offersItems.forEach((histOffer) => {
+      const freshOfferDef = orderStore.offers.find((o) => String(o._id) === String(histOffer.offerId))
+      if (!freshOfferDef) return
+
+      offerLog('editSelected -> rebuilding offer', {
+        offerId: histOffer.offerId,
+        offerName: histOffer.offerName,
+        freshOfferDef,
+        structuredOffer: histOffer.structuredOffer,
+      })
+
+      const rebuiltSelections = []
       let selectionTotal = 0
-      e.structuredOffer.selections.forEach((item) => {
-        item.addedItems.forEach((addedItem) => {
-          selectionTotal += (Number(addedItem.basePrice) || 0) * (Number(addedItem.quantity) || 1)
-          ;(addedItem.selectedOptions || []).forEach((group) => {
-            ;(group.selected || []).forEach((selection) => {
-              selectionTotal += (Number(selection.price) || 0) * (Number(selection.quantity) || 1)
+
+      ;(histOffer.structuredOffer?.selections || []).forEach((sel, selIndex) => {
+        const rebuiltAddedItems = []
+
+        offerLog('editSelected -> selection start', {
+          offerId: histOffer.offerId,
+          selectionIndex: selIndex,
+          selectionName: sel?.name,
+          selectionMenuItems: sel?.menuItems,
+          addedItems: sel?.addedItems,
+        })
+
+        ;(sel.addedItems || []).forEach((addedItem, itemIndex) => {
+          const freshMenuItem = menuStore.unFilteredMenuItems.find((m) => String(m._id) === String(addedItem.itemId))
+          if (!freshMenuItem) {
+            offerLog('editSelected -> freshMenuItem not found', {
+              addedItem,
+            })
+            return
+          }
+
+          const slotDef = (sel.menuItems || []).find((mi) => String(mi.menuItemId) === String(addedItem.itemId))
+          const freshOfferItemDef = (freshOfferDef.offerItems || []).find(
+            (oi) => String(oi.menuItem || oi.menuItemId || oi._id) === String(addedItem.itemId),
+          )
+
+          offerLog('editSelected -> item match', {
+            offerId: histOffer.offerId,
+            selectionIndex: selIndex,
+            itemIndex,
+            addedItem,
+            slotDef,
+            freshOfferItemDef,
+          })
+
+          const correctedBasePrice = resolveOfferItemBasePriceForEdit(slotDef, addedItem, freshOfferItemDef)
+
+          const rebuiltSelectedOptions = (addedItem.selectedOptions || [])
+            .map((group) => {
+              const freshGroup = (freshMenuItem.articlesOptionsGroup || []).find(
+                (g) => String(g._id) === String(group.groupId),
+              )
+              if (!freshGroup) {
+                offerLog('editSelected -> freshGroup not found', {
+                  addedItemId: addedItem.itemId,
+                  group,
+                  availableGroups: freshMenuItem.articlesOptionsGroup,
+                })
+                return null
+              }
+
+              const rebuiltGroupSelections = (group.selected || [])
+                .map((selOpt) => {
+                  const freshOpt = (freshGroup.articlesOptions || []).find(
+                    (o) => String(o._id) === String(selOpt.optionId),
+                  )
+                  if (!freshOpt) {
+                    offerLog('editSelected -> freshOpt not found', {
+                      addedItemId: addedItem.itemId,
+                      groupId: group.groupId,
+                      selOpt,
+                      availableOptions: freshGroup.articlesOptions,
+                    })
+                    return null
+                  }
+
+                  const correctedOptionPrice = resolveOfferOptionPriceForEdit({
+                    slotDef,
+                    groupId: group.groupId,
+                    optionId: selOpt.optionId,
+                    fallbackOption: freshOpt,
+                    fallbackGroupName: group.groupName,
+                    fallbackOptionName: selOpt.name,
+                    historyOption: selOpt,
+                  })
+
+                  offerLog('editSelected -> option resolved', {
+                    addedItemId: addedItem.itemId,
+                    groupId: group.groupId,
+                    groupName: group.groupName,
+                    optionId: selOpt.optionId,
+                    optionName: selOpt.name,
+                    finalPrice: correctedOptionPrice,
+                  })
+
+                  return {
+                    ...selOpt,
+                    optionId: freshOpt._id,
+                    name: freshOpt.name,
+                    price: correctedOptionPrice,
+                    quantity: Number(selOpt.quantity || 1),
+                    type: selOpt?.type || freshOpt.type,
+                  }
+                })
+                .filter(Boolean)
+
+              if (!rebuiltGroupSelections.length) return null
+
+              return {
+                ...group,
+                groupId: freshGroup._id,
+                groupName: freshGroup.name,
+                selected: rebuiltGroupSelections,
+              }
+            })
+            .filter(Boolean)
+
+          let itemOptionsTotal = 0
+          rebuiltSelectedOptions.forEach((g) => {
+            ;(g.selected || []).forEach((opt) => {
+              itemOptionsTotal += Number(opt.price || 0) * Number(opt.quantity || 1)
             })
           })
+
+          selectionTotal += correctedBasePrice * Number(addedItem.quantity || 1)
+          selectionTotal += itemOptionsTotal
+
+          offerLog('editSelected -> item totals', {
+            addedItemId: addedItem.itemId,
+            correctedBasePrice,
+            qty: Number(addedItem.quantity || 1),
+            itemOptionsTotal,
+            runningSelectionTotal: selectionTotal,
+          })
+
+          rebuiltAddedItems.push({
+            ...addedItem,
+            itemId: freshMenuItem._id,
+            itemName: freshMenuItem.name,
+            basePrice: correctedBasePrice,
+            selectedOptions: rebuiltSelectedOptions,
+          })
+        })
+
+        rebuiltSelections.push({
+          ...sel,
+          addedItems: rebuiltAddedItems,
         })
       })
-      orderStore.offersAdded({
-        ...e.structuredOffer,
-        _id: e.offerId,
-        offerId: e.offerId,
-        basePrice: e.structuredOffer.price,
-        selectionTotalPrice: selectionTotal,
-        totalPrice: Number(e.structuredOffer.price || 0) + selectionTotal,
+
+      const rebuiltOffer = {
+        ...freshOfferDef,
+        _id: freshOfferDef._id,
+        offerId: freshOfferDef._id,
+        name: freshOfferDef.name,
+        price: Number(freshOfferDef.price || 0),
+        basePrice: Number(freshOfferDef.price || 0),
         quantity: 1,
-      })
+        selections: rebuiltSelections,
+        selectionTotalPrice: selectionTotal,
+        totalPrice: Number(freshOfferDef.price || 0) + selectionTotal,
+      }
+
+      offerLog('editSelected -> final rebuilt offer', rebuiltOffer)
+      orderStore.offersAdded(rebuiltOffer)
     })
   }
 
-  // Use the original order's total as the paid amount
   order.editOrderTotal = order.total || 0
 
-  // Attach _editContext for OrderDetails.vue (delete→add later)
   const orderForStore = {
     ...order,
     _editContext: {
@@ -1149,18 +1675,19 @@ const editSelected = async (orderId) => {
       originalOffersToDelete,
     },
   }
+
   orderStore.addEditOrder(orderForStore)
 
-  // Clear selections and close
   selectedItems[orderId] = []
   selectedOfferItems[orderId] = []
   emits('close')
 }
 
-// ---------- Cancel ----------
+// -------------------- Cancel --------------------
 const cancelOrder = async (orderId) => {
   const order = orders.value.find((o) => o._id === orderId)
   if (!order) return
+
   if (order.status === 'In Progress') {
     const orderStore = useOrderStore()
     try {
@@ -1173,32 +1700,25 @@ const cancelOrder = async (orderId) => {
   } else {
     await applyOrderEdit(orderId, 'cancel', order.tableNumber)
   }
+
   fetchOrders()
 }
 
-// ---------- Promo display (Type · €Value · %; hide % when 0) ----------
+// -------------------- Promo display --------------------
 const getPromoForOrder = (order) => {
-  if (!order) return null
-
-  // ✅ Only show discount if the order actually has a promotionCode
-  if (!order.promotionCode) return null
+  if (!order || !order.promotionCode) return null
 
   const p = order.promotion || {}
   const typeKey = (p.type || order.discountType || '').toString()
   const typeName = TYPE_LABELS[typeKey] || (typeKey ? titleize(typeKey) : '')
 
-  // Raw values from DB
   const discountValueRaw = toNum(first(order.discount, p.discountValue, order.discountAmount))
   const discountPercentRaw = toNum(first(order.discountPercentage, p.discountPercent))
 
-  // If we only have a percent, derive value from the totals
   let discountValue = discountValueRaw
 
-  // Fix: If stored discount value matches the percentage (e.g. 10 and 10%) but subtotal math disagrees,
-  // it means the DB stored the percentage in the amount field. Recalculate it.
   if (discountPercentRaw > 0) {
     const calculated = (toNum(order.subtotal) * discountPercentRaw) / 100
-    // If raw value ~ percentage ID but calculated is different (allow small error margin)
     if (Math.abs(discountValueRaw - discountPercentRaw) < 0.01 && Math.abs(discountValueRaw - calculated) > 0.05) {
       discountValue = calculated
     }
@@ -1209,10 +1729,8 @@ const getPromoForOrder = (order) => {
     if (gap > 0) discountValue = gap
   }
 
-  // If we still have nothing, don't show a row
   if (discountValue <= 0 && discountPercentRaw <= 0) return null
 
-  // Build label: "Type · €Value · %"
   const parts = []
   if (typeName) parts.push(typeName)
   if (discountValue > 0) parts.push(eur.format(discountValue))
@@ -1222,13 +1740,12 @@ const getPromoForOrder = (order) => {
 
   return {
     label: `Discount (${parts.join(' · ')})`,
-    // Show a negative amount, e.g. "-€5.00"
     amount: discountValue > 0 ? eur.format(-Math.abs(discountValue)) : eur.format(0),
     detail: null,
   }
 }
 
-// ---------- Status / formatting ----------
+// -------------------- Status / formatting --------------------
 const formatDateTime = (dateStr) => {
   if (!dateStr) return 'N/A'
   const date = new Date(dateStr)
@@ -1240,43 +1757,51 @@ const formatDateTime = (dateStr) => {
     minute: '2-digit',
   })
 }
+
 const getPromisedTime = (createdAt, orderType) => {
   if (!createdAt) return 'N/A'
   const date = new Date(createdAt)
-  if (orderType?.toLowerCase() === 'takeaway') date.setMinutes(date.getMinutes() + (props.takeawayPromiseTime || 0))
-  else if (orderType?.toLowerCase() === 'delivery')
+  if (orderType?.toLowerCase() === 'takeaway') {
+    date.setMinutes(date.getMinutes() + (props.takeawayPromiseTime || 0))
+  } else if (orderType?.toLowerCase() === 'delivery') {
     date.setMinutes(date.getMinutes() + (props.deliveryPromiseTime || 0))
+  }
+
   return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
+
 const getOrderSource = (source) => (!source ? '' : source === 'CC' ? 'Call Center' : source)
+
 const getDisplayStatus = (order, index) => (index === 0 && liveStatus.value ? liveStatus.value : order.status)
+
 const getDeliveryZoneName = (deliveryZoneId) => {
   if (!deliveryZoneId || !Array.isArray(props.deliveryZoneOptions)) return ''
   const zone = props.deliveryZoneOptions.find((z) => z._id === deliveryZoneId)
   return zone ? zone.name : ''
 }
 
-// ---------- Toggle accordion + reset selections ----------
+// -------------------- Toggle accordion --------------------
 const toggleOrder = (index) => {
   expandedIndex.value = expandedIndex.value === index ? null : index
   for (const key in selectedItems) delete selectedItems[key]
   for (const key in selectedOfferItems) delete selectedOfferItems[key]
 }
+
 const isCancelled = (order, index) => {
   const norm = (s) =>
     String(s || '')
       .trim()
       .toLowerCase()
-  const hist = norm(order?.status) // Stella history
-  const live = index === 0 ? norm(liveStatus.value) : '' // latest row live chip (if you use it)
-  const coord = index === 0 ? norm(orderStatuses?.value ?? orderStatuses) : '' // coordinator code
 
-  // treat any variant like "canceled"/"cancelled" as cancelled
+  const hist = norm(order?.status)
+  const live = index === 0 ? norm(liveStatus.value) : ''
+  const coord = index === 0 ? norm(orderStatuses?.value ?? orderStatuses) : ''
+
   const saysCancel = (s) => s.startsWith('cancel')
   return [hist, live, coord].some(saysCancel)
 }
 
-// ---------- Stats / filters ----------
+// -------------------- Stats / filters --------------------
 const showAll = ref(false)
 const ordersToShow = computed(() => (showAll.value ? orders.value : orders.value.slice(0, 5)))
 const orderStatuses = ref(null)
@@ -1284,6 +1809,7 @@ const orderStatuses = ref(null)
 const periodStartDate = computed(() => {
   const today = new Date()
   let startDate = new Date(today)
+
   switch (selectedPeriod.value) {
     case '1 Month':
       startDate.setMonth(today.getMonth() - 1)
@@ -1298,6 +1824,7 @@ const periodStartDate = computed(() => {
       startDate = new Date(0)
       break
   }
+
   startDate.setHours(0, 0, 0, 0)
   return startDate
 })
@@ -1310,14 +1837,18 @@ const filteredOrders = computed(() => {
 
 const lastOrdered = computed(() => {
   if (!filteredOrders.value.length) return { daysAgo: 'No Orders', fullDate: '' }
+
   const sorted = [...filteredOrders.value].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
   const last = sorted[0]
   const lastDate = new Date(last.createdAt)
   const today = new Date()
+
   lastDate.setHours(0, 0, 0, 0)
   today.setHours(0, 0, 0, 0)
+
   const diffDays = Math.round((today - lastDate) / (1000 * 60 * 60 * 24))
   const daysAgoText = diffDays === 0 ? 'Today' : diffDays === 1 ? '1 day ago' : `${diffDays} days ago`
+
   return { daysAgo: daysAgoText, fullDate: formatDateTime(last.createdAt) }
 })
 
@@ -1331,6 +1862,7 @@ const orderTypes = computed(() => {
   const takeaway = filteredOrders.value.filter((o) => o.orderType?.toLowerCase() === 'takeaway').length
   const delivery = filteredOrders.value.filter((o) => o.orderType?.toLowerCase() === 'delivery').length
   const total = takeaway + delivery
+
   return {
     takeaway,
     takeawayPercent: total ? Math.round((takeaway / total) * 100) : 0,
@@ -1341,9 +1873,14 @@ const orderTypes = computed(() => {
 
 const averageOrder = computed(() => {
   if (!filteredOrders.value.length) return { average: 0, avgItems: 0 }
+
   const total = filteredOrders.value.reduce((sum, order) => sum + (order.total || 0), 0)
   const totalItems = filteredOrders.value.reduce((sum, order) => sum + (order.menuItems?.length || 0), 0)
-  return { average: total / filteredOrders.value.length, avgItems: totalItems / filteredOrders.value.length }
+
+  return {
+    average: total / filteredOrders.value.length,
+    avgItems: totalItems / filteredOrders.value.length,
+  }
 })
 
 const promoStats = computed(() => {
@@ -1358,12 +1895,14 @@ const complaintStats = computed(() => {
   return { count, percent }
 })
 
-// ---------- External status + orders ----------
+// -------------------- External status + orders --------------------
 const fetchOrderStatus = async () => {
   const outlet = useServiceStore()
+
   try {
     const base = coordurl.replace(/\/+$/, '')
     const urlC = `${base}/CoordApi/v1/Stella/GetOrderStatusByMobile`
+
     const res = await axios.get(urlC, {
       params: {
         mobile: props.selectedUser.MobilePhone,
@@ -1377,6 +1916,7 @@ const fetchOrderStatus = async () => {
         },
       ],
     })
+
     orderStatuses.value = res.data?.statusCode ? res.data.statusCode.toLowerCase() : null
   } catch {
     orderStatuses.value = null
@@ -1385,50 +1925,116 @@ const fetchOrderStatus = async () => {
 
 const mapOfferDetailsToSelections = (offerDetailsResponse, detailedOfferPayload) => {
   const detailedSelections = JSON.parse(JSON.stringify(detailedOfferPayload.selections || []))
-  const offerItems = offerDetailsResponse.offerItems || []
-  const storeMenuItems = useMenuStore().categories.flatMap((a) => a.menuItems || [])
+  const remainingItems = [...(offerDetailsResponse.offerItems || [])]
+  const storeMenuItems = useMenuStore().unFilteredMenuItems || []
 
-  offerItems.forEach((item) => {
-    detailedSelections.forEach((selection) => {
-      const matchedMenuItem = (selection.menuItems || []).find((mi) => mi.menuItemId === item.menuItem)
-      if (matchedMenuItem) {
-        const storeMenu = storeMenuItems.find((a) => a._id === item.menuItem)
-        if (!storeMenu) return
-        if (!selection.addedItems) selection.addedItems = []
+  offerLog('mapOfferDetailsToSelections -> start', {
+    offerDetailsResponse,
+    detailedOfferPayload,
+  })
 
-        const optionIds = (item.options || []).map((a) => a.option)
-        const articleOptionsGroup = (storeMenu.articlesOptionsGroup || []).filter((group) =>
-          (group.articlesOptions || []).some((opt) => optionIds.includes(opt._id)),
-        )
+  for (const selection of detailedSelections) {
+    if (!selection.addedItems) selection.addedItems = []
 
-        if (selection.addedItems.length < (selection.max ?? Infinity)) {
-          selection.addedItems.push({
-            articlesOptionsGroups: storeMenu.articlesOptionsGroup,
-            itemId: item.menuItem,
-            quantity: item.quantity,
-            imageUrl: storeMenu.imageUrl,
-            itemDescription: storeMenu.description,
-            basePrice: Number(item.price || 0).toFixed(2),
-            itemName: item.name,
-            code: item.code,
-            selectedOptions: articleOptionsGroup.map((group) => ({
-              groupId: group._id,
-              groupName: group?.name,
-              selected: (item.options || [])
-                .filter((opt) => (group.articlesOptions || []).some((gOpt) => gOpt._id === opt.option))
-                .map((opt) => ({
-                  optionId: opt.option,
-                  name: opt.name,
-                  quantity: opt.quantity,
-                  price: opt.price,
-                  type: opt.type,
-                })),
-            })),
-          })
+    const allowedIds = new Set((selection.menuItems || []).map((mi) => String(mi.menuItemId)))
+    const maxItems = selection.max ?? Infinity
+
+    for (let i = 0; i < remainingItems.length && selection.addedItems.length < maxItems; ) {
+      const histItem = remainingItems[i]
+
+      if (!allowedIds.has(String(histItem.menuItem))) {
+        i++
+        continue
+      }
+
+      const storeMenu = storeMenuItems.find((m) => String(m._id) === String(histItem.menuItem))
+      if (!storeMenu) {
+        offerLog('mapOfferDetailsToSelections -> storeMenu missing', histItem)
+        i++
+        continue
+      }
+
+      const offerMenuDef = (selection.menuItems || []).find(
+        (mi) => String(mi.menuItemId) === String(histItem.menuItem),
+      )
+
+      let basePrice = 0
+      if (offerMenuDef) {
+        const hasExplicitCharge = offerMenuDef.customPrice != null || offerMenuDef.price != null
+
+        if (offerMenuDef.isFree) {
+          basePrice = 0
+        } else if (hasExplicitCharge) {
+          basePrice = Number(offerMenuDef.customPrice ?? offerMenuDef.price ?? 0)
         }
       }
-    })
-  })
+
+      const optionIds = (histItem.options || []).map((o) => String(o.option))
+
+      const selectedOptions = (storeMenu.articlesOptionsGroup || [])
+        .map((group) => {
+          const selected = (group.articlesOptions || [])
+            .filter((opt) => optionIds.includes(String(opt._id)))
+            .map((opt) => {
+              const histOpt = (histItem.options || []).find((o) => String(o.option) === String(opt._id))
+
+              const correctedOptionPrice = resolveOfferOptionPrice(
+                offerMenuDef,
+                group._id,
+                opt._id,
+                opt,
+                group.name,
+                opt.name,
+                histOpt,
+              )
+
+              offerLog('mapOfferDetailsToSelections -> option resolved', {
+                item: histItem.name,
+                group: group.name,
+                option: opt.name,
+                correctedOptionPrice,
+                histOpt,
+              })
+
+              return {
+                optionId: opt._id,
+                name: opt.name,
+                quantity: Number(histOpt?.quantity || 1),
+                price: correctedOptionPrice,
+                type: histOpt?.type || opt.type,
+              }
+            })
+
+          if (!selected.length) return null
+
+          return {
+            groupId: group._id,
+            groupName: group.name,
+            selected,
+          }
+        })
+        .filter(Boolean)
+
+      selection.addedItems.push({
+        itemId: histItem.menuItem,
+        itemName: histItem.name,
+        itemDescription: storeMenu.description,
+        imageUrl: storeMenu.imageUrl,
+        quantity: Number(histItem.quantity || 1),
+        basePrice,
+        selectedOptions,
+      })
+
+      offerLog('mapOfferDetailsToSelections -> added item', {
+        histItem,
+        offerMenuDef,
+        basePrice,
+        selectedOptions,
+      })
+
+      remainingItems.splice(i, 1)
+    }
+  }
 
   return { ...detailedOfferPayload, selections: detailedSelections }
 }
@@ -1436,51 +2042,60 @@ const mapOfferDetailsToSelections = (offerDetailsResponse, detailedOfferPayload)
 const fetchOrders = async () => {
   const menuItems = useMenuStore()
   const orderStore = useOrderStore()
+
   try {
-    // Use MobilePhone or phoneNo as fallback since customer object may have either
     const phone = props.customer?.MobilePhone || props.customer?.Phone || props.customer?.phoneNo || ''
     const res = await axios.get(
       `${url}/orders/history?phone=${phone}&page=1&limit=500&from=2025-01-01&status=Completed`,
     )
+
     if (res.data?.status === 'Success') {
       orders.value = res.data.data.items.map((order) => {
-        // Calculate order-level discount percentage
         const p = order.promotion || {}
         const discountPercentRaw = toNum(first(order.discountPercentage, p.discountPercent))
 
-        const detailedOfferItems = (order.offerDetails || [])
-          .map((offer) => {
-            const offerItem = orderStore.offers.find((a) => a._id === offer.offerId)
-            if (!offerItem) return ''
-            const mappedData = mapOfferDetailsToSelections(offer, offerItem)
+        const detailedOfferItems = (order.offerDetails || []).map((offer) => {
+          const offerItem = orderStore.offers.find((a) => String(a._id) === String(offer.offerId))
+          // Preserve raw history if fresh offer definition is missing
+          if (!offerItem) {
+            offerLog('fetchOrders -> fresh offer definition not found, preserving raw history', {
+              orderId: order._id,
+              offerId: offer.offerId,
+              offerName: offer.offerName,
+            })
 
-            // Apply discount to offers if needed
-            let overrideUnitPrice = 0
-            if (discountPercentRaw > 0) {
-              const originalTotal = mappedData.totalPrice || 0
-              overrideUnitPrice = originalTotal * (1 - discountPercentRaw / 100)
+            return {
+              ...offer,
+              structuredOffer: offer.structuredOffer || { selections: [] },
+              overrideUnitPrice: null,
             }
+          }
 
-            return { orderOffer: offer, offerData: mappedData, overrideUnitPrice }
-          })
-          .filter(Boolean)
-          .map((offer) => ({
-            ...offer.orderOffer,
-            structuredOffer: { ...offer.offerData },
-            overrideUnitPrice: offer.overrideUnitPrice > 0 ? Number(offer.overrideUnitPrice).toFixed(2) : null,
-          }))
+          const mappedData = mapOfferDetailsToSelections(offer, offerItem)
+
+          let overrideUnitPrice = 0
+          if (discountPercentRaw > 0) {
+            const originalTotal = Number(mappedData.totalPrice || 0)
+            overrideUnitPrice = originalTotal * (1 - discountPercentRaw / 100)
+          }
+
+          return {
+            ...offer,
+            structuredOffer: { ...mappedData },
+            overrideUnitPrice: overrideUnitPrice > 0 ? Number(overrideUnitPrice).toFixed(2) : null,
+          }
+        })
 
         const detailedItems = (order.menuItems || []).map((item) => {
-          const menuItem = menuItems.unFilteredMenuItems.find((mi) => mi._id === item.menuItem)
+          const menuItem = menuItems.unFilteredMenuItems.find((mi) => String(mi._id) === String(item.menuItem))
 
-          // 1. Create a pool of option quantities (normalized to per-unit if item.quantity > 1)
           const optionCounts = new Map()
           if (item.options && item.options.length) {
             item.options.forEach((o) => {
               const qty = Number(o.quantity || 1)
               const unitQ = item.quantity && item.quantity > 1 ? Math.floor(qty / item.quantity) : qty
               if (unitQ > 0) {
-                optionCounts.set(o.option, (optionCounts.get(o.option) || 0) + unitQ)
+                optionCounts.set(String(o.option), (optionCounts.get(String(o.option)) || 0) + unitQ)
               }
             })
           }
@@ -1490,36 +2105,46 @@ const fetchOrders = async () => {
             let selectedTotalQty = 0
 
             const options = (group.articlesOptions || []).map((opt) => {
-              const optId = opt._id
+              const optId = String(opt._id)
               const available = optionCounts.get(optId) || 0
-
-              // How many we can take without exceeding group limit
               const remainingLimit = limit - selectedTotalQty
               const take = Math.min(available, remainingLimit)
 
               if (take > 0) {
                 optionCounts.set(optId, available - take)
                 selectedTotalQty += take
-                const historyDetails = (item.options || []).find((o) => o.option === optId)
-                return { ...opt, ...historyDetails, selected: true, quantity: take }
+
+                const historyDetails = (item.options || []).find((o) => String(o.option) === optId)
+
+                return {
+                  ...opt,
+                  ...historyDetails,
+                  selected: true,
+                  quantity: take,
+                }
               }
-              return { ...opt, selected: false }
+
+              return {
+                ...opt,
+                selected: false,
+              }
             })
-            return { ...group, articlesOptions: options }
+
+            return {
+              ...group,
+              articlesOptions: options,
+            }
           })
 
           const enrichedItem = {
             ...item,
-            menuItem: menuItem ? menuItem.name : 'Unknown Item',
+            menuItem: menuItem ? menuItem.name : item.menuItemName || 'Unknown Item',
             ...menuItem,
             articlesOptionsGroup: mappedGroups,
-            // Ensure we don't accidentally bring in a stale overrideUnitPrice from store
             overrideUnitPrice: null,
           }
 
-          // Calculate discounted price for this item
           if (discountPercentRaw > 0) {
-            // Calculate local total (Original)
             const originalTotal = Number(getTotalPrice(enrichedItem))
             const discounted = originalTotal * (1 - discountPercentRaw / 100)
             enrichedItem.overrideUnitPrice = discounted.toFixed(2)
@@ -1528,7 +2153,11 @@ const fetchOrders = async () => {
           return enrichedItem
         })
 
-        return { ...order, menuItems: detailedItems, offerDetails: detailedOfferItems }
+        return {
+          ...order,
+          menuItems: detailedItems,
+          offerDetails: detailedOfferItems,
+        }
       })
     } else {
       orders.value = []
@@ -1541,19 +2170,18 @@ const fetchOrders = async () => {
   }
 }
 
-// ---------- Misc ----------
+// -------------------- Misc --------------------
 const getTheEmployeeName = (employeeId) => {
   const user = users.value.find((user) => user._id === employeeId)
   if (!user) return ''
   return [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username
 }
+
 const getTotalPrice = (item) => {
-  // Use unitPrice if available (contains the correct total from API)
   if (item.unitPrice != null && item.unitPrice > 0) {
     return Number(item.unitPrice).toFixed(2)
   }
 
-  // Otherwise calculate from base price + all options (no deduplication)
   const basePrice = Number(item.price || 0)
 
   const selectedOptions =
@@ -1565,10 +2193,10 @@ const getTotalPrice = (item) => {
     (sum, opt) => sum + (Number(opt.price) || 0) * (Number(opt.quantity) || 1),
     0,
   )
+
   return (basePrice + optionsTotal).toFixed(2)
 }
 
-// ---------- Period stats ----------
 const fetchUsers = async () => {
   try {
     const userStore = useUsersStore()
@@ -1591,7 +2219,7 @@ onMounted(async () => {
   await fetchOrders()
 })
 
-// Placeholder stubs (already exist elsewhere in your codebase)
+// -------------------- Placeholder stubs already in your flow --------------------
 const repeatOrder = async (orderId) => {
   const order = orders.value.find((o) => o._id === orderId)
   if (!order) return
@@ -1599,29 +2227,16 @@ const repeatOrder = async (orderId) => {
   const menuStore = useMenuStore()
   const orderStore = useOrderStore()
 
-  // 1. Process Menu Items
-  // We iterate history items, but we rebuild the cart item using the FRESH item from store
   const items = (order.menuItems || [])
     .map((histItem) => {
-      // histItem._id is the Menu Item ID (because fetchOrders merges store item properties)
       const freshItem = menuStore.unFilteredMenuItems.find((mi) => mi._id === histItem._id)
-
-      // If item no longer exists in store, we might skip it or handle it.
-      // Here we skip gracefully or fall back?
-      // If detailedItems in fetchOrders succeeded, freshItem *should* exist.
-      // If it doesn't, we probably shouldn't add it to cart as it's discontinued.
       if (!freshItem) return null
 
-      // Map historical option selection to fresh option data
-      // We need to know WHICH options were selected.
-      // histItem.articlesOptionsGroup has the 'selected' flag from fetchOrders logic.
-      const histOptionMap = new Map() // OptionID -> quantity
+      const histOptionMap = new Map()
       if (histItem.articlesOptionsGroup) {
         histItem.articlesOptionsGroup.forEach((g) => {
           ;(g.articlesOptions || []).forEach((opt) => {
-            if (opt.selected) {
-              histOptionMap.set(opt._id, opt.quantity || 1)
-            }
+            if (opt.selected) histOptionMap.set(opt._id, opt.quantity || 1)
           })
         })
       }
@@ -1633,19 +2248,15 @@ const repeatOrder = async (orderId) => {
 
           const selected = (group.articlesOptions || [])
             .map((opt) => {
-              // Check if this option is in our historical map
               if (!histOptionMap.has(opt._id)) return null
 
               const available = histOptionMap.get(opt._id)
               if (available <= 0) return null
 
-              // Calculate how many we can take for this group
               const remainingLimit = limit - groupSelectedQty
               const take = Math.min(available, remainingLimit)
-
               if (take <= 0) return null
 
-              // Consume from map
               histOptionMap.set(opt._id, available - take)
               groupSelectedQty += take
 
@@ -1653,14 +2264,15 @@ const repeatOrder = async (orderId) => {
                 ...opt,
                 optionId: opt._id,
                 optionName: opt.name,
-                price: parseFloat(opt.price) || 0, // USE FRESH PRICE
+                price: parseFloat(opt.price) || 0,
                 type: opt.type,
-                quantity: take, // Use consumed quantity
+                quantity: take,
               }
             })
             .filter(Boolean)
 
           if (!selected.length) return null
+
           return {
             groupId: group._id,
             groupName: group.name,
@@ -1675,8 +2287,8 @@ const repeatOrder = async (orderId) => {
         orderId,
         itemId: freshItem._id,
         itemName: freshItem.name,
-        basePrice: parseFloat(freshItem.price) || 0, // USE FRESH BASE PRICE
-        totalPrice: 0, // Will be recalc by store
+        basePrice: parseFloat(freshItem.price) || 0,
+        totalPrice: 0,
         imageUrl: freshItem.imageUrl || '',
         promotionCode: freshItem.promotionCode || '',
         isRepeatedOrder: true,
@@ -1687,73 +2299,26 @@ const repeatOrder = async (orderId) => {
     })
     .filter(Boolean)
 
-  // 2. Process Offers
-  // Similar logic: find fresh offer definition from orderStore.offers
   const offersItems = (order.offerDetails || [])
     .map((histOffer) => {
-      // Find fresh offer
       const freshOfferDef = orderStore.offers.find((o) => o._id === histOffer.offerId)
       if (!freshOfferDef) return null
 
-      // We need to reconstruct the selections.
-      // histOffer.structuredOffer.selections (from fetchOrders) should effectively map to what we need,
-      // BUT we must ensure we use fresh prices.
-
-      // Ideally, we re-run `mapOfferDetailsToSelections` but using the FRESH prices from `freshOfferDef`.
-      // However, `mapOfferDetailsToSelections` takes the "offerDetails" response from history (which lacks prices or has old prices?)
-      // and looks up items in `storeMenuItems`.
-
-      // Actually, `mapOfferDetailsToSelections` (lines 1225+) ALREADY looks up `useMenuStore`.
-      // It sets `basePrice: Number(item.price || 0).toFixed(2)` where `item` comes from `offerDetailsResponse.offerItems`.
-      // `offerDetailsResponse` IS `histOffer` (the history object).
-      // So `mapOfferDetailsToSelections` uses the *historical configuration* of the offer (items list),
-      // but it looks up `storeMenu` (fresh) to get `articlesOptionsGroup`.
-
-      // WAIT using `mapOfferDetailsToSelections`:
-      // `const item = offerItems.find(...)` -> `offerItems` comes from `offerDetailsResponse` (History).
-      // `item.price` (History) is used? `Number(item.price || 0)`.
-      // YES, `mapOfferDetailsToSelections` uses `item.price` from the history object!
-      // This is why offers have old prices.
-
-      // To fix offers, we must look up the price from the FRESH `freshOfferDef` items list, not the history one.
-
-      // Let's re-map manually for safety and freshness.
-
-      // 1. We have `freshOfferDef`. It has `offerItems` (definition with current override prices).
-      // 2. We have `histOffer` (user's selection).
-
       let selectionTotal = 0
-
-      // Get FRESH selections structure based on history choices
       const selections = []
 
-      // Iterate over `structuredOffer.selections` (which tells us what the user picked: quantities, options)
-      // `structuredOffer` was built by `mapOfferDetailsToSelections`.
       if (histOffer.structuredOffer && histOffer.structuredOffer.selections) {
         histOffer.structuredOffer.selections.forEach((sel) => {
-          // 'sel' corresponds to a Selection Group (e.g. "Select 2 Pizzas")
-          // We need to map the addedItems
-
           const freshAddedItems = []
 
           sel.addedItems.forEach((addedItem) => {
-            // addedItem.itemId is the menu item ID.
-            // Find this item in the FRESH offer definition to get the override price.
             const freshOfferItemDef = freshOfferDef.offerItems.find((oi) => oi.menuItem === addedItem.itemId)
-
-            // If not in fresh offer, maybe it was removed? Skip.
             if (!freshOfferItemDef) return
 
-            // Fresh override price (or 0 if not overridden? check definition)
             const freshBasePrice = Number(freshOfferItemDef.price || 0)
-
-            // Now options.
-            // addedItem.selectedOptions has the groups/selected structure.
-            // We need to recalculate option prices using FRESH menu item.
             const freshMenuItem = menuStore.unFilteredMenuItems.find((m) => m._id === addedItem.itemId)
             if (!freshMenuItem) return
 
-            // Re-map options with fresh prices
             const freshSelectedOptions = (addedItem.selectedOptions || [])
               .map((group) => {
                 const freshGroup = freshMenuItem.articlesOptionsGroup.find((g) => g._id === group.groupId)
@@ -1765,7 +2330,7 @@ const repeatOrder = async (orderId) => {
                     if (!freshOpt) return null
                     return {
                       ...s,
-                      price: parseFloat(freshOpt.price) || 0, // FRESH
+                      price: parseFloat(freshOpt.price) || 0,
                     }
                   })
                   .filter(Boolean)
@@ -1775,7 +2340,6 @@ const repeatOrder = async (orderId) => {
               })
               .filter(Boolean)
 
-            // Calc total so we can pass it (though orderStore might recalc, better safe)
             let itemOptionsTotal = 0
             freshSelectedOptions.forEach((g) => {
               g.selected.forEach((s) => (itemOptionsTotal += s.price * s.quantity))
@@ -1785,7 +2349,7 @@ const repeatOrder = async (orderId) => {
 
             freshAddedItems.push({
               ...addedItem,
-              basePrice: freshBasePrice, // Updated
+              basePrice: freshBasePrice,
               selectedOptions: freshSelectedOptions,
             })
           })
@@ -1797,14 +2361,14 @@ const repeatOrder = async (orderId) => {
       }
 
       return {
-        ...freshOfferDef, // Use fresh definition (name, basePrice of offer itself)
+        ...freshOfferDef,
         _id: freshOfferDef._id,
         offerId: freshOfferDef._id,
-        basePrice: freshOfferDef.price, // Fresh base price of offer
+        basePrice: freshOfferDef.price,
         selectionTotalPrice: selectionTotal,
         totalPrice: Number(freshOfferDef.price || 0) + selectionTotal,
         quantity: 1,
-        selections: selections, // Our rebuilt selections
+        selections,
       }
     })
     .filter(Boolean)
@@ -1813,28 +2377,27 @@ const repeatOrder = async (orderId) => {
   emits('close')
   init({ message: 'Order items added to basket', color: 'success' })
 }
+
 const addItemsToOrder = (orderId) => {
   const order = orders.value.find((o) => o._id === orderId)
   if (!order) return
 
   const orderStore = useOrderStore()
-
-  // Reset and prepare edit context similar to editSelected
   orderStore.resetEditOrder()
   orderStore.setCartItems([])
   orderStore.offerItems = []
   orderStore.cartTotal = null
   orderStore.validation = null
 
-  // Attach _editContext (empty for pure add) and set as editOrder
   const orderForStore = {
     ...order,
-    editOrderTotal: order.total || 0, // Original order total (paid amount)
+    editOrderTotal: order.total || 0,
     _editContext: {
       originalMenuItems: [],
       originalOffersToDelete: [],
     },
   }
+
   orderStore.addEditOrder(orderForStore)
 
   emits('close')
@@ -1856,34 +2419,26 @@ const switchOrderType = async (orderId) => {
   }
 
   if (!isDelivery) {
-    // Switching TO Delivery -> Open Modal for Address Selection
     pendingSwitchOrderId.value = orderId
-    // Ensure we pass a customer object compatible with CustomerModal
-    // It expects a 'selectedUser' prop (Record<string,string>) with Name, Phone, OtherAddresses
     addressModalCustomer.value = props.customer
     showAddressModal.value = true
     return
   }
 
-  isLoading.value = true // Buffer: immediate feedback
+  isLoading.value = true
   try {
     await applyOrderEdit(orderId, action, order.tableNumber, payload)
     fetchOrders()
-  } catch (e) {
-    /* handled primarily by applyOrderEdit toast but we ensure fetch runs or state resets */
-  }
+  } catch {}
 }
 
 const handleAddressSelection = async (addr) => {
   if (!pendingSwitchOrderId.value) return
 
-  isLoading.value = true // Buffer: immediate feedback
+  isLoading.value = true
 
   const order = orders.value.find((o) => o._id === pendingSwitchOrderId.value)
   if (!order) return
-
-  // addr comes from CustomerModal address list item
-  // format: { designation, floor, aptNo, streetName, streetNo, district, city, postCode, deliveryNote }
 
   const streetPart = [addr.streetName, addr.streetNo].filter((val) => val && String(val).trim()).join(' ')
   const locationPart = [addr.district, addr.city].filter((val) => val && String(val).trim()).join(', ')
@@ -1897,18 +2452,14 @@ const handleAddressSelection = async (addr) => {
   const zip = addr.postCode || addr.postalCode || ''
   const designation = addr.designation || ''
 
-  // Calculate Delivery Fee based on Zone
-  let fee = props.deliveryFee || 0 // Default fallback
+  let fee = props.deliveryFee || 0
 
   if (props.deliveryZoneOptions && props.deliveryZoneOptions.length) {
-    // 1. Try Postal Code Match
     let zone = props.deliveryZoneOptions.find(
       (z) => z.postalCodes && z.postalCodes.some((pc) => String(pc).trim() === String(zip).trim()),
     )
 
-    // 2. Try Meeting Point Match if not found and looks like MP
     if (!zone && (designation.includes('Meeting') || designation.includes('M.P'))) {
-      // Simple match by designation inclusion
       zone = props.deliveryZoneOptions.find(
         (z) => z.meetingPoints && z.meetingPoints.some((mp) => designation.includes(mp.designation)),
       )
@@ -1934,7 +2485,7 @@ const handleAddressSelection = async (addr) => {
       Phone: c.Phone || c.MobilePhone || c.phoneNo,
       Address: fullAddress,
       ZipCode: zip,
-      DeliveryNote: addr.deliveryNote || '', // If backend supports it on entity/update
+      DeliveryNote: addr.deliveryNote || '',
     },
   }
 
@@ -1948,14 +2499,11 @@ const handleAddressSelection = async (addr) => {
   }
 }
 
-// ---------- Reschedule Logic ----------
 const openReschedule = (order) => {
   pendingRescheduleOrderId.value = order._id
 
   if (order.orderDateTime) {
     const d = new Date(order.orderDateTime)
-    // Format local ISO string for datetime-local input (YYYY-MM-DDTHH:mm)
-    // We adjust for timezone offset manually to get local time string
     const offset = d.getTimezoneOffset() * 60000
     const local = new Date(d.getTime() - offset)
     rescheduleDateTime.value = local.toISOString().slice(0, 16)
@@ -1969,8 +2517,8 @@ const openReschedule = (order) => {
 const saveReschedule = async () => {
   if (!pendingRescheduleOrderId.value || !rescheduleDateTime.value) return
 
-  isLoading.value = true // Buffer
-  showRescheduleModal.value = false // Close immediately to show buffer on list
+  isLoading.value = true
+  showRescheduleModal.value = false
 
   try {
     const payload = {
@@ -1978,11 +2526,11 @@ const saveReschedule = async () => {
     }
     await axios.patch(`${url}/orders/${pendingRescheduleOrderId.value}/schedule`, payload)
     init({ message: 'Order rescheduled successfully', color: 'success' })
-    fetchOrders() // Logic handles isLoading toggle
+    fetchOrders()
   } catch (e) {
     const msg = e?.response?.data?.message || e?.message || 'Failed to reschedule'
     init({ message: msg, color: 'danger' })
-    isLoading.value = false // Reset if error
+    isLoading.value = false
   }
 }
 </script>

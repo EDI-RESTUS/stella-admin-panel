@@ -133,44 +133,42 @@
             </div>
           </div>
 
-          <div class="summary-totals flex-none pt-3">
-            <div class="total-row">
-              <span>Subtotal:</span>
-              <span>{{ subtotal.toFixed(2) }} €</span>
-            </div>
-            <div v-if="orderType === 'delivery'" class="total-row">
-              <span>Delivery Fee:</span>
-              <span>{{ deliveryFee.toFixed(2) }} €</span>
-            </div>
-            <div v-if="promoTotal" class="total-row">
-              <span class="text-red-600">Discount:</span>
-              <span class="text-red-600">- {{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }} €</span>
-            </div>
-            <div class="total-row total-final !text-2xl">
-              <span v-if="orderStore.editOrder"
-                >Total:
-                <span class="text-green-600">PAID AMOUNT: {{ orderStore.editOrder.editOrderTotal.toFixed(2) }} €</span>
-              </span>
-              <span v-else>Total:</span>
-              <span v-if="orderStore.editOrder && promoTotal">
-                {{ (orderStore.editOrder.editOrderTotal + promoTotal.updatedTotal).toFixed(2) }} €
-              </span>
-              <span v-else-if="orderStore.editOrder">
-                {{ (orderStore.editOrder.editOrderTotal + totalAmount + deliveryFee).toFixed(2) }} €
-              </span>
-              <span v-else-if="!promoTotal">{{ (totalAmount + deliveryFee).toFixed(2) }} €</span>
-              <span v-else>{{ promoTotal.updatedTotal.toFixed(2) }} €</span>
-            </div>
-            <div v-if="orderStore.editOrder" class="total-row text-sm">
-              <span class="text-gray-600">Difference:</span>
-              <span v-if="promoTotal" class="font-semibold text-red-600">
-                {{ promoTotal.updatedTotal.toFixed(2) }} €
-              </span>
-              <span v-else class="font-semibold text-red-600">
-                {{ (totalAmount + deliveryFee).toFixed(2) }} €
-              </span>
-            </div>
-          </div>
+<div class="summary-totals flex-none pt-3">
+  <div class="total-row">
+    <span>Subtotal:</span>
+    <span>{{ subtotal.toFixed(2) }} €</span>
+  </div>
+
+  <div v-if="orderType === 'delivery'" class="total-row">
+    <span>Delivery Fee:</span>
+    <span>{{ deliveryFee.toFixed(2) }} €</span>
+  </div>
+
+  <div v-if="promoTotal" class="total-row">
+    <span class="text-red-600">Discount:</span>
+    <span class="text-red-600">- {{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }} €</span>
+  </div>
+
+  <div v-if="orderStore.editOrder" class="total-row">
+    <span class="text-gray-600">Paid Amount:</span>
+    <span class="text-green-600 font-semibold">{{ paidAmount.toFixed(2) }} €</span>
+  </div>
+
+  <div class="total-row total-final !text-2xl">
+    <span>Total:</span>
+    <span>{{ currentEditedTotal.toFixed(2) }} €</span>
+  </div>
+
+  <div v-if="orderStore.editOrder" class="total-row text-sm">
+    <span class="text-gray-600">Difference:</span>
+    <span
+      class="font-semibold"
+      :class="editDifference > 0 ? 'text-red-600' : editDifference < 0 ? 'text-green-600' : 'text-gray-700'"
+    >
+      {{ editDifference.toFixed(2) }} €
+    </span>
+  </div>
+</div>
         </div>
       </div>
       <!-- Outlet & Type & Time -->
@@ -350,12 +348,7 @@ const handleDenominationClick = (amount: number) => {
   manualCashString.value = amount.toString()
 }
 
-const finalTotal = computed(() => {
-  if (promoTotal.value) {
-    return promoTotal.value.updatedTotal
-  }
-  return totalAmount.value + props.deliveryFee
-})
+const finalTotal = computed(() => currentEditedTotal.value)
 
 const changeAmount = computed(() => {
   if (!selectedCashAmount.value) return 0
@@ -753,7 +746,21 @@ function setInter() {
     }
   }, 2000)
 }
+const currentEditedTotal = computed(() => {
+  if (promoTotal.value) {
+    return Number(promoTotal.value.updatedTotal || 0)
+  }
 
+  return Number(totalAmount.value + props.deliveryFee)
+})
+
+const paidAmount = computed(() => {
+  return Number(orderStore.editOrder?.editOrderTotal || 0)
+})
+
+const editDifference = computed(() => {
+  return Number((currentEditedTotal.value - paidAmount.value).toFixed(2))
+})
 function resetInter() {
   clearInterval(checkInterval.value)
 }
