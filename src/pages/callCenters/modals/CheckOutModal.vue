@@ -832,52 +832,36 @@ async function updateOrder() {
   // --- Existing non-promo edit flow (unchanged) ---
   const url = import.meta.env.VITE_API_BASE_URL
   const userStore = useUsersStore()
-  const existingMenuItems: any[] = []
-  const existingOffers: any[] = []
+  const itemsToDelete: any = {
+    menuItems: [],
+    offerMenuItems: [],
+  }
+
   orderStore.editOrder.menuItems.forEach((item: any) => {
     if (orderStore.cartItems.find((a: any) => a.itemId === item._id)) {
-      existingMenuItems.push(item._id)
+      itemsToDelete.menuItems.push({
+        menuItem: item._id,
+        quantity: 1,
+        options: (item.options || []).map((op: any) => ({
+          option: typeof op.option === 'string' ? op.option : String(op.option?._id),
+          quantity: Number(op.quantity ?? 1),
+        })),
+      })
     }
   })
 
-  orderStore.editOrder.offerDetails.forEach((item: any) => {
-    if (orderStore.offerItems.find((a: any) => a._id === item.offerId)) {
-      existingOffers.push(item)
-    }
-  })
+  const existingOffers = orderStore.editOrder.offerDetails.filter((item: any) =>
+    orderStore.offerItems.find((a: any) => a._id === item.offerId),
+  )
+  if (existingOffers.length) {
+    const uniq = Array.from(new Map(existingOffers.map((o: any) => [o.offerId, o])).values())
+    itemsToDelete.offerMenuItems = uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 }))
+  }
 
   try {
-    if (existingMenuItems.length) {
-      await Promise.all(
-        existingMenuItems.map((item) => {
-          const data = {
-            menuItems: [
-              {
-                menuItem: item,
-                quantity: 1,
-                options: (orderStore.editOrder.menuItems.find((m: any) => m._id === item)?.options || []).map(
-                  (op: any) => ({
-                    option: typeof op.option === 'string' ? op.option : String(op.option?._id),
-                    quantity: Number(op.quantity ?? 1),
-                  }),
-                ),
-              },
-            ],
-          }
-          return applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, data)
-        }),
-      )
+    if (itemsToDelete.menuItems.length || itemsToDelete.offerMenuItems.length) {
+      await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, itemsToDelete)
     }
-
-    // --- CHANGED: batch & dedupe offer deletes into ONE call ---
-    if (existingOffers.length) {
-      const uniq = Array.from(new Map(existingOffers.map((o: any) => [o.offerId, o])).values())
-      const payload = {
-        offerMenuItems: uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 })),
-      }
-      await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, payload)
-    }
-    // --- END CHANGE ---
 
     const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
       offerId: offer.offerId,
@@ -977,34 +961,26 @@ async function updateOrderWithPromo(promoCodes: string[]) {
       })),
     }))
 
-    // 2. Delete ALL original menu items
-    if (originalMenuItems.length) {
-      await Promise.all(
-        originalMenuItems.map((item: any) => {
-          const data = {
-            menuItems: [
-              {
-                menuItem: item._id,
-                quantity: 1,
-                options: (item.options || []).map((op: any) => ({
-                  option: typeof op.option === 'string' ? op.option : String(op.option?._id),
-                  quantity: Number(op.quantity ?? 1),
-                })),
-              },
-            ],
-          }
-          return applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, data)
-        }),
-      )
+    // 2. Delete ALL original items and offers in ONE call
+    const itemsToDelete: any = {
+      menuItems: originalMenuItems.map((item: any) => ({
+        menuItem: item._id,
+        quantity: 1,
+        options: (item.options || []).map((op: any) => ({
+          option: typeof op.option === 'string' ? op.option : String(op.option?._id),
+          quantity: Number(op.quantity ?? 1),
+        })),
+      })),
+      offerMenuItems: [],
     }
 
-    // 3. Delete ALL original offers
     if (originalOffers.length) {
       const uniq = Array.from(new Map(originalOffers.map((o: any) => [o.offerId, o])).values())
-      const payload = {
-        offerMenuItems: uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 })),
-      }
-      await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, payload)
+      itemsToDelete.offerMenuItems = uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 }))
+    }
+
+    if (itemsToDelete.menuItems.length || itemsToDelete.offerMenuItems.length) {
+      await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, itemsToDelete)
     }
 
     // 4. Build full order payload: cached original items + new cart items
