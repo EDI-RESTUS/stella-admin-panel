@@ -294,7 +294,7 @@ import axios from 'axios'
 const showCheckoutModal = ref(true)
 const selectedPayment: any = ref(null)
 const apiLoading = ref(false)
-const emits = defineEmits(['cancel'])
+const emits = defineEmits(['cancel', 'success'])
 const { init } = useToast()
 const props = defineProps<{
   deliveryFee: number
@@ -660,7 +660,8 @@ function handlePaymentSuccess() {
     } catch (e) {
       console.error('Error clearing cart', e)
     }
-    window.location.reload()
+    emits('success')
+    showCheckoutModal.value = false
   }, 800)
 }
 
@@ -775,10 +776,11 @@ async function cancelOrder() {
 
     init({ color: 'info', message: 'Order cancelled' })
 
-    // Reset everything by reloading, similar to success flow
+    // Reset everything by emitting event, similar to success flow
     setTimeout(() => {
       orderStore.cartItems = []
-      window.location.reload()
+      emits('cancel')
+      showCheckoutModal.value = false
     }, 800)
   } catch (e) {
     console.error(e)
@@ -919,7 +921,8 @@ async function updateOrder() {
     } catch (e) {
       console.error(e)
     }
-    window.location.reload()
+    emits('success')
+    showCheckoutModal.value = false
     return res.data
   } catch (err: any) {
     console.error('Order edit failed:', err)
@@ -1088,7 +1091,8 @@ async function updateOrderWithPromo(promoCodes: string[]) {
     } catch (e) {
       console.error(e)
     }
-    window.location.reload()
+    emits('success')
+    showCheckoutModal.value = false
     return res.data
   } catch (err: any) {
     console.error('Order edit with promo failed:', err)

@@ -363,6 +363,7 @@
       :promo-codes="appliedPromoCodes"
       :existing-order-id="existingOrderId"
       @cancel="closeCheckoutModal"
+      @success="emit('success')"
     />
     <PromotionModal
       ref="promotionModal"
@@ -403,7 +404,7 @@ const props = defineProps({
   dateSelected: String,
 })
 
-const emit = defineEmits(['restore-context'])
+const emit = defineEmits(['restore-context', 'success'])
 
 const route = useRoute()
 const router = useRouter()

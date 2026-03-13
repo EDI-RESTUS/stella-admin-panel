@@ -129,6 +129,7 @@
           <VaCardContent>
             <OrderDetails
               @restore-context="updateContext"
+              @success="resetContext"
               :delivery-fee="deliveryFee"
               :date-selected="dateSelected ? new Date(dateSelected).toString() : ''"
               :is-delivery-zone-selected="isDeliveryZoneSelected"
@@ -224,16 +225,12 @@ const selectSubCategory = (subId) => {
 }
 
 const getOffers = async () => {
-  const url = import.meta.env.VITE_API_BASE_URL
-  const params = new URLSearchParams({ outletId: serviceStore.selectedRest })
-  if (menuStore.deliveryZoneId) {
-    params.append('deliveryZoneId', menuStore.deliveryZoneId)
-  }
   loadingOffers.value = true
   try {
-    const response = await axios.get(url + '/offers?' + params.toString())
-    orderStore.offers = response.data.data
-    offers.value = response.data.data
+    const data = await menuStore.getOffers()
+    offers.value = data
+    // keep legacy orderStore sync if components depend on it
+    orderStore.offers = data
   } finally {
     loadingOffers.value = false
   }
@@ -252,6 +249,29 @@ const updateContext = (ctx) => {
   if (ctx.customerDetailsId) isCustomerTabActivated.value = true
 }
 
+const resetContext = () => {
+  orderStore.cartItems = []
+  orderStore.offerItems = []
+  orderStore.editOrder = null
+  orderStore.phoneNumber = ''
+  orderStore.address = {
+    line1: '',
+    line2: '',
+    city: '',
+    postcode: '',
+  }
+  orderStore.deliveryNotes = ''
+  orderStore.orderNotes = ''
+  orderStore.deliveryZone = null
+  customerDetailsId.value = ''
+  orderType.value = ''
+  dateSelected.value = ''
+  deliveryFee.value = 0
+  isDeliveryZoneSelected.value = ''
+  accordian.value = [true, true]
+  forceRemount.value++
+}
+
 // Auto-set delivery zone from user's allowed zones before fetching menu
 async function autoSetUserDeliveryZone() {
   try {
@@ -260,16 +280,16 @@ async function autoSetUserDeliveryZone() {
       // User has no zone restrictions, don't auto-set
       return
     }
-    
+
     // Fetch delivery zones for the outlet
     const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/deliveryZones/${serviceStore.selectedRest}`)
     const zones = response.data.data.filter((zone) => zone.isActive !== false)
-    
+
     // Filter to user's allowed zones
-    const userZones = zones.filter((zone) => 
+    const userZones = zones.filter((zone) =>
       allowed.includes(zone._id) || allowed.includes(zone.id)
     )
-    
+
     // If user has exactly one allowed zone, auto-set it
     if (userZones.length === 1) {
       const zone = userZones[0]
@@ -357,12 +377,18 @@ watch(
         history.replaceState(null, '', window.location.pathname + window.location.search)
       }
       isLoading.value = true
-      
-      // Auto-set delivery zone from user's allowed zones before fetching menu
+
+      // 1. Setup Zone (awaited)
       await autoSetUserDeliveryZone()
-      
-      getMenu()
-      getOffers()
+
+      // 2. Fetch Restaurant Basics (needed by both Menu and Offers)
+      const payload = serviceStore.items.find((item) => item._id === serviceStore.selectedRest).slug
+      await menuStore.getOutletDetails(payload)
+
+      // 3. Start Offers and Menu in parallel
+      // getOffers is first in Promise.all to ensure it hits the browser queue first
+      await Promise.all([getOffers(), getMenu()])
+
       orderStore.cartItems = []
       orderStore.paymentId = ''
       orderStore.redirectUrl = ''
@@ -376,6 +402,7 @@ watch(
 const filteredCategories = computed(() => {
   const validCategories = categories.value.filter(
     (category) =>
+      category.loading || // Show loading categories immediately for headers/spinners
       category.menuItems.length > 0 ||
       (category.subCategories.length && category.subCategories.some((a) => a.menuItems.length)),
   )
@@ -444,12 +471,9 @@ watch(
 )
 
 async function getMenu() {
-  isLoading.value = true
-  menuStore.resetUnFilteredMenuItems()
   const payload = serviceStore.items.find((item) => item._id === serviceStore.selectedRest).slug
   await menuStore.getOutletDetails(payload)
   await menuStore.getCategories()
-  isLoading.value = false
 }
 </script>
 
