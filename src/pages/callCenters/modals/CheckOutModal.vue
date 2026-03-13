@@ -15,9 +15,7 @@
           <h3 class="va-h3">Order Details</h3>
 
           <div class="order-items order-items-wrapper overflow-y-auto flex-1 min-h-0 basis-0 h-0">
-            <div v-if="!orderStore.cartItems || orderStore.cartItems.length === 0" class="p-4 text-red-600 font-bold bg-red-100 rounded mb-2">
-              DEBUG: CART IS EMPTY (Len: {{ orderStore.cartItems ? orderStore.cartItems.length : 'null' }})
-            </div>
+
             <div v-for="(item, index) in orderStore.cartItems" :key="item.itemId" class="order-item">
               <div class="item-main">
                 <div class="item-details">
