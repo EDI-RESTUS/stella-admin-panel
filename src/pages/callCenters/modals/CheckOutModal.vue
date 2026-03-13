@@ -15,9 +15,7 @@
           <h3 class="va-h3">Order Details</h3>
 
           <div class="order-items order-items-wrapper overflow-y-auto flex-1 min-h-0 basis-0 h-0">
-            <div v-if="!orderStore.cartItems || orderStore.cartItems.length === 0" class="p-4 text-red-600 font-bold bg-red-100 rounded mb-2">
-              DEBUG: CART IS EMPTY (Len: {{ orderStore.cartItems ? orderStore.cartItems.length : 'null' }})
-            </div>
+
             <div v-for="(item, index) in orderStore.cartItems" :key="item.itemId" class="order-item">
               <div class="item-main">
                 <div class="item-details">
@@ -133,44 +131,42 @@
             </div>
           </div>
 
-          <div class="summary-totals flex-none pt-3">
-            <div class="total-row">
-              <span>Subtotal:</span>
-              <span>{{ subtotal.toFixed(2) }} €</span>
-            </div>
-            <div v-if="orderType === 'delivery'" class="total-row">
-              <span>Delivery Fee:</span>
-              <span>{{ deliveryFee.toFixed(2) }} €</span>
-            </div>
-            <div v-if="promoTotal" class="total-row">
-              <span class="text-red-600">Discount:</span>
-              <span class="text-red-600">- {{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }} €</span>
-            </div>
-            <div class="total-row total-final !text-2xl">
-              <span v-if="orderStore.editOrder"
-                >Total:
-                <span class="text-green-600">PAID AMOUNT: {{ orderStore.editOrder.editOrderTotal.toFixed(2) }} €</span>
-              </span>
-              <span v-else>Total:</span>
-              <span v-if="orderStore.editOrder && promoTotal">
-                {{ (orderStore.editOrder.editOrderTotal + promoTotal.updatedTotal).toFixed(2) }} €
-              </span>
-              <span v-else-if="orderStore.editOrder">
-                {{ (orderStore.editOrder.editOrderTotal + totalAmount + deliveryFee).toFixed(2) }} €
-              </span>
-              <span v-else-if="!promoTotal">{{ (totalAmount + deliveryFee).toFixed(2) }} €</span>
-              <span v-else>{{ promoTotal.updatedTotal.toFixed(2) }} €</span>
-            </div>
-            <div v-if="orderStore.editOrder" class="total-row text-sm">
-              <span class="text-gray-600">Difference:</span>
-              <span v-if="promoTotal" class="font-semibold text-red-600">
-                {{ promoTotal.updatedTotal.toFixed(2) }} €
-              </span>
-              <span v-else class="font-semibold text-red-600">
-                {{ (totalAmount + deliveryFee).toFixed(2) }} €
-              </span>
-            </div>
-          </div>
+<div class="summary-totals flex-none pt-3">
+  <div class="total-row">
+    <span>Subtotal:</span>
+    <span>{{ subtotal.toFixed(2) }} €</span>
+  </div>
+
+  <div v-if="orderType === 'delivery'" class="total-row">
+    <span>Delivery Fee:</span>
+    <span>{{ deliveryFee.toFixed(2) }} €</span>
+  </div>
+
+  <div v-if="promoTotal" class="total-row">
+    <span class="text-red-600">Discount:</span>
+    <span class="text-red-600">- {{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }} €</span>
+  </div>
+
+  <div v-if="orderStore.editOrder" class="total-row">
+    <span class="text-gray-600">Paid Amount:</span>
+    <span class="text-green-600 font-semibold">{{ paidAmount.toFixed(2) }} €</span>
+  </div>
+
+  <div class="total-row total-final !text-2xl">
+    <span>Total:</span>
+    <span>{{ currentEditedTotal.toFixed(2) }} €</span>
+  </div>
+
+  <div v-if="orderStore.editOrder" class="total-row text-sm">
+    <span class="text-gray-600">Difference:</span>
+    <span
+      class="font-semibold"
+      :class="editDifference > 0 ? 'text-red-600' : editDifference < 0 ? 'text-green-600' : 'text-gray-700'"
+    >
+      {{ editDifference.toFixed(2) }} €
+    </span>
+  </div>
+</div>
         </div>
       </div>
       <!-- Outlet & Type & Time -->
@@ -296,7 +292,7 @@ import axios from 'axios'
 const showCheckoutModal = ref(true)
 const selectedPayment: any = ref(null)
 const apiLoading = ref(false)
-const emits = defineEmits(['cancel'])
+const emits = defineEmits(['cancel', 'success'])
 const { init } = useToast()
 const props = defineProps<{
   deliveryFee: number
@@ -350,12 +346,7 @@ const handleDenominationClick = (amount: number) => {
   manualCashString.value = amount.toString()
 }
 
-const finalTotal = computed(() => {
-  if (promoTotal.value) {
-    return promoTotal.value.updatedTotal
-  }
-  return totalAmount.value + props.deliveryFee
-})
+const finalTotal = computed(() => currentEditedTotal.value)
 
 const changeAmount = computed(() => {
   if (!selectedCashAmount.value) return 0
@@ -667,7 +658,8 @@ function handlePaymentSuccess() {
     } catch (e) {
       console.error('Error clearing cart', e)
     }
-    window.location.reload()
+    emits('success')
+    showCheckoutModal.value = false
   }, 800)
 }
 
@@ -753,7 +745,21 @@ function setInter() {
     }
   }, 2000)
 }
+const currentEditedTotal = computed(() => {
+  if (promoTotal.value) {
+    return Number(promoTotal.value.updatedTotal || 0)
+  }
 
+  return Number(totalAmount.value + props.deliveryFee)
+})
+
+const paidAmount = computed(() => {
+  return Number(orderStore.editOrder?.editOrderTotal || 0)
+})
+
+const editDifference = computed(() => {
+  return Number((currentEditedTotal.value - paidAmount.value).toFixed(2))
+})
 function resetInter() {
   clearInterval(checkInterval.value)
 }
@@ -768,10 +774,11 @@ async function cancelOrder() {
 
     init({ color: 'info', message: 'Order cancelled' })
 
-    // Reset everything by reloading, similar to success flow
+    // Reset everything by emitting event, similar to success flow
     setTimeout(() => {
       orderStore.cartItems = []
-      window.location.reload()
+      emits('cancel')
+      showCheckoutModal.value = false
     }, 800)
   } catch (e) {
     console.error(e)
@@ -811,54 +818,50 @@ onUnmounted(() => {
 
 async function updateOrder() {
   apiLoading.value = true
+
+  // --- Detect promo codes (from props OR original order) ---
+  const codes = normalizeCodes(props.promoCode, props.promoCodes)
+  const editPromos = orderStore.editOrder.promoCodes || (orderStore.editOrder.promoCode ? [orderStore.editOrder.promoCode] : [])
+  const allCodes = [...new Set([...codes, ...editPromos].filter(Boolean))]
+  const hasPromo = allCodes.length > 0
+
+  if (hasPromo) {
+    return await updateOrderWithPromo(allCodes)
+  }
+
+  // --- Existing non-promo edit flow (unchanged) ---
   const url = import.meta.env.VITE_API_BASE_URL
   const userStore = useUsersStore()
-  const existingMenuItems: any[] = []
-  const existingOffers: any[] = []
+  const itemsToDelete: any = {
+    menuItems: [],
+    offerMenuItems: [],
+  }
+
   orderStore.editOrder.menuItems.forEach((item: any) => {
     if (orderStore.cartItems.find((a: any) => a.itemId === item._id)) {
-      existingMenuItems.push(item._id)
+      itemsToDelete.menuItems.push({
+        menuItem: item._id,
+        quantity: 1,
+        options: (item.options || []).map((op: any) => ({
+          option: typeof op.option === 'string' ? op.option : String(op.option?._id),
+          quantity: Number(op.quantity ?? 1),
+        })),
+      })
     }
   })
 
-  orderStore.editOrder.offerDetails.forEach((item: any) => {
-    if (orderStore.offerItems.find((a: any) => a._id === item.offerId)) {
-      existingOffers.push(item)
-    }
-  })
+  const existingOffers = orderStore.editOrder.offerDetails.filter((item: any) =>
+    orderStore.offerItems.find((a: any) => a._id === item.offerId),
+  )
+  if (existingOffers.length) {
+    const uniq = Array.from(new Map(existingOffers.map((o: any) => [o.offerId, o])).values())
+    itemsToDelete.offerMenuItems = uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 }))
+  }
 
   try {
-    if (existingMenuItems.length) {
-      await Promise.all(
-        existingMenuItems.map((item) => {
-          const data = {
-            menuItems: [
-              {
-                menuItem: item,
-                quantity: 1,
-                options: (orderStore.editOrder.menuItems.find((m: any) => m._id === item)?.options || []).map(
-                  (op: any) => ({
-                    option: typeof op.option === 'string' ? op.option : String(op.option?._id),
-                    quantity: Number(op.quantity ?? 1),
-                  }),
-                ),
-              },
-            ],
-          }
-          return applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, data)
-        }),
-      )
+    if (itemsToDelete.menuItems.length || itemsToDelete.offerMenuItems.length) {
+      await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, itemsToDelete)
     }
-
-    // --- CHANGED: batch & dedupe offer deletes into ONE call ---
-    if (existingOffers.length) {
-      const uniq = Array.from(new Map(existingOffers.map((o: any) => [o.offerId, o])).values())
-      const payload = {
-        offerMenuItems: uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 })),
-      }
-      await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, payload)
-    }
-    // --- END CHANGE ---
 
     const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
       offerId: offer.offerId,
@@ -916,11 +919,182 @@ async function updateOrder() {
     } catch (e) {
       console.error(e)
     }
-    window.location.reload()
+    emits('success')
+    showCheckoutModal.value = false
     return res.data
   } catch (err: any) {
     console.error('Order edit failed:', err)
     init({ message: err.response.data.message, color: 'danger' })
+    apiLoading.value = false
+    throw err
+  }
+}
+
+/**
+ * Promo-aware edit: delete ALL original items/offers, then resend the
+ * entire order via PATCH so the promo engine re-calculates on the full order.
+ */
+async function updateOrderWithPromo(promoCodes: string[]) {
+  const userStore = useUsersStore()
+  try {
+    // 1. Cache original menu items before deleting
+    const originalMenuItems = orderStore.editOrder.menuItems || []
+    const cachedMenuItems = originalMenuItems.map((item: any) => ({
+      menuItem: item._id,
+      quantity: Number(item.quantity ?? 1),
+      options: (item.options || []).map((op: any) => ({
+        option: typeof op.option === 'string' ? op.option : String(op.option?._id),
+        quantity: Number(op.quantity ?? 1),
+      })),
+    }))
+
+    // Cache original offers before deleting
+    const originalOffers = orderStore.editOrder.offerDetails || []
+    const cachedOfferItems = originalOffers.map((od: any) => ({
+      offerId: od.offerId,
+      menuItems: (od.offerItems || []).map((oi: any) => ({
+        menuItem: typeof oi.menuItem === 'string' ? oi.menuItem : String(oi.menuItem?._id || oi._id),
+        quantity: Number(oi.quantity ?? 1),
+        options: (oi.options || []).map((op: any) => ({
+          option: typeof op.option === 'string' ? op.option : String(op.option?._id),
+          quantity: Number(op.quantity ?? 1),
+        })),
+      })),
+    }))
+
+    // 2. Delete ALL original items and offers in ONE call
+    const itemsToDelete: any = {
+      menuItems: originalMenuItems.map((item: any) => ({
+        menuItem: item._id,
+        quantity: 1,
+        options: (item.options || []).map((op: any) => ({
+          option: typeof op.option === 'string' ? op.option : String(op.option?._id),
+          quantity: Number(op.quantity ?? 1),
+        })),
+      })),
+      offerMenuItems: [],
+    }
+
+    if (originalOffers.length) {
+      const uniq = Array.from(new Map(originalOffers.map((o: any) => [o.offerId, o])).values())
+      itemsToDelete.offerMenuItems = uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 }))
+    }
+
+    if (itemsToDelete.menuItems.length || itemsToDelete.offerMenuItems.length) {
+      await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, itemsToDelete)
+    }
+
+    // 4. Build full order payload: cached original items + new cart items
+    const newMenuItems = orderStore.cartItems.map((e: any) => ({
+      menuItem: e.itemId,
+      quantity: e.quantity,
+      options: e.selectedOptions.flatMap((group: any) =>
+        group.selected.map((option: any) => ({
+          option: option.optionId,
+          quantity: option.quantity,
+        })),
+      ),
+    }))
+
+    // Merge: remove from cache only as many as exist in cart (edited items), keep the rest
+    const cartCountMap = new Map<string, number>()
+    for (const c of orderStore.cartItems as any[]) {
+      cartCountMap.set(c.itemId, (cartCountMap.get(c.itemId) || 0) + 1)
+    }
+    const removedCountMap = new Map<string, number>()
+    const untouchedCachedItems = cachedMenuItems.filter((ci: any) => {
+      const allowed = cartCountMap.get(ci.menuItem) || 0
+      const removed = removedCountMap.get(ci.menuItem) || 0
+      if (allowed > 0 && removed < allowed) {
+        removedCountMap.set(ci.menuItem, removed + 1)
+        return false // this one was edited, skip it
+      }
+      return true // keep untouched original
+    })
+    const menuItems = [...untouchedCachedItems, ...newMenuItems]
+
+    const newOfferItems = orderStore.offerItems.map((offer: any) => ({
+      offerId: offer.offerId,
+      menuItems: offer.selections.flatMap((selection: any) =>
+        selection.addedItems.map((item: any) => ({
+          menuItem: item.itemId,
+          quantity: item.quantity || 1,
+          options:
+            item.selectedOptions?.flatMap((group: any) =>
+              group.selected.map((option: any) => ({
+                option: option.optionId,
+                quantity: option.quantity,
+              })),
+            ) || [],
+        })),
+      ),
+    }))
+
+    // Merge: count-based removal for offers too
+    const cartOfferCountMap = new Map<string, number>()
+    for (const o of orderStore.offerItems as any[]) {
+      cartOfferCountMap.set(o.offerId, (cartOfferCountMap.get(o.offerId) || 0) + 1)
+    }
+    const removedOfferCountMap = new Map<string, number>()
+    const untouchedCachedOffers = cachedOfferItems.filter((co: any) => {
+      const allowed = cartOfferCountMap.get(co.offerId) || 0
+      const removed = removedOfferCountMap.get(co.offerId) || 0
+      if (allowed > 0 && removed < allowed) {
+        removedOfferCountMap.set(co.offerId, removed + 1)
+        return false
+      }
+      return true
+    })
+    const offerMenuItems = [...untouchedCachedOffers, ...newOfferItems]
+
+    const dateVal = props.dateSelected ? new Date(props.dateSelected) : new Date()
+    const orderDateTime = !isNaN(dateVal.getTime()) ? dateVal.toISOString() : new Date().toISOString()
+
+    const pm = selectedPayment.value || {} as any
+    const patchPayload: any = {
+      orderFor: orderFor.value,
+      customerDetailId: props.customerDetailsId,
+      orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
+      deliveryZoneId: orderStore.deliveryZone?._id,
+      outletId: serviceStore.selectedRest,
+      orderDateTime,
+      phoneNo: orderStore.phoneNumber || '',
+      address: sanitizeAddress(orderStore.address),
+      deliveryNotes: orderStore.deliveryNotes || '',
+      orderNotes: orderStore.orderNotes,
+      deliveryFee: props.deliveryFee,
+      paymentMode: {
+        _id: pm._id,
+        name: pm.name,
+        paymentTypeId: pm.paymentTypeId,
+        autoReceipt: pm.autoReceipt ?? false,
+        receiptFormat: pm.receiptFormat ?? 'NONE',
+      },
+      menuItems,
+      offerDetails: offerMenuItems,
+      promoCodes,
+    }
+    if (promoCodes.length === 1) patchPayload.promoCode = promoCodes[0]
+
+    // 4. PATCH the entire order
+    const res = await orderStore.patchOrder(orderStore.editOrder._id, patchPayload)
+
+    init({
+      message: res.data?.message || 'Order updated with promo',
+      color: res.data?.status !== 'Failed' ? 'success' : 'danger',
+    })
+    orderStore.editOrder = null as any
+    try {
+      orderStore.cartItems = [] as any
+    } catch (e) {
+      console.error(e)
+    }
+    emits('success')
+    showCheckoutModal.value = false
+    return res.data
+  } catch (err: any) {
+    console.error('Order edit with promo failed:', err)
+    init({ message: err.response?.data?.message || 'Order edit failed', color: 'danger' })
     apiLoading.value = false
     throw err
   }

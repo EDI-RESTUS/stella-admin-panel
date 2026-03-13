@@ -11,6 +11,10 @@ export const useMenuStore = defineStore('menu', {
       unFilteredMenuItems: [],
       offer: null,
       deliveryZoneId: null,
+      // Caching
+      outletCache: {}, // { outletSlug: details }
+      menuCache: {}, // { cacheKey: categories }
+      offersCache: {}, // { cacheKey: offers }
     }
   },
   getters: {
@@ -57,32 +61,59 @@ export const useMenuStore = defineStore('menu', {
       this.unFilteredMenuItems
     },
     async getOutletDetails(payload) {
+      if (this.outletCache[payload]) {
+        this.restDetails = this.outletCache[payload]
+        return
+      }
       const response = await axios.get(`${this.url}/outletsvo`, {
         params: {
           outletSlug: payload,
         },
       })
       this.restDetails = response.data[0]
+      this.outletCache[payload] = response.data[0]
     },
     async getCategories() {
+      const cacheKey = `${this.restDetails?._id}_${this.deliveryZoneId || 'nozone'}`
+      if (this.menuCache[cacheKey]) {
+        const cached = this.menuCache[cacheKey]
+        this.categories = cached.categories
+        this.unFilteredMenuItems = cached.unFilteredMenuItems
+        return
+      }
+
       await axios
         .get(`${this.url}/menuCategoriesvo?limit=50`, {
           params: {
             outletName: this.restDetails.name,
           },
         })
-        .then((res) => {
+        .then(async (res) => {
           if (res.data.length) {
             this.categories = res.data.map((e) => ({
               ...e,
+              loading: true, // Granular loading
               menuItems: [],
               subCategories: e.subCategories.map((subCategory) => ({
                 ...subCategory,
                 menuItems: [],
               })),
             }))
-            res.data.forEach(async (category) => {
-              await this.getMenuItems(category)
+            this.unFilteredMenuItems = []
+
+            // Trigger fetches without awaiting all of them
+            res.data.forEach((category) => {
+              this.getMenuItems(category).then(() => {
+                // Once all categories for this restaurant/zone are loaded, we could cache.
+                // But for now, we'll cache the "last seen" state when needed or on completion.
+                // Simple approach: Check if all categories finished loading
+                if (this.categories.every(c => !c.loading)) {
+                   this.menuCache[cacheKey] = {
+                    categories: JSON.parse(JSON.stringify(this.categories)),
+                    unFilteredMenuItems: JSON.parse(JSON.stringify(this.unFilteredMenuItems))
+                  }
+                }
+              })
             })
           }
         })
@@ -168,9 +199,18 @@ export const useMenuStore = defineStore('menu', {
           if (cat.subCategories) updateOptions(cat.subCategories)
         })
       }
+
+      // Sync back to cache
+      const cacheKey = `${this.restDetails?._id}_${this.deliveryZoneId || 'nozone'}`
+      if (this.menuCache[cacheKey]) {
+        this.menuCache[cacheKey] = {
+          categories: JSON.parse(JSON.stringify(this.categories)),
+          unFilteredMenuItems: JSON.parse(JSON.stringify(this.unFilteredMenuItems))
+        }
+      }
     },
     async getMenuItems(item) {
-      axios
+      const response = await axios
         .get(`${this.url}/menuItemsvo?limit=1000`, {
           params: {
             outletId: this.restDetails._id,
@@ -178,27 +218,62 @@ export const useMenuStore = defineStore('menu', {
             ...(this.deliveryZoneId && { deliveryZoneId: this.deliveryZoneId }),
           },
         })
-        .then((response) => {
-          this.unFilteredMenuItems.push(...response.data)
-          const categoryIndex = this.categories.findIndex((category) => category._id === item._id)
-          if (categoryIndex !== -1) {
-            const itemsWithSubCategories = response.data.filter((item) => item.subCategories.length)
-            const itemsWithoutSubCategories = response.data.filter((item) => !item.subCategories.length)
-            this.categories[categoryIndex] = {
-              ...this.categories[categoryIndex],
-              menuItems: itemsWithoutSubCategories,
-              subCategories: this.categories[categoryIndex].subCategories.map((e) => {
-                const subCategoryItems = itemsWithSubCategories.filter(
-                  (item) => item.subCategories.length && item.subCategories.find((a) => a.id === e._id),
-                )
-                return {
-                  ...e,
-                  menuItems: subCategoryItems,
-                }
-              }),
+
+      this.unFilteredMenuItems.push(...response.data)
+      const categoryIndex = this.categories.findIndex((category) => category._id === item._id)
+      if (categoryIndex !== -1) {
+        const itemsWithSubCategories = response.data.filter((item) => item.subCategories.length)
+        const itemsWithoutSubCategories = response.data.filter((item) => !item.subCategories.length)
+        this.categories[categoryIndex] = {
+          ...this.categories[categoryIndex],
+          loading: false, // Finished loading
+          menuItems: itemsWithoutSubCategories,
+          subCategories: this.categories[categoryIndex].subCategories.map((e) => {
+            const subCategoryItems = itemsWithSubCategories.filter(
+              (item) => item.subCategories.length && item.subCategories.find((a) => a.id === e._id || a._id === e._id),
+            )
+            return {
+              ...e,
+              menuItems: subCategoryItems,
             }
-          }
-        })
+          }),
+        }
+      }
+    },
+    async getOffers() {
+      // Ensure we have restDetails (specifically the ID) before proceeding
+      if (!this.restDetails?._id) {
+        // Retry a few times or wait briefly if it's currently fetching
+        let retries = 0
+        while (!this.restDetails?._id && retries < 10) {
+          await new Promise(resolve => setTimeout(resolve, 200))
+          retries++
+        }
+        if (!this.restDetails?._id) {
+          console.error('[MenuStore] restDetails not available for getOffers')
+          return []
+        }
+      }
+
+      const cacheKey = `${this.restDetails._id}_${this.deliveryZoneId || 'nozone'}`
+      if (this.offersCache[cacheKey]) {
+        return this.offersCache[cacheKey]
+      }
+
+      const params = new URLSearchParams({ outletId: this.restDetails._id })
+      if (this.deliveryZoneId) {
+        params.append('deliveryZoneId', this.deliveryZoneId)
+      }
+
+      try {
+        const response = await axios.get(this.url + '/offers?' + params.toString())
+        const offers = response.data.data
+        this.offersCache[cacheKey] = offers
+        return offers
+      } catch (error) {
+        console.error('[MenuStore] Failed to fetch offers:', error)
+        throw error
+      }
     },
   },
 })

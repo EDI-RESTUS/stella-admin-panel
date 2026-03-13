@@ -366,7 +366,7 @@ async function duplicateOffer(payload) {
     const { _id, __v, createdAt, updatedAt, ...rest } = payload
     const duplicate = {
       ...rest,
-      code: (rest.code || '') + '_COPY',
+      code: (rest.code || ''),
       isActive: false,
     }
     await axios.post(`${import.meta.env.VITE_API_BASE_URL}/offers`, duplicate)
@@ -1085,7 +1085,7 @@ function formatReadableDate(dateStr: string): string {
               title="Duplicate Offer"
               @click="duplicateOffer(rowData)"
             >
-              <VaIcon name="mso-content_copy" class="w-4.5 h-4.5 block" />
+              <VaIcon name="mso-content" class="w-4.5 h-4.5 block" />
             </button>
 
             <!-- Delete -->

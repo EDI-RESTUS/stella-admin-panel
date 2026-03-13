@@ -170,9 +170,6 @@
                 <div v-for="selectedArticle in item.items" :key="selectedArticle.itemName" class="mt-2 text-xs">
                   <p class="font-semibold text-gray-800 mt-1 flex items-center gap-2">
                     <span class="mb-1">{{ selectedArticle.itemName }}</span>
-                    <span v-if="Number(selectedArticle.basePrice) > 0" class="text-xs font-normal text-gray-500">
-                      (€{{ Number(selectedArticle.basePrice).toFixed(2) }})
-                    </span>
                   </p>
 
                   <div class="flex flex-wrap gap-1 text-xs">
@@ -236,26 +233,30 @@
               <span class="text-gray-600">Subtotal</span>
               <span>€{{ subtotal.toFixed(2) }}</span>
             </div>
+
             <div v-if="orderType === 'delivery'" class="flex justify-between">
               <span class="text-gray-600">Delivery Fee</span>
               <span>€{{ deliveryFee.toFixed(2) }}</span>
             </div>
-            <div class="flex justify-between font-bold text-xs pt-1 border-t">
-              <span v-if="orderStore.editOrder">
-                Total
-                <span class="text-green-600">
-                  · PAID €{{ (orderStore.editOrder.editOrderTotal || 0).toFixed(2) }}
-                </span>
-              </span>
-              <span v-else>Total</span>
-              <span v-if="orderStore.editOrder">
-                €{{ ((orderStore.editOrder.editOrderTotal || 0) + total).toFixed(2) }}
-              </span>
-              <span v-else>€{{ total.toFixed(2) }}</span>
+
+            <div v-if="orderStore.editOrder" class="flex justify-between">
+              <span class="text-gray-600">Paid</span>
+              <span class="text-green-600">€{{ paidAmount.toFixed(2) }}</span>
             </div>
+
+            <div class="flex justify-between font-bold text-xs pt-1 border-t">
+              <span>Total</span>
+              <span>€{{ currentOrderTotal.toFixed(2) }}</span>
+            </div>
+
             <div v-if="orderStore.editOrder" class="flex justify-between text-xs pt-0.5">
               <span class="text-gray-600">Difference</span>
-              <span class="font-semibold text-red-600">€{{ total.toFixed(2) }}</span>
+              <span
+                class="font-semibold"
+                :class="editDifference > 0 ? 'text-red-600' : 'text-green-600'"
+              >
+                €{{ editDifference.toFixed(2) }}
+              </span>
             </div>
           </template>
 
@@ -265,35 +266,39 @@
               <span class="text-gray-600">Subtotal</span>
               <span>€{{ (promoOriginalItems + promoOriginalOffers).toFixed(2) }}</span>
             </div>
+
             <div class="flex justify-between text-[10px] text-gray-500">
               <span>Items + Offers</span>
               <span>€{{ promoOriginalItems.toFixed(2) }} + €{{ promoOriginalOffers.toFixed(2) }}</span>
             </div>
+
             <div class="flex justify-between">
               <span class="text-gray-600">Discount</span>
               <span>€{{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }}</span>
             </div>
+
             <div class="flex justify-between">
               <span class="text-gray-600">Delivery Fee</span>
               <span>€{{ Number(promoTotal.deliveryFee || 0).toFixed(2) }}</span>
             </div>
-            <div class="flex justify-between font-bold text-xs pt-1 border-t">
-              <span v-if="orderStore.editOrder">
-                Total
-                <span class="text-green-600">
-                  · PAID €{{ (orderStore.editOrder.editOrderTotal || 0).toFixed(2) }}
-                </span>
-              </span>
-              <span v-else>Total</span>
-              <span v-if="orderStore.editOrder">
-                €{{ ((orderStore.editOrder.editOrderTotal || 0) + promoTotal.updatedTotal).toFixed(2) }}
-              </span>
-              <span v-else>€{{ promoTotal.updatedTotal.toFixed(2) }}</span>
+
+            <div v-if="orderStore.editOrder" class="flex justify-between">
+              <span class="text-gray-600">Paid</span>
+              <span class="text-green-600">€{{ paidAmount.toFixed(2) }}</span>
             </div>
+
+            <div class="flex justify-between font-bold text-xs pt-1 border-t">
+              <span>Total</span>
+              <span>€{{ currentOrderTotal.toFixed(2) }}</span>
+            </div>
+
             <div v-if="orderStore.editOrder" class="flex justify-between text-xs pt-0.5">
               <span class="text-gray-600">Difference</span>
-              <span class="font-semibold text-red-600">
-                €{{ promoTotal.updatedTotal.toFixed(2) }}
+              <span
+                class="font-semibold"
+                :class="editDifference > 0 ? 'text-red-600' : 'text-green-600'"
+              >
+                €{{ editDifference.toFixed(2) }}
               </span>
             </div>
           </template>
@@ -358,6 +363,7 @@
       :promo-codes="appliedPromoCodes"
       :existing-order-id="existingOrderId"
       @cancel="closeCheckoutModal"
+      @success="emit('success')"
     />
     <PromotionModal
       ref="promotionModal"
@@ -398,7 +404,7 @@ const props = defineProps({
   dateSelected: String,
 })
 
-const emit = defineEmits(['restore-context'])
+const emit = defineEmits(['restore-context', 'success'])
 
 const route = useRoute()
 const router = useRouter()
@@ -434,7 +440,24 @@ const isFutureTimeAllowed = computed(() => {
   if (!selectedDt.value) return false
   return isBetween11to23(selectedDt.value)
 })
+const paidAmount = computed(() => Number(orderStore.editOrder?.editOrderTotal || 0))
 
+const currentOrderTotal = computed(() => {
+  if (promoTotal.value) {
+    return Number(promoTotal.value.updatedTotal || 0)
+  }
+  return Number(total.value || 0)
+})
+
+const editDifference = computed(() => {
+  if (!orderStore.editOrder) return currentOrderTotal.value
+  return Number((currentOrderTotal.value - paidAmount.value).toFixed(2))
+})
+
+const extraToPay = computed(() => {
+  if (!orderStore.editOrder) return currentOrderTotal.value
+  return Math.max(0, editDifference.value)
+})
 const promoOriginalItems = computed(() => {
   const v = promoTotal.value
   if (!v?.menuItems) return 0
@@ -582,13 +605,9 @@ function parseSelectedDate(v) {
 
 const getTotalPrice = computed(() => {
   if (orderStore.editOrder) {
-    if (promoTotal.value) {
-      return (promoTotal.value.updatedTotal - orderStore.editOrder.editOrderTotal).toFixed(2) || 0
-    } else {
-      return (total.value - orderStore.editOrder.editOrderTotal).toFixed(2) || 0
-    }
+    return extraToPay.value.toFixed(2)
   }
-  return total.value.toFixed(2)
+  return currentOrderTotal.value.toFixed(2)
 })
 
 const orderItemsStyle = computed(() => {
@@ -668,30 +687,42 @@ const offersItems = computed(() =>
   offerItems.value.map((item, index) => {
     const items = []
     const subItems = []
-    item.selections.map((selection) => {
-      selection.addedItems.map((addedItems) => {
-        addedItems.selectedOptions.forEach((group) => {
-          group.selected.forEach((sel) => {
+
+    ;(item.selections || []).forEach((selection) => {
+      ;(selection.addedItems || []).forEach((addedItem) => {
+        ;(addedItem.selectedOptions || []).forEach((group) => {
+          ;(group.selected || []).forEach((sel) => {
             subItems.push({ text: formattedLabel(sel), type: sel.type })
           })
         })
       })
-      items.push(...selection.addedItems)
+
+      items.push(...(selection.addedItems || []))
     })
-    const totalPrice = item.selectionTotalPrice ? item.price + item.selectionTotalPrice : item.price
+
+    const quantity = Number(item.quantity || 1)
+    const basePrice = Number(item.basePrice ?? item.price ?? 0)
+    const selectionTotalPrice = Number(item.selectionTotalPrice ?? 0)
+
+    // Source of truth must be the store total if it already exists
+    const total = item.totalPrice != null
+      ? Number(item.totalPrice)
+      : (basePrice + selectionTotalPrice) * quantity
+
+    const unitTotal = quantity > 0 ? total / quantity : 0
 
     return {
-      id: item.itemId || index,
-      offerId: item.offerId,
+      id: item.offerId || item._id || item.itemId || index,
+      offerId: item.offerId || item._id,
       name: item.name,
-      quantity: item.quantity,
-      basePrice: item.price,
-      selectionTotalPrice: item.selectionTotalPrice,
+      quantity,
+      basePrice,
+      selectionTotalPrice,
       items,
-      unitTotal: totalPrice,
-      total: totalPrice * item.quantity,
-      fullItem: { ...item, offerId: item.offerId },
-      // fullItem: item,
+      subItems,
+      unitTotal,
+      total,
+      fullItem: { ...item, offerId: item.offerId || item._id },
       __storeIndex: index,
     }
   }),
