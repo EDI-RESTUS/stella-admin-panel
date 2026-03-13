@@ -15,7 +15,7 @@
 
     <template v-if="items.length || offersItems.length">
       <!-- Promo Code with Button -->
-      <div class="flex flex-wrap items-center gap-1 mt-3 mb-3 w-full">
+      <div v-if="!orderStore.editOrder" class="flex flex-wrap items-center gap-1 mt-3 mb-3 w-full">
         <VaInput
           v-model="promoCode"
           placeholder="Promotion Code"
