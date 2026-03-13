@@ -100,11 +100,11 @@ export const useMenuStore = defineStore('menu', {
               })),
             }))
             this.unFilteredMenuItems = []
-            
+
             // Trigger fetches without awaiting all of them
             res.data.forEach((category) => {
               this.getMenuItems(category).then(() => {
-                // Once all categories for this restaurant/zone are loaded, we could cache. 
+                // Once all categories for this restaurant/zone are loaded, we could cache.
                 // But for now, we'll cache the "last seen" state when needed or on completion.
                 // Simple approach: Check if all categories finished loading
                 if (this.categories.every(c => !c.loading)) {
@@ -218,7 +218,7 @@ export const useMenuStore = defineStore('menu', {
             ...(this.deliveryZoneId && { deliveryZoneId: this.deliveryZoneId }),
           },
         })
-      
+
       this.unFilteredMenuItems.push(...response.data)
       const categoryIndex = this.categories.findIndex((category) => category._id === item._id)
       if (categoryIndex !== -1) {
