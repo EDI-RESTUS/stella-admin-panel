@@ -308,8 +308,8 @@ const onButtonCategoryDelete = async (payload) => {
               autofocus
               @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
-                rowData.editName = false
-                emits('updateCategory', { name: rowData.name, _id: rowData._id })
+                rowData.editName = false;
+                emits('updateCategory', { name: rowData.name, _id: rowData._id });
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
@@ -338,8 +338,8 @@ const onButtonCategoryDelete = async (payload) => {
               autofocus
               @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
-                rowData.editDescription = false
-                emits('updateCategory', { description: rowData.description, _id: rowData._id })
+                rowData.editDescription = false;
+                emits('updateCategory', { description: rowData.description, _id: rowData._id });
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">

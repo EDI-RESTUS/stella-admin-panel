@@ -596,10 +596,10 @@ function openFileModal(data) {
               :selected-rest="selectedRest"
               @uploadSuccess="
                 (data) => {
-                  rowData.imageUrl = data.url
-                  rowData.assetId = data._id
-                  $emit('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value })
-                  rowData.editing = ''
+                  rowData.imageUrl = data.url;
+                  rowData.assetId = data._id;
+                  $emit('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value });
+                  rowData.editing = '';
                 }
               "
             />
@@ -616,8 +616,8 @@ function openFileModal(data) {
               autofocus
               @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
-                rowData.editName = false
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value })
+                rowData.editName = false;
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value });
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
@@ -640,8 +640,8 @@ function openFileModal(data) {
               autofocus
               @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
-                rowData.editDescription = false
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value })
+                rowData.editDescription = false;
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value });
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
@@ -664,8 +664,8 @@ function openFileModal(data) {
               class="editable-input"
               autofocus
               @blur="
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage }),
-                  (rowData.editing = '')
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage });
+                rowData.editing = '';
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'code'">
@@ -696,8 +696,8 @@ function openFileModal(data) {
               class="editable-input"
               autofocus
               @blur="
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage }),
-                  (rowData.editing = '')
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage });
+                rowData.editing = '';
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'price'">
@@ -732,7 +732,7 @@ function openFileModal(data) {
                     updating: 'category',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ getCategoryName(e) }}
@@ -749,7 +749,7 @@ function openFileModal(data) {
                     updating: 'category',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ getCategoryName(e) }}
@@ -762,7 +762,7 @@ function openFileModal(data) {
                     updating: 'category',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 +{{ rowData.categories.length - 2 }} more
@@ -832,7 +832,7 @@ function openFileModal(data) {
                     updating: 'subCategory',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ sub.name }}
@@ -849,7 +849,7 @@ function openFileModal(data) {
                     updating: 'subCategory',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ sub.name }}
@@ -862,7 +862,7 @@ function openFileModal(data) {
                     updating: 'subCategory',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 +{{ rowData.subCategories.length - 2 }} more
@@ -904,7 +904,7 @@ function openFileModal(data) {
                     updating: 'options',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 <CirclePlus class="w-4 h-4" />
@@ -946,7 +946,7 @@ function openFileModal(data) {
                     updating: 'allergens',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 <CirclePlus class="w-4 h-4" />
@@ -965,18 +965,12 @@ function openFileModal(data) {
                 class="sr-only"
                 @change="
                   (e) => {
-                    console.log(
-                      '🎯 Toggle clicked! e.target.checked =',
-                      e.target.checked,
-                      'rowData.isActive =',
-                      rowData.isActive,
-                    )
                     emits('updateArticle', {
                       ...rowData,
                       isActive: e.target.checked,
                       searchQuery: searchQuery.value,
                       page: currentPage.value,
-                    })
+                    });
                   }
                 "
               />

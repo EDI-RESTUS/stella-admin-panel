@@ -375,8 +375,8 @@ const openEditGroupModal = (group) => {
               autofocus
               @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
-                rowData.editName = false
-                updateData(rowData)
+                rowData.editName = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
@@ -403,8 +403,8 @@ const openEditGroupModal = (group) => {
               class="editable-input"
               autofocus
               @blur="
-                rowData.editInternalName = false
-                updateData(rowData)
+                rowData.editInternalName = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editInternalName = true">
@@ -436,8 +436,8 @@ const openEditGroupModal = (group) => {
               autofocus
               @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
-                rowData.editDescription = false
-                updateData(rowData)
+                rowData.editDescription = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
@@ -486,9 +486,9 @@ const openEditGroupModal = (group) => {
                 :key="option.key || option"
                 class="px-3 py-1.5 text-sm text-slate-700 hover:bg-blue-50 cursor-pointer text-center transition-colors duration-150"
                 @click="
-                  rowData.type = option.key || option
-                  updateData(rowData)
-                  rowData.showTypeDropdown = false
+                  rowData.type = option.key || option;
+                  updateData(rowData);
+                  rowData.showTypeDropdown = false;
                 "
               >
                 {{ option.label }}
@@ -525,8 +525,8 @@ const openEditGroupModal = (group) => {
               class="editable-input"
               type="number"
               @blur="
-                rowData.editMinimumChoices = false
-                updateData(rowData)
+                rowData.editMinimumChoices = false;
+                updateData(rowData);
               "
             />
             <div
@@ -552,8 +552,8 @@ const openEditGroupModal = (group) => {
               class="editable-input"
               type="number"
               @blur="
-                rowData.editMaximumChoices = false
-                updateData(rowData)
+                rowData.editMaximumChoices = false;
+                updateData(rowData);
               "
             />
             <div
@@ -703,36 +703,36 @@ const openEditGroupModal = (group) => {
       v-if="isEditArticleOptionGroupsModal"
       :selected-option-groups="selectedOptionGroups"
       @cancel="
-        isEditArticleOptionGroupsModal = false
-        selectedOptionGroups = ''
-        emits('getOptionGroups', searchQuery)
+        isEditArticleOptionGroupsModal = false;
+        selectedOptionGroups = '';
+        emits('getOptionGroups', searchQuery);
       "
     />
     <EditArticleOptionGroupsOptionsModal
       v-if="isEditArticleOptionsModal"
       :selected-options="selectedOptions"
       @cancel="
-        isEditArticleOptionsModal = false
-        selectedOptions = ''
-        emits('getOptionGroups', searchQuery)
+        isEditArticleOptionsModal = false;
+        selectedOptions = '';
+        emits('getOptionGroups', searchQuery);
       "
     />
     <EditArticleOptionGroupsItemsModal
       v-if="isEditArticleOptionGroupsItemsModal"
       :selected-option-group="selectedItems"
       @cancel="
-        isEditArticleOptionGroupsItemsModal = false
-        selectedItems = ''
-        emits('getOptionGroups', searchQuery)
+        isEditArticleOptionGroupsItemsModal = false;
+        selectedItems = '';
+        emits('getOptionGroups', searchQuery);
       "
     />
     <EditOptionGroupArticlesModal
       v-if="isEditOptionGroupArticlesModal"
       :selected-items="selectedItems"
       @cancel="
-        isEditOptionGroupArticlesModal = false
-        selectedItems = ''
-        emits('getOptionGroups', searchQuery)
+        isEditOptionGroupArticlesModal = false;
+        selectedItems = '';
+        emits('getOptionGroups', searchQuery);
       "
     />
   </div>

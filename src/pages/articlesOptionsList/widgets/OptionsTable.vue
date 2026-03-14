@@ -487,8 +487,8 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
               class="editable-input"
               autofocus
               @blur="
-                rowData.editPOSName = false
-                updateData(rowData)
+                rowData.editPOSName = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editPOSName = true">
@@ -511,8 +511,8 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
               class="editable-input"
               autofocus
               @blur="
-                rowData.editCode = false
-                updateData(rowData)
+                rowData.editCode = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editCode = true">
@@ -569,9 +569,9 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
                 :key="option.key || option"
                 class="px-3 py-1.5 text-sm text-slate-700 hover:bg-blue-50 cursor-pointer text-center transition-colors duration-150"
                 @click="
-                  rowData.type = option.key || option
-                  updateData(rowData)
-                  rowData.showTypeDropdown = false
+                  rowData.type = option.key || option;
+                  updateData(rowData);
+                  rowData.showTypeDropdown = false;
                 "
               >
                 {{ option }}
@@ -590,8 +590,8 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
               class="editable-input"
               autofocus
               @blur="
-                rowData.editPrice = false
-                updateData(rowData)
+                rowData.editPrice = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editPrice = true">
@@ -625,8 +625,8 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
               class="editable-input"
               autofocus
               @blur="
-                rowData.editMinimumChoices = false
-                updateData(rowData)
+                rowData.editMinimumChoices = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editMinimumChoices = true">
@@ -650,8 +650,8 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
               class="editable-input"
               autofocus
               @blur="
-                rowData.editMaximumChoices = false
-                updateData(rowData)
+                rowData.editMaximumChoices = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editMaximumChoices = true">

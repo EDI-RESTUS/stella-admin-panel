@@ -652,10 +652,10 @@ function formatReadableDate(dateStr: string): string {
               :selected-rest="selectedRest"
               @uploadSuccess="
                 (data) => {
-                  rowData.imageUrl = data.url
-                  rowData.assetId = data._id
-                  updateData(rowData)
-                  rowData.editing = ''
+                  rowData.imageUrl = data.url;
+                  rowData.assetId = data._id;
+                  updateData(rowData);
+                  rowData.editing = '';
                 }
               "
             />
@@ -672,8 +672,8 @@ function formatReadableDate(dateStr: string): string {
               autofocus
               @input="(e) => setLocaleValue(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
-                rowData.editName = false
-                updateData(rowData)
+                rowData.editName = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
@@ -702,8 +702,8 @@ function formatReadableDate(dateStr: string): string {
               autofocus
               @input="(e) => setLocaleValue(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
-                rowData.editDescription = false
-                updateData(rowData)
+                rowData.editDescription = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
@@ -731,8 +731,8 @@ function formatReadableDate(dateStr: string): string {
               type="text"
               autofocus
               @blur="
-                rowData.editCode = false
-                updateData(rowData)
+                rowData.editCode = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editCode = true">
@@ -760,8 +760,8 @@ function formatReadableDate(dateStr: string): string {
               type="text"
               autofocus
               @blur="
-                rowData.editPrice = false
-                updateData(rowData)
+                rowData.editPrice = false;
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editPrice = true">
@@ -907,8 +907,8 @@ function formatReadableDate(dateStr: string): string {
                       type="text"
                       @change="
                         () => {
-                          updateData({ ...rowData, fromInlineEdit: true })
-                          selection.editName = false
+                          updateData({ ...rowData, fromInlineEdit: true });
+                          selection.editName = false;
                         }
                       "
                     />
@@ -927,8 +927,8 @@ function formatReadableDate(dateStr: string): string {
                       type="number"
                       @change="
                         () => {
-                          updateData({ ...rowData, fromInlineEdit: true })
-                          selection.editMinChoice = false
+                          updateData({ ...rowData, fromInlineEdit: true });
+                          selection.editMinChoice = false;
                         }
                       "
                     />
@@ -945,8 +945,8 @@ function formatReadableDate(dateStr: string): string {
                       type="number"
                       @change="
                         () => {
-                          updateData({ ...rowData, fromInlineEdit: true })
-                          selection.editMaxChoice = false
+                          updateData({ ...rowData, fromInlineEdit: true });
+                          selection.editMaxChoice = false;
                         }
                       "
                     />
