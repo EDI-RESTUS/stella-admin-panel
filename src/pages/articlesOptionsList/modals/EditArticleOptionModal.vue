@@ -150,16 +150,18 @@ const types = [
 if (props.selectedOption && props.selectedOption._id) {
   formData.value = {
     ...props.selectedOption,
-    name: typeof props.selectedOption.name === 'string'
-      ? { en: props.selectedOption.name }
-      : { ...props.selectedOption.name },
+    name:
+      typeof props.selectedOption.name === 'string'
+        ? { en: props.selectedOption.name }
+        : { ...props.selectedOption.name },
   }
 } else if (props.selectedOption && !props.selectedOption._id) {
   formData.value = {
     _id: '',
-    name: typeof props.selectedOption.name === 'string'
-      ? { en: props.selectedOption.name }
-      : { ...props.selectedOption.name },
+    name:
+      typeof props.selectedOption.name === 'string'
+        ? { en: props.selectedOption.name }
+        : { ...props.selectedOption.name },
     posName: props.selectedOption.posName || '',
     code: props.selectedOption.code || '',
     type: props.selectedOption.type || '',

@@ -139,23 +139,27 @@ const isDuplicating = computed(() => Object.keys(props.selectedOptionGroups).len
 if (props.selectedOptionGroups && props.selectedOptionGroups._id) {
   formData.value = {
     ...props.selectedOptionGroups,
-    name: typeof props.selectedOptionGroups.name === 'string'
-      ? { en: props.selectedOptionGroups.name }
-      : { ...props.selectedOptionGroups.name },
-    description: typeof props.selectedOptionGroups.description === 'string'
-      ? { en: props.selectedOptionGroups.description }
-      : { ...(props.selectedOptionGroups.description || {}) },
+    name:
+      typeof props.selectedOptionGroups.name === 'string'
+        ? { en: props.selectedOptionGroups.name }
+        : { ...props.selectedOptionGroups.name },
+    description:
+      typeof props.selectedOptionGroups.description === 'string'
+        ? { en: props.selectedOptionGroups.description }
+        : { ...(props.selectedOptionGroups.description || {}) },
   }
 } else if (props.selectedOptionGroups && !props.selectedOptionGroups._id) {
   formData.value = {
     _id: '',
-    name: typeof props.selectedOptionGroups.name === 'string'
-      ? { en: props.selectedOptionGroups.name }
-      : { ...props.selectedOptionGroups.name },
+    name:
+      typeof props.selectedOptionGroups.name === 'string'
+        ? { en: props.selectedOptionGroups.name }
+        : { ...props.selectedOptionGroups.name },
     internalName: props.selectedOptionGroups.internalName || '',
-    description: typeof props.selectedOptionGroups.description === 'string'
-      ? { en: props.selectedOptionGroups.description }
-      : { ...(props.selectedOptionGroups.description || {}) },
+    description:
+      typeof props.selectedOptionGroups.description === 'string'
+        ? { en: props.selectedOptionGroups.description }
+        : { ...(props.selectedOptionGroups.description || {}) },
     singleChoice: props.selectedOptionGroups.singleChoice || false,
     multipleChoice: props.selectedOptionGroups.multipleChoice || false,
     multipleChoiceNoQty: props.selectedOptionGroups.multipleChoiceNoQty || false,

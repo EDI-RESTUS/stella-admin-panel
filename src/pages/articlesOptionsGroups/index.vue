@@ -32,7 +32,7 @@ const getOptionGroups = async () => {
         }&rawName=true`,
     )
     const rawData = response.data
-    const item = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
+    const item = Array.isArray(rawData) ? rawData : rawData.items || rawData.result || []
 
     // Extract total count from the response if available
     if (rawData.totalNoRec !== undefined) {
@@ -68,7 +68,11 @@ const getOptionGroups = async () => {
 const getOptionGroupsCount = () => {
   const url = import.meta.env.VITE_API_BASE_URL
   axios
-    .get(`${url}/articles-options-groups/count?outletId=${servicesStore.selectedRest}&search=${encodeURIComponent(searchValue.value)}${activeOnly.value ? '&isActive=true' : ''}`)
+    .get(
+      `${url}/articles-options-groups/count?outletId=${servicesStore.selectedRest}&search=${encodeURIComponent(
+        searchValue.value,
+      )}${activeOnly.value ? '&isActive=true' : ''}`,
+    )
     .then((response) => {
       count.value = Number(response.data.data || response.data.totalNoRec || response.data.count || 0)
     })

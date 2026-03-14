@@ -107,10 +107,10 @@ export const useMenuStore = defineStore('menu', {
                 // Once all categories for this restaurant/zone are loaded, we could cache.
                 // But for now, we'll cache the "last seen" state when needed or on completion.
                 // Simple approach: Check if all categories finished loading
-                if (this.categories.every(c => !c.loading)) {
-                   this.menuCache[cacheKey] = {
+                if (this.categories.every((c) => !c.loading)) {
+                  this.menuCache[cacheKey] = {
                     categories: JSON.parse(JSON.stringify(this.categories)),
-                    unFilteredMenuItems: JSON.parse(JSON.stringify(this.unFilteredMenuItems))
+                    unFilteredMenuItems: JSON.parse(JSON.stringify(this.unFilteredMenuItems)),
                   }
                 }
               })
@@ -126,19 +126,18 @@ export const useMenuStore = defineStore('menu', {
       try {
         const { entityType, entityId, inStock } = payload
         // Determine endpoint based on entity type
-        const endpoint = entityType === 'MenuItem'
-          ? `${this.url}/menuItems/${entityId}`
-          : `${this.url}/articles-options/${entityId}`
+        const endpoint =
+          entityType === 'MenuItem' ? `${this.url}/menuItems/${entityId}` : `${this.url}/articles-options/${entityId}`
 
         // Find the current entity to get its inStockByZones
         let currentZones = []
         if (entityType === 'MenuItem') {
-          const item = this.unFilteredMenuItems.find(i => i._id === entityId)
+          const item = this.unFilteredMenuItems.find((i) => i._id === entityId)
           currentZones = Array.isArray(item?.inStockByZones) ? [...item.inStockByZones] : []
         }
 
         // Update the specific zone in the array
-        const idx = currentZones.findIndex(z => z.deliveryZoneId === this.deliveryZoneId)
+        const idx = currentZones.findIndex((z) => z.deliveryZoneId === this.deliveryZoneId)
         if (idx >= 0) {
           currentZones[idx] = { ...currentZones[idx], inStock }
         } else {
@@ -173,7 +172,7 @@ export const useMenuStore = defineStore('menu', {
           if (cat.subCategories) updateItem(cat.subCategories) // Recurse into subcats
         })
         // Also update unFilteredMenuItems
-        const unfiltered = this.unFilteredMenuItems.find(i => i._id === entityId)
+        const unfiltered = this.unFilteredMenuItems.find((i) => i._id === entityId)
         if (unfiltered) {
           unfiltered.inStock = inStock
           if (inStockByZones) unfiltered.inStockByZones = inStockByZones
@@ -183,8 +182,8 @@ export const useMenuStore = defineStore('menu', {
         const updateOptions = (items) => {
           items.forEach((item) => {
             // Check item's option groups
-            item.articlesOptionsGroup?.forEach(group => {
-              const option = group.articlesOptions?.find(o => o._id === entityId)
+            item.articlesOptionsGroup?.forEach((group) => {
+              const option = group.articlesOptions?.find((o) => o._id === entityId)
               if (option) {
                 option.inStock = inStock
                 if (inStockByZones) option.inStockByZones = inStockByZones
@@ -205,19 +204,18 @@ export const useMenuStore = defineStore('menu', {
       if (this.menuCache[cacheKey]) {
         this.menuCache[cacheKey] = {
           categories: JSON.parse(JSON.stringify(this.categories)),
-          unFilteredMenuItems: JSON.parse(JSON.stringify(this.unFilteredMenuItems))
+          unFilteredMenuItems: JSON.parse(JSON.stringify(this.unFilteredMenuItems)),
         }
       }
     },
     async getMenuItems(item) {
-      const response = await axios
-        .get(`${this.url}/menuItemsvo?limit=1000`, {
-          params: {
-            outletId: this.restDetails._id,
-            categoryId: item._id,
-            ...(this.deliveryZoneId && { deliveryZoneId: this.deliveryZoneId }),
-          },
-        })
+      const response = await axios.get(`${this.url}/menuItemsvo?limit=1000`, {
+        params: {
+          outletId: this.restDetails._id,
+          categoryId: item._id,
+          ...(this.deliveryZoneId && { deliveryZoneId: this.deliveryZoneId }),
+        },
+      })
 
       this.unFilteredMenuItems.push(...response.data)
       const categoryIndex = this.categories.findIndex((category) => category._id === item._id)
@@ -246,7 +244,7 @@ export const useMenuStore = defineStore('menu', {
         // Retry a few times or wait briefly if it's currently fetching
         let retries = 0
         while (!this.restDetails?._id && retries < 10) {
-          await new Promise(resolve => setTimeout(resolve, 200))
+          await new Promise((resolve) => setTimeout(resolve, 200))
           retries++
         }
         if (!this.restDetails?._id) {

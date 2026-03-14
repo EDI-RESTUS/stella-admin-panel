@@ -251,10 +251,7 @@
 
             <div v-if="orderStore.editOrder" class="flex justify-between text-xs pt-0.5">
               <span class="text-gray-600">Difference</span>
-              <span
-                class="font-semibold"
-                :class="editDifference > 0 ? 'text-red-600' : 'text-green-600'"
-              >
+              <span class="font-semibold" :class="editDifference > 0 ? 'text-red-600' : 'text-green-600'">
                 €{{ editDifference.toFixed(2) }}
               </span>
             </div>
@@ -294,10 +291,7 @@
 
             <div v-if="orderStore.editOrder" class="flex justify-between text-xs pt-0.5">
               <span class="text-gray-600">Difference</span>
-              <span
-                class="font-semibold"
-                :class="editDifference > 0 ? 'text-red-600' : 'text-green-600'"
-              >
+              <span class="font-semibold" :class="editDifference > 0 ? 'text-red-600' : 'text-green-600'">
                 €{{ editDifference.toFixed(2) }}
               </span>
             </div>
@@ -308,9 +302,9 @@
           <div class="w-full relative">
             <!-- Overlay for disabled state to allow clicks for error message (optional, but requested 'pop up') -->
             <div
-               v-if="isServiceRestricted"
-               class="absolute inset-0 z-10 cursor-not-allowed"
-               @click="showRestrictedMessage"
+              v-if="isServiceRestricted"
+              class="absolute inset-0 z-10 cursor-not-allowed"
+              @click="showRestrictedMessage"
             ></div>
             <VaButton
               :disabled="
@@ -363,7 +357,7 @@
       :promo-codes="appliedPromoCodes"
       :existing-order-id="existingOrderId"
       @cancel="closeCheckoutModal"
-      @success="emit('success')"
+      @success="onCheckoutSuccess"
     />
     <PromotionModal
       ref="promotionModal"
@@ -705,9 +699,7 @@ const offersItems = computed(() =>
     const selectionTotalPrice = Number(item.selectionTotalPrice ?? 0)
 
     // Source of truth must be the store total if it already exists
-    const total = item.totalPrice != null
-      ? Number(item.totalPrice)
-      : (basePrice + selectionTotalPrice) * quantity
+    const total = item.totalPrice != null ? Number(item.totalPrice) : (basePrice + selectionTotalPrice) * quantity
 
     const unitTotal = quantity > 0 ? total / quantity : 0
 
@@ -908,6 +900,13 @@ const showCheckoutModal = ref(false)
 
 function closeCheckoutModal() {
   showCheckoutModal.value = false
+}
+
+function onCheckoutSuccess() {
+  clearPromoCode()
+  appliedPromoCodes.value = []
+  showCheckoutModal.value = false
+  emit('success')
 }
 
 // -----------------TO OPEN THE EDIT MODAL-------------------------
@@ -1152,32 +1151,33 @@ onMounted(async () => {
         console.log('[PaymentRetry] Order data:', order)
 
         // Check if SPECIFIC menu items are loaded
-        const requiredItemIds = (order.menuItems || []).map(i => i.menuItem)
+        const requiredItemIds = (order.menuItems || []).map((i) => i.menuItem)
         console.log('[PaymentRetry] Required Item IDs:', requiredItemIds)
 
         let retries = 0
         let allItemsFound = false
 
-        while (!allItemsFound && retries < 40) { // Increased retries to 40 (20s)
-           const loadedIds = new Set(menuStore.unFilteredMenuItems.map(m => m._id))
-           const missing = requiredItemIds.filter(id => !loadedIds.has(id))
+        while (!allItemsFound && retries < 40) {
+          // Increased retries to 40 (20s)
+          const loadedIds = new Set(menuStore.unFilteredMenuItems.map((m) => m._id))
+          const missing = requiredItemIds.filter((id) => !loadedIds.has(id))
 
-           if (missing.length === 0) {
-             allItemsFound = true
-             console.log('[PaymentRetry] All required menu items found.')
-           } else {
-             console.warn(`[PaymentRetry] Missing items: ${missing.join(', ')}. Waiting... (${retries + 1}/40)`)
-             if (retries % 5 === 0) console.log(`[PaymentRetry] Loaded count: ${menuStore.unFilteredMenuItems.length}`)
-             await new Promise(resolve => setTimeout(resolve, 500))
-             retries++
-           }
+          if (missing.length === 0) {
+            allItemsFound = true
+            console.log('[PaymentRetry] All required menu items found.')
+          } else {
+            console.warn(`[PaymentRetry] Missing items: ${missing.join(', ')}. Waiting... (${retries + 1}/40)`)
+            if (retries % 5 === 0) console.log(`[PaymentRetry] Loaded count: ${menuStore.unFilteredMenuItems.length}`)
+            await new Promise((resolve) => setTimeout(resolve, 500))
+            retries++
+          }
         }
 
         if (menuStore.unFilteredMenuItems.length === 0) {
-           console.error('[PaymentRetry] Menu items failed to load after timeout. Cart restoration may be incomplete.')
-           init({ message: 'Menu data missing. Order details may be incomplete.', color: 'warning' })
+          console.error('[PaymentRetry] Menu items failed to load after timeout. Cart restoration may be incomplete.')
+          init({ message: 'Menu data missing. Order details may be incomplete.', color: 'warning' })
         } else {
-           console.log('[PaymentRetry] Menu items loaded. Proceeding with restoration.')
+          console.log('[PaymentRetry] Menu items loaded. Proceeding with restoration.')
         }
 
         // 2. Restore cart
@@ -1190,9 +1190,8 @@ onMounted(async () => {
           orderType: (order.orderType || '').toLowerCase(),
           deliveryFee: Number(order.deliveryFee || 0),
           isDeliveryZoneSelected: !!order.deliveryZoneId,
-          dateSelected: order.orderDateTime || order.createdAt
+          dateSelected: order.orderDateTime || order.createdAt,
         })
-
 
         existingOrderId.value = oid
         orderStore.orderDateTime = order.orderDateTime || order.createdAt

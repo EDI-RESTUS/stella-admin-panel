@@ -1,6 +1,3 @@
-
-
-
 <template>
   <VaModal
     class="big-form"
@@ -19,7 +16,7 @@
         <VaInput v-model="formData.code" class="mb-1 max-w-[150px]" label="Code" placeholder="Code" type="text" />
         <div class="flex flex-col gap-2">
           <div v-for="lang in supportedLanguages" :key="lang + 'name'">
-             <VaInput
+            <VaInput
               v-model="formData.name[lang]"
               :label="`Name (${lang.toUpperCase()})`"
               placeholder="Name"
@@ -176,9 +173,7 @@ const getLocalizedValue = (value: any) => {
 
 const getOutletDetails = async () => {
   try {
-    const response = await axios.get(
-      `${import.meta.env.VITE_API_BASE_URL}/outlets/${servicesStore.selectedRest}`
-    )
+    const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/outlets/${servicesStore.selectedRest}`)
     if (response.data?.supportedLanguages?.length) {
       supportedLanguages.value = response.data.supportedLanguages
     } else {
@@ -215,7 +210,6 @@ onMounted(() => {
   getOutletDetails()
 })
 
-
 const selectedRest = computed(() => servicesStore.selectedRest)
 categoryStore.getAll(servicesStore.selectedRest).then((response) => {
   categories.value = response.map((e) => {
@@ -233,7 +227,7 @@ categoryStore.getAll(servicesStore.selectedRest).then((response) => {
     if (props.selectedCategory.categories) {
       const mappedCats = []
       props.selectedCategory.categories.forEach((c) => {
-        const cId = typeof c === 'string' ? c : (c.id || c._id)
+        const cId = typeof c === 'string' ? c : c.id || c._id
         if (cId) {
           const found = categories.value.find((cat) => cat._id === cId || cat.id === cId)
           if (found) mappedCats.push(found.wCode)
@@ -247,7 +241,7 @@ categoryStore.getAll(servicesStore.selectedRest).then((response) => {
     if (props.selectedCategory.subCategories) {
       const mappedSubs = []
       props.selectedCategory.subCategories.forEach((s) => {
-        const sId = typeof s === 'string' ? s : (s.id || s._id)
+        const sId = typeof s === 'string' ? s : s.id || s._id
         if (sId) {
           // Flatten all subcategories to search
           for (const cat of categories.value) {
@@ -343,7 +337,7 @@ const submit = () => {
         // Ensure id is present or fallback to _id if id is missing but _id exists
         // (Though typically _doc has id if virtuals are enabled, or we use _id as id)
         if (!cleanGroup.id && cleanGroup._id) {
-            cleanGroup.id = cleanGroup._id
+          cleanGroup.id = cleanGroup._id
         }
         return cleanGroup
       })

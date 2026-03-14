@@ -28,14 +28,12 @@
             class="flex-1"
             @keyup.enter="addPostalCode"
           />
-          <VaButton
-            size="small"
-            color="success"
-            icon="add"
-            @click="addPostalCode"
-          />
+          <VaButton size="small" color="success" icon="add" @click="addPostalCode" />
         </div>
-        <div v-if="postalCodes.length" class="flex flex-wrap gap-2 bg-blue-50 p-4 rounded-lg max-h-[30vh] overflow-y-auto">
+        <div
+          v-if="postalCodes.length"
+          class="flex flex-wrap gap-2 bg-blue-50 p-4 rounded-lg max-h-[30vh] overflow-y-auto"
+        >
           <VaBadge
             v-for="(code, index) in postalCodes"
             :key="code"
@@ -64,11 +62,7 @@
       <div>
         <h3 class="va-h6 mb-3">Meeting Points</h3>
         <div v-if="meetingPoints.length" class="flex flex-col gap-3 max-h-[40vh] overflow-y-auto">
-          <VaCard
-            v-for="(mp, index) in meetingPoints"
-            :key="mp._id || index"
-            class="meeting-point-card"
-          >
+          <VaCard v-for="(mp, index) in meetingPoints" :key="mp._id || index" class="meeting-point-card">
             <VaCardContent>
               <!-- View mode -->
               <div v-if="editingMpIndex !== index" class="flex items-start justify-between gap-3">
@@ -83,13 +77,7 @@
                   </div>
                 </div>
                 <div class="flex gap-1">
-                  <VaButton
-                    preset="plain"
-                    size="small"
-                    color="primary"
-                    icon="mso-edit"
-                    @click="startEditMp(index)"
-                  />
+                  <VaButton preset="plain" size="small" color="primary" icon="mso-edit" @click="startEditMp(index)" />
                   <VaButton
                     preset="plain"
                     size="small"
@@ -145,14 +133,7 @@
             </VaCardContent>
           </VaCard>
         </div>
-        <VaButton
-          v-if="!showAddMpForm"
-          class="mt-3"
-          size="small"
-          color="primary"
-          icon="add"
-          @click="openAddMpForm"
-        >
+        <VaButton v-if="!showAddMpForm" class="mt-3" size="small" color="primary" icon="add" @click="openAddMpForm">
           Add Meeting Point
         </VaButton>
       </div>
@@ -160,8 +141,8 @@
 
     <template #footer>
       <div class="flex justify-between mt-4">
-        <VaButton color="danger" @click="deleteZone" :disabled="loading">Delete Delivery Zone</VaButton>
-        <VaButton @click="save" :disabled="loading">Update</VaButton>
+        <VaButton color="danger" :disabled="loading" @click="deleteZone">Delete Delivery Zone</VaButton>
+        <VaButton :disabled="loading" @click="save">Update</VaButton>
       </div>
     </template>
   </VaModal>
@@ -231,9 +212,7 @@ const url: any = import.meta.env.VITE_API_BASE_URL
 async function fetchZoneDetails() {
   loading.value = true
   try {
-    const response = await axios.get(
-      `${url}/deliveryZone/${servicesStore.selectedRest}?id=${props.rowData._id}`,
-    )
+    const response = await axios.get(`${url}/deliveryZone/${servicesStore.selectedRest}?id=${props.rowData._id}`)
     const zone = response.data.data[0]
     zoneName.value = zone.name || ''
     postalCodes.value = [...(zone.postalCodes || [])]
@@ -318,10 +297,7 @@ function cancelEditMp() {
 async function saveEditMp(mp: any) {
   mpLoading.value = true
   try {
-    await axios.patch(
-      `${url}/deliveryZones/${props.rowData._id}/meetingPoints/${mp._id}`,
-      { ...mpForm.value },
-    )
+    await axios.patch(`${url}/deliveryZones/${props.rowData._id}/meetingPoints/${mp._id}`, { ...mpForm.value })
     // Update the local meeting point data
     const idx = editingMpIndex.value!
     meetingPoints.value[idx] = { ...meetingPoints.value[idx], ...mpForm.value }
@@ -359,10 +335,7 @@ function openAddMpForm() {
 async function addMeetingPoint() {
   mpLoading.value = true
   try {
-    await axios.post(
-      `${url}/deliveryZones/${props.rowData._id}/meetingPoints`,
-      { ...mpForm.value },
-    )
+    await axios.post(`${url}/deliveryZones/${props.rowData._id}/meetingPoints`, { ...mpForm.value })
     // Re-fetch to get the new meeting point with its _id
     await fetchZoneDetails()
     showAddMpForm.value = false
@@ -405,7 +378,7 @@ async function deleteZone() {
     title: 'Delete Delivery Zone',
     okText: 'Delete',
     cancelText: 'Cancel',
-    size: 'medium'
+    size: 'medium',
   })
 
   if (!isConfirmed) return
@@ -414,7 +387,7 @@ async function deleteZone() {
   try {
     const data = {
       ...props.rowData,
-      isDeleted: true
+      isDeleted: true,
     }
     await axios.patch(`${url}/deliveryZones/${props.rowData._id}`, data)
     init({ message: 'Delivery zone deleted successfully', color: 'success' })

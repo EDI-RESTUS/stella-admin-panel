@@ -1,5 +1,10 @@
 <template>
-  <div v-if="isOfferAvailable(item)" class="menu-item" :class="{ 'out-of-stock': item.inStock === false }" @click="getOffers">
+  <div
+    v-if="isOfferAvailable(item)"
+    class="menu-item"
+    :class="{ 'out-of-stock': item.inStock === false }"
+    @click="getOffers"
+  >
     <div class="item-content">
       <div class="item-name">{{ item.name }}</div>
       <div class="item-price">€{{ parseFloat(item.price).toFixed(2) }}</div>

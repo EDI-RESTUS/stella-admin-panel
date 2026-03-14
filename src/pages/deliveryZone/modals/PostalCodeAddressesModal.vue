@@ -18,27 +18,16 @@
     <div v-else class="flex flex-col gap-4">
       <!-- Add Address Button / Form -->
       <div v-if="!showAddForm && !editingId" class="flex justify-end">
-        <VaButton
-          size="small"
-          icon="add"
-          @click="startAddAddress"
-        >
-          Add Address
-        </VaButton>
+        <VaButton size="small" icon="add" @click="startAddAddress"> Add Address </VaButton>
       </div>
 
       <!-- Add/Edit Form -->
       <VaCard v-if="showAddForm || editingId" class="mb-4 border border-gray-200">
         <VaCardContent class="flex flex-col gap-3">
           <h3 class="font-bold text-sm">{{ editingId ? 'Edit Address' : 'Add Address' }}</h3>
-          
-          <VaInput
-            v-model="addressForm.streetName"
-            label="Street Name"
-            placeholder="Street Name"
-            size="small"
-          />
-          
+
+          <VaInput v-model="addressForm.streetName" label="Street Name" placeholder="Street Name" size="small" />
+
           <!-- Only show these fields for Adding, as per user instructions for Edit (which only showed Street Name update) 
                But user says "PATCH update postal code entry... -d { 'Street Name': ... }". 
                I'll show all fields for editing but maybe only street name is editable?
@@ -52,20 +41,9 @@
               placeholder="Municipality"
               size="small"
             />
-            <VaInput
-              v-model="addressForm.district"
-              label="District"
-              placeholder="District"
-              size="small"
-            />
+            <VaInput v-model="addressForm.district" label="District" placeholder="District" size="small" />
           </div>
-           <VaInput
-              v-model="addressForm.postalCode"
-              label="Postal Code"
-              size="small"
-              readonly
-              disabled
-            />
+          <VaInput v-model="addressForm.postalCode" label="Postal Code" size="small" readonly disabled />
 
           <div class="flex justify-end gap-2 mt-2">
             <VaButton preset="secondary" size="small" @click="cancelForm">Cancel</VaButton>
@@ -88,20 +66,8 @@
             </div>
           </div>
           <div class="flex gap-1">
-             <VaButton
-              preset="plain"
-              size="small"
-              icon="edit"
-              color="primary"
-              @click="startEditAddress(addr)"
-            />
-            <VaButton
-              preset="plain"
-              size="small"
-              icon="delete"
-              color="danger"
-              @click="deleteAddress(addr)"
-            />
+            <VaButton preset="plain" size="small" icon="edit" color="primary" @click="startEditAddress(addr)" />
+            <VaButton preset="plain" size="small" icon="delete" color="danger" @click="deleteAddress(addr)" />
           </div>
         </div>
       </div>
@@ -158,7 +124,7 @@ async function fetchAddresses() {
     // But here the user says http://.../postalcodes?postalCode=...
     // I'll assume standard response format.
     // Based on user "data": [...] in previous artifacts, it's likely response.data.data
-    // But let's check response structure. 
+    // But let's check response structure.
     // If it's a direct list, response.data.
     // I'll guess response.data.data based on other files.
     // Actually, looking at PostCodeModal.vue lines 121-127:
@@ -166,7 +132,7 @@ async function fetchAddresses() {
     // So it's response.data.data
     addresses.value = response.data.data || []
   } catch (error: any) {
-    // If 404, maybe empty? 
+    // If 404, maybe empty?
     if (error?.response?.status !== 404) {
       const message = error?.response?.data?.message || 'Failed to load addresses'
       init({ message, color: 'danger' })
@@ -193,7 +159,7 @@ function startEditAddress(addr: any) {
   addressForm.municipality = addr['Municipality / Community'] || addr.municipality || ''
   addressForm.district = addr['District'] || addr.district || ''
   addressForm.postalCode = addr['Postal Code'] || addr.postalCode || props.postalCode
-  
+
   editingId.value = addr._id || addr.id
   showAddForm.value = false
 }
@@ -207,10 +173,10 @@ async function saveAddress() {
   formLoading.value = true
   try {
     const payload = {
-      "Street Name": addressForm.streetName,
-      "Postal Code": addressForm.postalCode,
-      "Municipality / Community": addressForm.municipality,
-      "District": addressForm.district,
+      'Street Name': addressForm.streetName,
+      'Postal Code': addressForm.postalCode,
+      'Municipality / Community': addressForm.municipality,
+      District: addressForm.district,
     }
 
     if (editingId.value) {
@@ -222,7 +188,7 @@ async function saveAddress() {
       await axios.post(`${url}/postalcodes`, payload)
       init({ message: 'Address added', color: 'success' })
     }
-    
+
     cancelForm()
     fetchAddresses()
   } catch (error: any) {
@@ -246,8 +212,6 @@ async function deleteAddress(addr: any) {
     init({ message, color: 'danger' })
   }
 }
-
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

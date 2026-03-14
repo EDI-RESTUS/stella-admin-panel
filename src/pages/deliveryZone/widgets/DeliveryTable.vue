@@ -418,13 +418,7 @@ const items = toRef(props, 'items')
 
       <template #cell(actions)="{ rowData }">
         <div class="flex gap-2 justify-end">
-          <VaButton
-            preset="primary"
-            size="small"
-            color="primary"
-            icon="mso-edit"
-            @click="openEditModal(rowData)"
-          />
+          <VaButton preset="primary" size="small" color="primary" icon="mso-edit" @click="openEditModal(rowData)" />
           <VaButton
             preset="primary"
             size="small"

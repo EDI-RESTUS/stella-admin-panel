@@ -45,9 +45,7 @@ const buildStockMapFromItems = () => {
   try {
     items.value.forEach((item: any) => {
       if (Array.isArray(item.inStockByZones)) {
-        const inStockZoneIds = item.inStockByZones
-          .filter((z: any) => z.inStock)
-          .map((z: any) => z.deliveryZoneId)
+        const inStockZoneIds = item.inStockByZones.filter((z: any) => z.inStock).map((z: any) => z.deliveryZoneId)
         if (inStockZoneIds.length > 0) {
           stockMap[item._id] = inStockZoneIds
         }

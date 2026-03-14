@@ -35,7 +35,7 @@ const getArticles = async (outletId) => {
   isLoading.value = true
   const url = import.meta.env.VITE_API_BASE_URL
 
-  let queryString = `outletId=${outletId}&limit=50&page=${pageNumber.value}&search=${searchQuery.value}&sortKey=${sortBy.value}&sortValue=${sortOrder.value}`
+  const queryString = `outletId=${outletId}&limit=50&page=${pageNumber.value}&search=${searchQuery.value}&sortKey=${sortBy.value}&sortValue=${sortOrder.value}`
 
   try {
     const response = await axios.get(`${url}/menuItems?${queryString}`, { timeout: 60000 })
@@ -128,9 +128,7 @@ const buildStockMapFromItems = () => {
   try {
     items.value.forEach((item: any) => {
       if (Array.isArray(item.inStockByZones)) {
-        const inStockZoneIds = item.inStockByZones
-          .filter((z: any) => z.inStock)
-          .map((z: any) => z.deliveryZoneId)
+        const inStockZoneIds = item.inStockByZones.filter((z: any) => z.inStock).map((z: any) => z.deliveryZoneId)
         if (inStockZoneIds.length > 0) {
           stockMap[item._id] = inStockZoneIds
         }

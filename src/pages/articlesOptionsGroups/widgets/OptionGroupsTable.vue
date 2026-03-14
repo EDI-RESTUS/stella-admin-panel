@@ -124,7 +124,16 @@ function resetColumnVisibility() {
   columns.forEach((c) => (columnVisibility[c.key] = true))
 }
 
-const emits = defineEmits(['getOptionGroups', 'editOptionGroup', 'sortBy', 'sortingOrder', 'updateOptionGroupModal', 'getOptionGroupsForPagination', 'update:currentPage', 'activeOnlyChanged'])
+const emits = defineEmits([
+  'getOptionGroups',
+  'editOptionGroup',
+  'sortBy',
+  'sortingOrder',
+  'updateOptionGroupModal',
+  'getOptionGroupsForPagination',
+  'update:currentPage',
+  'activeOnlyChanged',
+])
 const props = defineProps({
   items: { type: Array, required: true },
   count: { type: Number, default: 0 },
@@ -155,9 +164,13 @@ watch(searchQuery, () => {
 })
 
 // Emit activeOnly changes so parent can re-fetch with server-side filter
-watch(activeOnly, (val) => {
-  emits('activeOnlyChanged', val)
-}, { immediate: true })
+watch(
+  activeOnly,
+  (val) => {
+    emits('activeOnlyChanged', val)
+  },
+  { immediate: true },
+)
 
 async function updateData(rowData) {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -362,7 +375,7 @@ const openEditGroupModal = (group) => {
               autofocus
               @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
-                rowData.editName = false;
+                rowData.editName = false
                 updateData(rowData)
               "
             />
@@ -390,7 +403,7 @@ const openEditGroupModal = (group) => {
               class="editable-input"
               autofocus
               @blur="
-                rowData.editInternalName = false;
+                rowData.editInternalName = false
                 updateData(rowData)
               "
             />
@@ -411,7 +424,10 @@ const openEditGroupModal = (group) => {
 
         <!-- DESCRIPTION -->
         <template #cell(description)="{ rowData }">
-          <div class="editable-field relative group max-w-[200px] truncate" :title="getLocalizedValue(rowData.description)">
+          <div
+            class="editable-field relative group max-w-[200px] truncate"
+            :title="getLocalizedValue(rowData.description)"
+          >
             <textarea
               v-if="rowData.editDescription"
               :value="getEditableLocaleValue(rowData.description)"
@@ -420,7 +436,7 @@ const openEditGroupModal = (group) => {
               autofocus
               @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
-                rowData.editDescription = false;
+                rowData.editDescription = false
                 updateData(rowData)
               "
             />
@@ -470,8 +486,8 @@ const openEditGroupModal = (group) => {
                 :key="option.key || option"
                 class="px-3 py-1.5 text-sm text-slate-700 hover:bg-blue-50 cursor-pointer text-center transition-colors duration-150"
                 @click="
-                  rowData.type = option.key || option;
-                  updateData(rowData);
+                  rowData.type = option.key || option
+                  updateData(rowData)
                   rowData.showTypeDropdown = false
                 "
               >
@@ -509,7 +525,7 @@ const openEditGroupModal = (group) => {
               class="editable-input"
               type="number"
               @blur="
-                rowData.editMinimumChoices = false;
+                rowData.editMinimumChoices = false
                 updateData(rowData)
               "
             />
@@ -536,7 +552,7 @@ const openEditGroupModal = (group) => {
               class="editable-input"
               type="number"
               @blur="
-                rowData.editMaximumChoices = false;
+                rowData.editMaximumChoices = false
                 updateData(rowData)
               "
             />
@@ -634,7 +650,14 @@ const openEditGroupModal = (group) => {
 
       <!-- Bottom Pagination -->
       <div v-if="pages > 1" class="flex justify-center py-3 border-t border-slate-200">
-        <VaPagination :model-value="props.currentPage" :pages="pages" buttons-preset="secondary" gapped="20" :visible-pages="3" @update:modelValue="changePage">
+        <VaPagination
+          :model-value="props.currentPage"
+          :pages="pages"
+          buttons-preset="secondary"
+          gapped="20"
+          :visible-pages="3"
+          @update:modelValue="changePage"
+        >
           <template #firstPageLink="{ onClick, disabled }">
             <button
               class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
@@ -680,8 +703,8 @@ const openEditGroupModal = (group) => {
       v-if="isEditArticleOptionGroupsModal"
       :selected-option-groups="selectedOptionGroups"
       @cancel="
-        isEditArticleOptionGroupsModal = false;
-        selectedOptionGroups = '';
+        isEditArticleOptionGroupsModal = false
+        selectedOptionGroups = ''
         emits('getOptionGroups', searchQuery)
       "
     />
@@ -689,8 +712,8 @@ const openEditGroupModal = (group) => {
       v-if="isEditArticleOptionsModal"
       :selected-options="selectedOptions"
       @cancel="
-        isEditArticleOptionsModal = false;
-        selectedOptions = '';
+        isEditArticleOptionsModal = false
+        selectedOptions = ''
         emits('getOptionGroups', searchQuery)
       "
     />
@@ -698,8 +721,8 @@ const openEditGroupModal = (group) => {
       v-if="isEditArticleOptionGroupsItemsModal"
       :selected-option-group="selectedItems"
       @cancel="
-        isEditArticleOptionGroupsItemsModal = false;
-        selectedItems = '';
+        isEditArticleOptionGroupsItemsModal = false
+        selectedItems = ''
         emits('getOptionGroups', searchQuery)
       "
     />
@@ -707,8 +730,8 @@ const openEditGroupModal = (group) => {
       v-if="isEditOptionGroupArticlesModal"
       :selected-items="selectedItems"
       @cancel="
-        isEditOptionGroupArticlesModal = false;
-        selectedItems = '';
+        isEditOptionGroupArticlesModal = false
+        selectedItems = ''
         emits('getOptionGroups', searchQuery)
       "
     />

@@ -46,9 +46,7 @@ const buildStockMapFromItems = () => {
   try {
     items.value.forEach((item: any) => {
       if (Array.isArray(item.inStockByZones)) {
-        const inStockZoneIds = item.inStockByZones
-          .filter((z: any) => z.inStock)
-          .map((z: any) => z.deliveryZoneId)
+        const inStockZoneIds = item.inStockByZones.filter((z: any) => z.inStock).map((z: any) => z.deliveryZoneId)
         if (inStockZoneIds.length > 0) {
           stockMap[item._id] = inStockZoneIds
         }
@@ -77,7 +75,7 @@ const getOptions = async () => {
 
     // Handle response structures: array directly, { items: [...] }, or { result: [...] }
     const rawData = response.data
-    const item = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
+    const item = Array.isArray(rawData) ? rawData : rawData.items || rawData.result || []
 
     // Extract total count from the response if available
     if (rawData.totalNoRec !== undefined) {
@@ -116,7 +114,11 @@ const getOptions = async () => {
 const getOptionsCount = () => {
   const url = import.meta.env.VITE_API_BASE_URL
   axios
-    .get(`${url}/articles-options/count?outletId=${servicesStore.selectedRest}&search=${encodeURIComponent(searchValue.value)}${activeOnly.value ? '&isActive=true' : ''}`)
+    .get(
+      `${url}/articles-options/count?outletId=${servicesStore.selectedRest}&search=${encodeURIComponent(
+        searchValue.value,
+      )}${activeOnly.value ? '&isActive=true' : ''}`,
+    )
     .then((response) => {
       count.value = Number(response.data.data || response.data.totalNoRec || response.data.count || 0)
     })
@@ -124,7 +126,6 @@ const getOptionsCount = () => {
       console.error('[ArticleOptions] Failed to get count:', err)
     })
 }
-
 
 watch(
   () => servicesStore.selectedRest,

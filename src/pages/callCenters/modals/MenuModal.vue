@@ -102,7 +102,11 @@
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option._id),
                   'out-of-stock': option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
-                @click="option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK') ? null : updateSingleChoice(group, option)"
+                @click="
+                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                    ? null
+                    : updateSingleChoice(group, option)
+                "
               >
                 <div v-if="option.imageUrl" class="item-image">
                   <img
@@ -127,8 +131,6 @@
                   :value="option._id"
                   class="absolute bottom-2 right-2 accent-gray-700 pointer-events-none"
                 />
-
-
               </label>
 
               <!-- Multiple Choice (No Qty)-->
@@ -143,7 +145,9 @@
                   'out-of-stock': option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
                 @click.prevent="
-                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK') ? null : toggleMultipleChoiceNoQty(group, option)
+                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                    ? null
+                    : toggleMultipleChoiceNoQty(group, option)
                 "
               >
                 <div v-if="option.imageUrl" class="item-image">
@@ -207,7 +211,9 @@
                   <button
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                     :disabled="
-                      getQty(group._id, option._id) === 0 || option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                      getQty(group._id, option._id) === 0 ||
+                      option.inStock === false ||
+                      option.name?.toUpperCase().includes('OUT OF STOCK')
                     "
                     @click="() => updateMultipleChoice(group, option, getQty(group._id, option._id) - 1)"
                   >
@@ -225,7 +231,8 @@
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                     :disabled="
                       getQty(group._id, option._id) >= (option.maximumChoices || group.maximumChoices || 99) ||
-                      option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                      option.inStock === false ||
+                      option.name?.toUpperCase().includes('OUT OF STOCK')
                     "
                     @click="() => updateMultipleChoice(group, option, getQty(group._id, option._id) + 1)"
                   >
@@ -669,7 +676,6 @@ function decrement(item) {
 }
 
 onMounted(() => {
-
   if (props.isEdit && props.item?.selectedOptions) {
     selectedOptions.value = JSON.parse(JSON.stringify(props.item.selectedOptions))
     const selectedGroupAndOption = props.item.selectedOptions.find((group) =>
@@ -682,8 +688,6 @@ onMounted(() => {
 })
 
 const { init } = useToast()
-
-
 </script>
 
 <style>
@@ -737,6 +741,4 @@ const { init } = useToast()
   border-color: #e9ecef !important;
   background: white !important;
 }
-
-
 </style>

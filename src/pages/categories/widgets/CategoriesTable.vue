@@ -160,7 +160,10 @@ const filteredItems = computed(() => {
   const query = searchQuery.value.toLowerCase()
   return items.value
     .filter((item) => !activeOnly.value || item.isActive)
-    .filter((item) => item.wCode?.toLowerCase().includes(query) || getLocalizedValue(item.name)?.toLowerCase().includes(query))
+    .filter(
+      (item) =>
+        item.wCode?.toLowerCase().includes(query) || getLocalizedValue(item.name)?.toLowerCase().includes(query),
+    )
 })
 
 const onButtonCategoryDelete = async (payload) => {
@@ -305,7 +308,7 @@ const onButtonCategoryDelete = async (payload) => {
               autofocus
               @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
-                rowData.editName = false;
+                rowData.editName = false
                 emits('updateCategory', { name: rowData.name, _id: rowData._id })
               "
             />
@@ -335,7 +338,7 @@ const onButtonCategoryDelete = async (payload) => {
               autofocus
               @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
-                rowData.editDescription = false;
+                rowData.editDescription = false
                 emits('updateCategory', { description: rowData.description, _id: rowData._id })
               "
             />
@@ -345,10 +348,7 @@ const onButtonCategoryDelete = async (payload) => {
                 v-if="getLocalizedValue(rowData.description)"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
               />
-              <CirclePlus
-                v-else
-                class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors"
-              />
+              <CirclePlus v-else class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors" />
             </div>
           </div>
         </template>
