@@ -43,27 +43,29 @@
         <div v-if="selectedTab" class="flex flex-wrap md:flex-nowrap items-center gap-1 relative w-full">
           <!-- Mobile Number -->
           <!-- Mobile Number Combined -->
-          <div class="border rounded px-1 py-1 bg-white flex items-center w-full md:w-[150px] focus-within:ring-1 focus-within:ring-gray-200 focus-within:border-gray-300">
-             <select
-                v-model="phonePrefix"
-                class="bg-transparent text-[10px] md:text-xs outline-none w-[45px] appearance-none cursor-pointer"
-                style="text-align-last: center;"
-                :disabled="selectedUser !== ''"
-             >
-                <option v-for="p in countryPrefixes" :key="p.value" :value="p.value">+{{p.value}}</option>
-             </select>
-             <div class="h-3 w-[1px] bg-gray-300 mx-1"></div>
-             <input
-                v-model="phoneLocal"
-                :disabled="selectedUser !== ''"
-                type="tel"
-                placeholder="Mobile"
-                pattern="[0-9]*"
-                inputmode="numeric"
-                class="text-xs outline-none w-full min-w-0 bg-transparent"
-                @input="e => phoneLocal = e.target.value.replace(/\D/g, '')"
-                @keyup.enter="fetchCustomerDetails(true)"
-             />
+          <div
+            class="border rounded px-1 py-1 bg-white flex items-center w-full md:w-[150px] focus-within:ring-1 focus-within:ring-gray-200 focus-within:border-gray-300"
+          >
+            <select
+              v-model="phonePrefix"
+              class="bg-transparent text-[10px] md:text-xs outline-none w-[45px] appearance-none cursor-pointer"
+              style="text-align-last: center"
+              :disabled="selectedUser !== ''"
+            >
+              <option v-for="p in countryPrefixes" :key="p.value" :value="p.value">+{{ p.value }}</option>
+            </select>
+            <div class="h-3 w-[1px] bg-gray-300 mx-1"></div>
+            <input
+              v-model="phoneLocal"
+              :disabled="selectedUser !== ''"
+              type="tel"
+              placeholder="Mobile"
+              pattern="[0-9]*"
+              inputmode="numeric"
+              class="text-xs outline-none w-full min-w-0 bg-transparent"
+              @input="(e) => (phoneLocal = e.target.value.replace(/\D/g, ''))"
+              @keyup.enter="fetchCustomerDetails(true)"
+            />
           </div>
 
           <!-- Customer Name -->
@@ -95,36 +97,36 @@
 
           <!-- Add / Edit Button -->
           <template v-if="!selectedUser">
-              <VaButton
-                class="text-white h-[24px] w-[24px] rounded-md flex items-center justify-center"
-                size="small"
-                icon="mso-add"
-                title="Add Customer"
-                :style="{ '--va-background-color': outlet.primaryColor }"
-                @click="openCustomerModal"
-              />
+            <VaButton
+              class="text-white h-[24px] w-[24px] rounded-md flex items-center justify-center"
+              size="small"
+              icon="mso-add"
+              title="Add Customer"
+              :style="{ '--va-background-color': outlet.primaryColor }"
+              @click="openCustomerModal"
+            />
           </template>
 
           <template v-else>
             <div class="flex items-center gap-1">
-                <VaButton
-                  class="hover:bg-blue-600 text-white h-[24px] w-[24px] rounded-md flex items-center justify-center"
-                  size="small"
-                  icon="mso-edit"
-                  title="Edit Customer"
-                  :style="{ '--va-background-color': outlet.primaryColor }"
-                  @click="openCustomerModal"
-                />
+              <VaButton
+                class="hover:bg-blue-600 text-white h-[24px] w-[24px] rounded-md flex items-center justify-center"
+                size="small"
+                icon="mso-edit"
+                title="Edit Customer"
+                :style="{ '--va-background-color': outlet.primaryColor }"
+                @click="openCustomerModal"
+              />
 
               <!-- Order History Button -->
-                <VaButton
-                  class="hover:bg-green-600 text-white h-[24px] w-[24px] rounded-md flex items-center justify-center"
-                  size="small"
-                  icon="mso-history"
-                  title="View Order History"
-                  :style="{ '--va-background-color': outlet.primaryColor }"
-                  @click="showHistoryModal = true"
-                />
+              <VaButton
+                class="hover:bg-green-600 text-white h-[24px] w-[24px] rounded-md flex items-center justify-center"
+                size="small"
+                icon="mso-history"
+                title="View Order History"
+                :style="{ '--va-background-color': outlet.primaryColor }"
+                @click="showHistoryModal = true"
+              />
             </div>
           </template>
 
@@ -399,38 +401,38 @@ const countryPrefixes = [
   { text: '+44 (UK)', value: '44' },
   { text: '+1 (US)', value: '1' },
   { text: '+7 (RU)', value: '7' },
-   { text: '+971 (AE)', value: '971' },
+  { text: '+971 (AE)', value: '971' },
   { text: '+961 (LB)', value: '961' },
 ]
 
 const phoneNumber = computed({
   get() {
-    return (phonePrefix.value + phoneLocal.value)
+    return phonePrefix.value + phoneLocal.value
   },
   set(val) {
-     const raw = String(val || '').replace(/\D/g, '')
-     if (!raw) {
-       phoneLocal.value = ''
-       return
-     }
-     // Short internal codes 1-15: keep +357 prefix, don't try to match country codes
-     // (otherwise "15" would match +1 (US) and leave local = "5")
-     const num = Number(raw)
-     if (raw.length <= 2 && num >= 1 && num <= 15) {
-       phonePrefix.value = '357'
-       phoneLocal.value = raw
-       return
-     }
-     const found = countryPrefixes.find(p => raw.startsWith(p.value))
-     if (found) {
-        phonePrefix.value = found.value
-        phoneLocal.value = raw.slice(found.value.length)
-     } else {
-        // Assume default 357 if no match
-        phonePrefix.value = '357'
-        phoneLocal.value = raw
-     }
-  }
+    const raw = String(val || '').replace(/\D/g, '')
+    if (!raw) {
+      phoneLocal.value = ''
+      return
+    }
+    // Short internal codes 1-15: keep +357 prefix, don't try to match country codes
+    // (otherwise "15" would match +1 (US) and leave local = "5")
+    const num = Number(raw)
+    if (raw.length <= 2 && num >= 1 && num <= 15) {
+      phonePrefix.value = '357'
+      phoneLocal.value = raw
+      return
+    }
+    const found = countryPrefixes.find((p) => raw.startsWith(p.value))
+    if (found) {
+      phonePrefix.value = found.value
+      phoneLocal.value = raw.slice(found.value.length)
+    } else {
+      // Assume default 357 if no match
+      phonePrefix.value = '357'
+      phoneLocal.value = raw
+    }
+  },
 })
 const name = ref('')
 const userResults = ref([])
@@ -996,9 +998,7 @@ function autoSelectLocationForShortPhone() {
     }
 
     // Match zone directly by serviceZoneId == phone number (e.g. phone 15 → Deftera)
-    const matchingZone = deliveryZoneOptions.value.find(
-      (zone) => Number(zone.serviceZoneId) === phoneNum,
-    )
+    const matchingZone = deliveryZoneOptions.value.find((zone) => Number(zone.serviceZoneId) === phoneNum)
 
     if (matchingZone) {
       selectDeliveryZone(matchingZone)
@@ -1026,9 +1026,7 @@ const filteredDeliveryZones = computed(() => {
 
   // For phone numbers 1-15, only show the matching zone (by serviceZoneId)
   if (phone.length <= 2 && phoneNum >= 1 && phoneNum <= 15) {
-    return deliveryZoneOptions.value.filter(
-      (zone) => Number(zone.serviceZoneId) === phoneNum,
-    )
+    return deliveryZoneOptions.value.filter((zone) => Number(zone.serviceZoneId) === phoneNum)
   }
 
   // For regular phone numbers, show all zones
@@ -1057,10 +1055,10 @@ function selectDeliveryZone(zone) {
         zIndex: 9999, // Ensure it's on top
       })
       // Clear selection if it was set (or just don't set it)
-       selectedZone.value = ''
-       serviceZoneId.value = ''
-       emits('setDeliveryZone', false)
-       orderStore.setDeliveryZone(null)
+      selectedZone.value = ''
+      serviceZoneId.value = ''
+      emits('setDeliveryZone', false)
+      orderStore.setDeliveryZone(null)
       return
     }
 
@@ -1086,7 +1084,7 @@ watch(selectedTab, (newTab) => {
   console.log('[watcher:selectedTab] Tab changed to:', newTab)
 
   if (serviceZoneId.value && deliveryZoneOptions.value.length) {
-    const currentZone = deliveryZoneOptions.value.find(z => z.serviceZoneId == serviceZoneId.value)
+    const currentZone = deliveryZoneOptions.value.find((z) => z.serviceZoneId == serviceZoneId.value)
 
     if (currentZone) {
       console.log('[watcher:selectedTab] Re-validating zone:', currentZone.name)
@@ -1094,25 +1092,25 @@ watch(selectedTab, (newTab) => {
       console.log(`[watcher:selectedTab] Is available for ${newTab} (cc):`, isAvailable)
 
       if (isAvailable === false) {
-          confirm({
-            message: `${newTab === 'takeaway' ? 'Takeaway' : 'Delivery'} not available for this Zone`,
-            okText: 'Close',
-            cancelText: '',
-            size: 'small',
-            zIndex: 9999,
-          })
-          // Clear invalid selection
-          selectedZone.value = ''
-          serviceZoneId.value = ''
-          emits('setDeliveryZone', false)
-          orderStore.setDeliveryZone(null)
+        confirm({
+          message: `${newTab === 'takeaway' ? 'Takeaway' : 'Delivery'} not available for this Zone`,
+          okText: 'Close',
+          cancelText: '',
+          size: 'small',
+          zIndex: 9999,
+        })
+        // Clear invalid selection
+        selectedZone.value = ''
+        serviceZoneId.value = ''
+        emits('setDeliveryZone', false)
+        orderStore.setDeliveryZone(null)
       } else {
-         // Re-emit fee if needed? Delivery has charge, Takeaway 0.
-         // CustomerDetails logic usually handles this on select, maybe need to re-trigger or rely on consumer?
-         // The original code emits setDeliveryFee only on selectDeliveryZone.
-         // Let's ensure we update the fee when tab changes if zone is valid.
-         const fee = newTab === 'takeaway' ? 0 : currentZone.deliveryCharge
-         emits('setDeliveryFee', fee)
+        // Re-emit fee if needed? Delivery has charge, Takeaway 0.
+        // CustomerDetails logic usually handles this on select, maybe need to re-trigger or rely on consumer?
+        // The original code emits setDeliveryFee only on selectDeliveryZone.
+        // Let's ensure we update the fee when tab changes if zone is valid.
+        const fee = newTab === 'takeaway' ? 0 : currentZone.deliveryCharge
+        emits('setDeliveryFee', fee)
       }
     }
   }
@@ -1155,7 +1153,7 @@ async function handleDeliveryZoneFetch() {
     // Auto-select if user is restricted to exactly one zone
     const allowed = userStore.userDetails?.allowedDeliveryZoneIds
     if (allowed && allowed.length > 0 && deliveryZoneOptions.value.length === 1) {
-       selectDeliveryZone(deliveryZoneOptions.value[0])
+      selectDeliveryZone(deliveryZoneOptions.value[0])
     }
 
     if (!deliveryZoneOptions.value.length) {

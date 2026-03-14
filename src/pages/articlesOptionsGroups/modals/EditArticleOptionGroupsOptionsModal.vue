@@ -62,7 +62,7 @@ const getOptions = async () => {
 
     // Handle response structures: array directly, { items: [...] }, or { result: [...] }
     const rawData = response.data
-    const data = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
+    const data = Array.isArray(rawData) ? rawData : rawData.items || rawData.result || []
 
     items.value = data
       .map((e) => {

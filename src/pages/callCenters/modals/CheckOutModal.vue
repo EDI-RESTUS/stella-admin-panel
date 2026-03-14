@@ -15,7 +15,6 @@
           <h3 class="va-h3">Order Details</h3>
 
           <div class="order-items order-items-wrapper overflow-y-auto flex-1 min-h-0 basis-0 h-0">
-
             <div v-for="(item, index) in orderStore.cartItems" :key="item.itemId" class="order-item">
               <div class="item-main">
                 <div class="item-details">
@@ -115,7 +114,6 @@
                       </div>
                     </div>
                   </div>
-
                 </div>
 
                 <div class="item-total-price">
@@ -131,42 +129,44 @@
             </div>
           </div>
 
-<div class="summary-totals flex-none pt-3">
-  <div class="total-row">
-    <span>Subtotal:</span>
-    <span>{{ subtotal.toFixed(2) }} €</span>
-  </div>
+          <div class="summary-totals flex-none pt-3">
+            <div class="total-row">
+              <span>Subtotal:</span>
+              <span>{{ subtotal.toFixed(2) }} €</span>
+            </div>
 
-  <div v-if="orderType === 'delivery'" class="total-row">
-    <span>Delivery Fee:</span>
-    <span>{{ deliveryFee.toFixed(2) }} €</span>
-  </div>
+            <div v-if="orderType === 'delivery'" class="total-row">
+              <span>Delivery Fee:</span>
+              <span>{{ deliveryFee.toFixed(2) }} €</span>
+            </div>
 
-  <div v-if="promoTotal" class="total-row">
-    <span class="text-red-600">Discount:</span>
-    <span class="text-red-600">- {{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }} €</span>
-  </div>
+            <div v-if="promoTotal" class="total-row">
+              <span class="text-red-600">Discount:</span>
+              <span class="text-red-600"
+                >- {{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }} €</span
+              >
+            </div>
 
-  <div v-if="orderStore.editOrder" class="total-row">
-    <span class="text-gray-600">Paid Amount:</span>
-    <span class="text-green-600 font-semibold">{{ paidAmount.toFixed(2) }} €</span>
-  </div>
+            <div v-if="orderStore.editOrder" class="total-row">
+              <span class="text-gray-600">Paid Amount:</span>
+              <span class="text-green-600 font-semibold">{{ paidAmount.toFixed(2) }} €</span>
+            </div>
 
-  <div class="total-row total-final !text-2xl">
-    <span>Total:</span>
-    <span>{{ currentEditedTotal.toFixed(2) }} €</span>
-  </div>
+            <div class="total-row total-final !text-2xl">
+              <span>Total:</span>
+              <span>{{ currentEditedTotal.toFixed(2) }} €</span>
+            </div>
 
-  <div v-if="orderStore.editOrder" class="total-row text-sm">
-    <span class="text-gray-600">Difference:</span>
-    <span
-      class="font-semibold"
-      :class="editDifference > 0 ? 'text-red-600' : editDifference < 0 ? 'text-green-600' : 'text-gray-700'"
-    >
-      {{ editDifference.toFixed(2) }} €
-    </span>
-  </div>
-</div>
+            <div v-if="orderStore.editOrder" class="total-row text-sm">
+              <span class="text-gray-600">Difference:</span>
+              <span
+                class="font-semibold"
+                :class="editDifference > 0 ? 'text-red-600' : editDifference < 0 ? 'text-green-600' : 'text-gray-700'"
+              >
+                {{ editDifference.toFixed(2) }} €
+              </span>
+            </div>
+          </div>
         </div>
       </div>
       <!-- Outlet & Type & Time -->
@@ -179,93 +179,119 @@
         </div>
 
         <!-- Payment Types & Keypad -->
-<div class="flex-grow min-h-0 overflow-hidden pt-0 pr-4 pb-4">
-  <div class="grid h-full min-h-0 grid-cols-1 md:grid-cols-2 gap-4">
-    <!-- Left pane: payment types -->
-<div class="flex flex-col h-full min-h-0">
-  <!-- Card container like Order Items -->
-  <div class="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col flex-1 min-h-0">
-    <div class="p-4 flex-1 min-h-0 overflow-y-auto">
-      <div class="payment-options grid gap-2 sm:grid-cols-2">
-        <div
-          v-for="payment in paymentTypes.filter((a) => userDetails.paymentType.includes(a.paymentTypeId))"
-          :key="payment.paymentTypeId"
-          class="payment-option transition-all p-4 flex items-center justify-center text-center"
-          :class="selectedPayment == payment ? 'selected' : ''"
-          @click="selectedPayment = payment"
-        >
-          <div class="payment-label font-bold text-lg">{{ payment.name }}</div>
+        <div class="flex-grow min-h-0 overflow-hidden pt-0 pr-4 pb-4">
+          <div class="grid h-full min-h-0 grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Left pane: payment types -->
+            <div class="flex flex-col h-full min-h-0">
+              <!-- Card container like Order Items -->
+              <div class="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col flex-1 min-h-0">
+                <div class="p-4 flex-1 min-h-0 overflow-y-auto">
+                  <div class="payment-options grid gap-2 sm:grid-cols-2">
+                    <div
+                      v-for="payment in paymentTypes.filter((a) => userDetails.paymentType.includes(a.paymentTypeId))"
+                      :key="payment.paymentTypeId"
+                      class="payment-option transition-all p-4 flex items-center justify-center text-center"
+                      :class="selectedPayment == payment ? 'selected' : ''"
+                      @click="selectedPayment = payment"
+                    >
+                      <div class="payment-label font-bold text-lg">{{ payment.name }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Payment button -->
+              <div class="pt-4">
+                <button
+                  id="confirmBtn"
+                  :disabled="apiLoading || !selectedPayment"
+                  class="btn btn-primary !w-full !min-w-0 py-2 !text-2xl"
+                  @click="orderStore.editOrder ? updateOrder() : createOrder()"
+                >
+                  <span v-if="!apiLoading" id="btnText">Payment</span>
+                  <div v-if="apiLoading" id="loadingSpinner" class="loading-spinner animate-spin"></div>
+                </button>
+              </div>
+            </div>
+
+            <!-- Right pane -->
+            <div
+              class="p-4 gap-3 bg-white rounded-xl border border-gray-200 shadow-sm h-full min-h-0 overflow-hidden flex flex-col"
+            >
+              <div class="bg-white p-3 rounded-lg border border-gray-300 text-right shadow-inner">
+                <div class="text-3xl font-bold text-gray-800">€ {{ (selectedCashAmount || 0).toFixed(2) }}</div>
+                <div class="text-3xl mt-1" :class="changeAmount >= 0 ? 'text-green-600' : 'text-red-600'">
+                  Change: € {{ changeAmount.toFixed(2) }}
+                </div>
+              </div>
+
+              <div class="flex-1 min-h-0 flex flex-col gap-3">
+                <!-- Denominations -->
+                <div class="grid grid-cols-3 gap-2 flex-1 min-h-0 auto-rows-fr">
+                  <button
+                    v-for="amount in cashDenominations"
+                    :key="amount"
+                    class="py-2 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 font-bold text-gray-700 shadow-sm active:translate-y-0.5 transition-all text-2xl h-full"
+                    @click="handleDenominationClick(amount)"
+                  >
+                    {{ amount.toFixed(2) }}
+                  </button>
+                </div>
+
+                <!-- Keypad -->
+                <div class="grid grid-cols-3 gap-2 flex-[2] min-h-0 auto-rows-fr">
+                  <button
+                    v-for="n in ['7', '8', '9']"
+                    :key="n"
+                    class="key-btn bg-gray-200 hover:bg-gray-300 h-full"
+                    @click="handleKeypadInput(n)"
+                  >
+                    {{ n }}
+                  </button>
+                  <button
+                    v-for="n in ['4', '5', '6']"
+                    :key="n"
+                    class="key-btn bg-gray-200 hover:bg-gray-300 h-full"
+                    @click="handleKeypadInput(n)"
+                  >
+                    {{ n }}
+                  </button>
+                  <button
+                    v-for="n in ['1', '2', '3']"
+                    :key="n"
+                    class="key-btn bg-gray-200 hover:bg-gray-300 h-full"
+                    @click="handleKeypadInput(n)"
+                  >
+                    {{ n }}
+                  </button>
+
+                  <button class="key-btn bg-gray-200 hover:bg-gray-300 h-full" @click="handleKeypadInput('0')">
+                    0
+                  </button>
+                  <button class="key-btn bg-gray-200 hover:bg-gray-300 h-full" @click="handleKeypadInput('.')">
+                    .
+                  </button>
+                  <button
+                    class="key-btn bg-gray-400 hover:bg-gray-500 text-white h-full"
+                    @click="handleKeypadInput('backspace')"
+                  >
+                    <span class="text-2xl">⌫</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Payment button -->
-  <div class="pt-4">
-    <button
-      id="confirmBtn"
-      :disabled="apiLoading || !selectedPayment"
-      class="btn btn-primary !w-full !min-w-0 py-2 !text-2xl"
-      @click="orderStore.editOrder ? updateOrder() : createOrder()"
-    >
-      <span v-if="!apiLoading" id="btnText">Payment</span>
-      <div v-if="apiLoading" id="loadingSpinner" class="loading-spinner animate-spin"></div>
-    </button>
-  </div>
-</div>
-
-    <!-- Right pane -->
-    <div class=" p-4 gap-3 bg-white rounded-xl border border-gray-200 shadow-sm h-full min-h-0 overflow-hidden flex flex-col">
-  <div class="bg-white p-3 rounded-lg border border-gray-300 text-right shadow-inner">
-    <div class="text-3xl font-bold text-gray-800">€ {{ (selectedCashAmount || 0).toFixed(2) }}</div>
-    <div class="text-3xl mt-1" :class="changeAmount >= 0 ? 'text-green-600' : 'text-red-600'">
-      Change: € {{ changeAmount.toFixed(2) }}
-  </div>
-</div>
-
-<div class="flex-1 min-h-0 flex flex-col gap-3">
-  <!-- Denominations -->
-  <div class="grid grid-cols-3 gap-2 flex-1 min-h-0 auto-rows-fr">
-    <button
-      v-for="amount in cashDenominations"
-      :key="amount"
-      class="py-2 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 font-bold text-gray-700 shadow-sm active:translate-y-0.5 transition-all text-2xl h-full"
-      @click="handleDenominationClick(amount)"
-    >
-      {{ amount.toFixed(2) }}
-    </button>
-  </div>
-
-  <!-- Keypad -->
-  <div class="grid grid-cols-3 gap-2 flex-[2] min-h-0 auto-rows-fr">
-    <button v-for="n in ['7','8','9']" :key="n" class="key-btn bg-gray-200 hover:bg-gray-300 h-full" @click="handleKeypadInput(n)">{{ n }}</button>
-    <button v-for="n in ['4','5','6']" :key="n" class="key-btn bg-gray-200 hover:bg-gray-300 h-full" @click="handleKeypadInput(n)">{{ n }}</button>
-    <button v-for="n in ['1','2','3']" :key="n" class="key-btn bg-gray-200 hover:bg-gray-300 h-full" @click="handleKeypadInput(n)">{{ n }}</button>
-
-    <button class="key-btn bg-gray-200 hover:bg-gray-300 h-full" @click="handleKeypadInput('0')">0</button>
-    <button class="key-btn bg-gray-200 hover:bg-gray-300 h-full" @click="handleKeypadInput('.')">.</button>
-    <button class="key-btn bg-gray-400 hover:bg-gray-500 text-white h-full" @click="handleKeypadInput('backspace')">
-      <span class="text-2xl">⌫</span>
-    </button>
-  </div>
-</div>
-    </div>
-  </div>
-</div>
       </div>
 
       <!-- SaferPay Iframe Section -->
       <div v-if="redirectUrl" class="col-span-2 flex flex-col bg-white h-full">
         <div class="flex-grow relative py-16">
-          <iframe :src="redirectUrl" width="100%" height="100%" class="border-none"/>
-          <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
-
-          </div>
+          <iframe :src="redirectUrl" width="100%" height="100%" class="border-none" />
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-50"></div>
         </div>
         <div class="p-4 border-t border-gray-200 flex justify-between items-center bg-gray-50">
-          <span class="text-sm text-gray-500 flex items-center gap-2">
-
-          </span>
+          <span class="text-sm text-gray-500 flex items-center gap-2"> </span>
           <div class="flex gap-2">
             <button
               class="btn btn-secondary text-sm px-4 py-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -331,9 +357,9 @@ const handleKeypadInput = (input: string) => {
     // Prevent multiple leading zeros
     if (manualCashString.value === '0' && input === '0') return
     if (manualCashString.value === '0' && input !== '.') {
-       manualCashString.value = input
+      manualCashString.value = input
     } else {
-       manualCashString.value += input
+      manualCashString.value += input
     }
   }
 
@@ -369,11 +395,11 @@ const etaTime = computed(() => {
 
   const timeString = etaDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
 
-const isScheduled = orderFor.value !== 'current'
+  const isScheduled = orderFor.value !== 'current'
 
-const isFutureOrder = selectedDate.getTime() > now.getTime() + 30 * 60 * 1000
+  const isFutureOrder = selectedDate.getTime() > now.getTime() + 30 * 60 * 1000
 
-const showScheduledText = isScheduled || isFutureOrder
+  const showScheduledText = isScheduled || isFutureOrder
 
   const zoneName = orderStore.deliveryZone?.name ? `${orderStore.deliveryZone.name} - ` : ''
 
@@ -437,7 +463,6 @@ const getPaymentOptions = () => {
       console.error('Failed to fetch payment options:', err)
     })
 }
-
 
 watch(
   () => showCheckoutModal.value,
@@ -821,7 +846,8 @@ async function updateOrder() {
 
   // --- Detect promo codes (from props OR original order) ---
   const codes = normalizeCodes(props.promoCode, props.promoCodes)
-  const editPromos = orderStore.editOrder.promoCodes || (orderStore.editOrder.promoCode ? [orderStore.editOrder.promoCode] : [])
+  const editPromos =
+    orderStore.editOrder.promoCodes || (orderStore.editOrder.promoCode ? [orderStore.editOrder.promoCode] : [])
   const allCodes = [...new Set([...codes, ...editPromos].filter(Boolean))]
   const hasPromo = allCodes.length > 0
 
@@ -1050,7 +1076,7 @@ async function updateOrderWithPromo(promoCodes: string[]) {
     const dateVal = props.dateSelected ? new Date(props.dateSelected) : new Date()
     const orderDateTime = !isNaN(dateVal.getTime()) ? dateVal.toISOString() : new Date().toISOString()
 
-    const pm = selectedPayment.value || {} as any
+    const pm = selectedPayment.value || ({} as any)
     const patchPayload: any = {
       orderFor: orderFor.value,
       customerDetailId: props.customerDetailsId,
@@ -1319,7 +1345,11 @@ async function createOrder() {
     const errorData = err.response?.data
 
     // Check for OUT_OF_STOCK error and append item names
-    if (errorData?.code === 'OUT_OF_STOCK' && Array.isArray(errorData?.outOfStockItems) && errorData.outOfStockItems.length) {
+    if (
+      errorData?.code === 'OUT_OF_STOCK' &&
+      Array.isArray(errorData?.outOfStockItems) &&
+      errorData.outOfStockItems.length
+    ) {
       errorMessage = `${errorMessage} Items: ${errorData.outOfStockItems.join(', ')}`
     }
 
@@ -1916,6 +1946,4 @@ const promoOfferItemPrice = (item: any, index: number) => {
 .big-xl-xl-modal :deep(.va-modal__close-btn:hover) {
   background: #e06752;
 }
-
-
 </style>

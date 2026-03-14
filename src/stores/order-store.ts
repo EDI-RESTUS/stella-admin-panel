@@ -64,10 +64,10 @@ export const useOrderStore = defineStore('order', {
     originalItemsTotal: (s) =>
       s.validation
         ? Number(
-          s.validation.menuItems
-            .reduce((sum, it) => sum + Number(it.originalPrice) + Number(it.optionsPrice || 0), 0)
-            .toFixed(2),
-        )
+            s.validation.menuItems
+              .reduce((sum, it) => sum + Number(it.originalPrice) + Number(it.optionsPrice || 0), 0)
+              .toFixed(2),
+          )
         : s.cartItems.reduce((acc, item: any) => acc + (item.totalPrice || 0), 0),
 
     // Offers (before promos) = sum of basePrice in offerDetails
@@ -83,7 +83,10 @@ export const useOrderStore = defineStore('order', {
         : s.cartItems.reduce((acc, item: any) => acc + (item.totalPrice || 0), 0),
 
     // Offers after promos = backend aggregate updatedOffersTotal
-    offersAfterPromos: (s) => (s.validation ? Number((s.validation.updatedOffersTotal || 0).toFixed(2)) : s.offerItems.reduce((acc, offer: any) => acc + (offer.totalPrice || 0), 0)),
+    offersAfterPromos: (s) =>
+      s.validation
+        ? Number((s.validation.updatedOffersTotal || 0).toFixed(2))
+        : s.offerItems.reduce((acc, offer: any) => acc + (offer.totalPrice || 0), 0),
 
     deliveryFeeValidated: (s) => (s.validation ? Number((s.validation.deliveryFee || 0).toFixed(2)) : 0),
 
@@ -228,7 +231,11 @@ export const useOrderStore = defineStore('order', {
         // DEBUG: Log the first few available IDs to check format
         if (menuStore.unFilteredMenuItems.length > 0) {
           const sample = menuStore.unFilteredMenuItems[0]
-          console.log(`[OrderStore] Debug ID format - Target: "${targetId}" | First Store Item: "${sample._id}" (type: ${typeof sample._id}) | Sample Name: ${sample.name}`)
+          console.log(
+            `[OrderStore] Debug ID format - Target: "${targetId}" | First Store Item: "${
+              sample._id
+            }" (type: ${typeof sample._id}) | Sample Name: ${sample.name}`,
+          )
         }
 
         const originalMenuItem = menuStore.unFilteredMenuItems.find((m: any) => {
@@ -246,35 +253,44 @@ export const useOrderStore = defineStore('order', {
           console.log(`[OrderStore] Found original item: ${originalMenuItem.name} (${originalMenuItem._id})`)
         }
 
-        const mappedOptions = (originalMenuItem?.articlesOptionsGroup || []).map((group: any) => {
-          const selected = (group.articlesOptions || [])
-            .filter((opt: any) => {
-              const found = (menuItem.options || []).find((o: any) => (o.option === opt._id || o.option?._id === opt._id))
-              return !!found
-            })
-            .map((opt: any) => {
-              const found = (menuItem.options || []).find((o: any) => (o.option === opt._id || o.option?._id === opt._id))
-              return {
-                ...opt,
-                optionId: opt._id,
-                optionName: opt.name,
-                price: parseFloat(opt.price) || 0,
-                type: opt.type,
-                quantity: found ? (Number(found.quantity) || 1) : 1,
-                selected: true
-              }
-            })
+        const mappedOptions = (originalMenuItem?.articlesOptionsGroup || [])
+          .map((group: any) => {
+            const selected = (group.articlesOptions || [])
+              .filter((opt: any) => {
+                const found = (menuItem.options || []).find(
+                  (o: any) => o.option === opt._id || o.option?._id === opt._id,
+                )
+                return !!found
+              })
+              .map((opt: any) => {
+                const found = (menuItem.options || []).find(
+                  (o: any) => o.option === opt._id || o.option?._id === opt._id,
+                )
+                return {
+                  ...opt,
+                  optionId: opt._id,
+                  optionName: opt.name,
+                  price: parseFloat(opt.price) || 0,
+                  type: opt.type,
+                  quantity: found ? Number(found.quantity) || 1 : 1,
+                  selected: true,
+                }
+              })
 
-          if (!selected.length) return null
+            if (!selected.length) return null
 
-          return {
-            groupId: group._id,
-            groupName: group.name,
-            categoryId: originalMenuItem.categories && originalMenuItem.categories.length > 0 ? originalMenuItem.categories[0].id : null,
-            menuItemId: originalMenuItem._id,
-            selected
-          }
-        }).filter(Boolean)
+            return {
+              groupId: group._id,
+              groupName: group.name,
+              categoryId:
+                originalMenuItem.categories && originalMenuItem.categories.length > 0
+                  ? originalMenuItem.categories[0].id
+                  : null,
+              menuItemId: originalMenuItem._id,
+              selected,
+            }
+          })
+          .filter(Boolean)
 
         return {
           orderId: orderId,
@@ -288,7 +304,7 @@ export const useOrderStore = defineStore('order', {
           isRepeatedOrder: true,
           quantity: menuItem.quantity,
           isFree: !!menuItem.isFree,
-          selectedOptions: mappedOptions
+          selectedOptions: mappedOptions,
         }
       })
 
@@ -303,24 +319,28 @@ export const useOrderStore = defineStore('order', {
         order.offerDetails.forEach((od: any) => {
           // Construct selections from offerItems
           // We group them into a single "Options" group per item to match CheckOutModal structure
-          const selections = [{
-            addedItems: (od.offerItems || []).map((oi: any) => ({
-              itemId: oi.menuItem || oi._id,
-              itemName: oi.name,
-              quantity: oi.quantity || 1,
-              selectedOptions: [{
-                groupId: 'restored-group',
-                groupName: 'Options',
-                selected: (oi.options || []).map((opt: any) => ({
-                  optionId: opt.option || opt._id,
-                  name: opt.name,
-                  price: parseFloat(opt.price || 0),
-                  quantity: opt.quantity || 1,
-                  type: opt.type || 'extra'
-                }))
-              }]
-            }))
-          }]
+          const selections = [
+            {
+              addedItems: (od.offerItems || []).map((oi: any) => ({
+                itemId: oi.menuItem || oi._id,
+                itemName: oi.name,
+                quantity: oi.quantity || 1,
+                selectedOptions: [
+                  {
+                    groupId: 'restored-group',
+                    groupName: 'Options',
+                    selected: (oi.options || []).map((opt: any) => ({
+                      optionId: opt.option || opt._id,
+                      name: opt.name,
+                      price: parseFloat(opt.price || 0),
+                      quantity: opt.quantity || 1,
+                      type: opt.type || 'extra',
+                    })),
+                  },
+                ],
+              })),
+            },
+          ]
 
           this.offersAdded({
             _id: od.offerId,
@@ -331,11 +351,10 @@ export const useOrderStore = defineStore('order', {
             selectionTotalPrice: 0, // Already included in totalPrice usually
             totalPrice: parseFloat(od.totalPrice),
             quantity: 1,
-            selections: selections
+            selections: selections,
           })
         })
       }
-
 
       // 4. Set context
       this.setOrderFor(order.orderFor)

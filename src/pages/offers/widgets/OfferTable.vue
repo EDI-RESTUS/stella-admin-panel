@@ -255,7 +255,9 @@ watch(
     // Search filter
     if (lowerQuery) {
       mappedItems = mappedItems.filter((item) =>
-        [getLocalizedValue(item.name), item.code].filter(Boolean).some((field) => field.toLowerCase().includes(lowerQuery)),
+        [getLocalizedValue(item.name), item.code]
+          .filter(Boolean)
+          .some((field) => field.toLowerCase().includes(lowerQuery)),
       )
     }
 
@@ -366,7 +368,7 @@ async function duplicateOffer(payload) {
     const { _id, __v, createdAt, updatedAt, ...rest } = payload
     const duplicate = {
       ...rest,
-      code: (rest.code || ''),
+      code: rest.code || '',
       isActive: false,
     }
     await axios.post(`${import.meta.env.VITE_API_BASE_URL}/offers`, duplicate)
@@ -650,10 +652,10 @@ function formatReadableDate(dateStr: string): string {
               :selected-rest="selectedRest"
               @uploadSuccess="
                 (data) => {
-                  rowData.imageUrl = data.url
-                  rowData.assetId = data._id
-                  updateData(rowData)
-                  rowData.editing = ''
+                  rowData.imageUrl = data.url;
+                  rowData.assetId = data._id;
+                  updateData(rowData);
+                  rowData.editing = '';
                 }
               "
             />
@@ -671,7 +673,7 @@ function formatReadableDate(dateStr: string): string {
               @input="(e) => setLocaleValue(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
                 rowData.editName = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
@@ -701,7 +703,7 @@ function formatReadableDate(dateStr: string): string {
               @input="(e) => setLocaleValue(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
                 rowData.editDescription = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
@@ -730,7 +732,7 @@ function formatReadableDate(dateStr: string): string {
               autofocus
               @blur="
                 rowData.editCode = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editCode = true">
@@ -759,7 +761,7 @@ function formatReadableDate(dateStr: string): string {
               autofocus
               @blur="
                 rowData.editPrice = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editPrice = true">
@@ -905,8 +907,8 @@ function formatReadableDate(dateStr: string): string {
                       type="text"
                       @change="
                         () => {
-                          updateData({ ...rowData, fromInlineEdit: true })
-                          selection.editName = false
+                          updateData({ ...rowData, fromInlineEdit: true });
+                          selection.editName = false;
                         }
                       "
                     />
@@ -925,8 +927,8 @@ function formatReadableDate(dateStr: string): string {
                       type="number"
                       @change="
                         () => {
-                          updateData({ ...rowData, fromInlineEdit: true })
-                          selection.editMinChoice = false
+                          updateData({ ...rowData, fromInlineEdit: true });
+                          selection.editMinChoice = false;
                         }
                       "
                     />
@@ -943,8 +945,8 @@ function formatReadableDate(dateStr: string): string {
                       type="number"
                       @change="
                         () => {
-                          updateData({ ...rowData, fromInlineEdit: true })
-                          selection.editMaxChoice = false
+                          updateData({ ...rowData, fromInlineEdit: true });
+                          selection.editMaxChoice = false;
                         }
                       "
                     />
@@ -992,21 +994,33 @@ function formatReadableDate(dateStr: string): string {
                 <!-- Trigger button -->
                 <button
                   class="flex items-center justify-between w-full px-2 py-1.5 text-xs rounded-lg border transition-all duration-200"
-                  :class="(rowSelectedZones[rowData._id] || []).length > 0
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'"
+                  :class="
+                    (rowSelectedZones[rowData._id] || []).length > 0
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                  "
                   @click.stop="rowData._showZoneMenu = !rowData._showZoneMenu"
                 >
                   <span class="truncate">
                     <template v-if="(rowSelectedZones[rowData._id] || []).length > 0">
-                      {{ (rowSelectedZones[rowData._id] || []).length }} Zone{{ (rowSelectedZones[rowData._id] || []).length > 1 ? 's' : '' }}
+                      {{ (rowSelectedZones[rowData._id] || []).length }} Zone{{
+                        (rowSelectedZones[rowData._id] || []).length > 1 ? 's' : ''
+                      }}
                     </template>
-                    <template v-else>
-                      Select zone
-                    </template>
+                    <template v-else> Select zone </template>
                   </span>
-                  <svg class="w-3 h-3 flex-shrink-0 ml-1 transition-transform" :class="rowData._showZoneMenu ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                  <svg
+                    class="w-3 h-3 flex-shrink-0 ml-1 transition-transform"
+                    :class="rowData._showZoneMenu ? 'rotate-180' : ''"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                      clip-rule="evenodd"
+                    />
                   </svg>
                 </button>
 

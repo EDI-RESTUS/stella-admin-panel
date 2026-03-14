@@ -18,10 +18,7 @@
     <template #right>
       <div class="flex items-center gap-3">
         <!-- Language picker (only when outlet has multiple languages) -->
-        <div
-          v-if="outletLanguages.length > 1"
-          class="relative"
-        >
+        <div v-if="outletLanguages.length > 1" class="relative">
           <select
             v-model="selectedLanguage"
             class="lang-select appearance-none pl-3 pr-7 py-1.5 rounded-xl text-sm font-semibold uppercase bg-white/60 border border-slate-200 shadow-sm hover:shadow-md hover:bg-white/80 backdrop-blur-md transition-all duration-200 cursor-pointer text-slate-700 focus:outline-none"
@@ -31,7 +28,9 @@
             </option>
           </select>
           <div class="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
           </div>
         </div>
 
@@ -85,7 +84,9 @@ const outletLanguages = computed(() => {
   return ['en']
 })
 const selectedLanguage = ref(locale.value || 'en')
-watch(selectedLanguage, (lang) => { locale.value = lang })
+watch(selectedLanguage, (lang) => {
+  locale.value = lang
+})
 // When outlet changes, sync locale to first supported language
 watch(outletLanguages, (langs) => {
   if (langs.length && !langs.includes(selectedLanguage.value)) {

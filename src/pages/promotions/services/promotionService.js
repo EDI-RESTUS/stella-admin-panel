@@ -127,7 +127,7 @@ export const getArticlesByOutlet = async (outletId) => {
 
     // Handle response structures: array directly, { items: [...] }, or { result: [...] }
     const rawData = response.data
-    const data = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
+    const data = Array.isArray(rawData) ? rawData : rawData.items || rawData.result || []
     return data
   } catch (error) {
     console.error('[getArticlesOptionsByOutlet] Error:', error)

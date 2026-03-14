@@ -192,7 +192,11 @@
                           <VaCheckbox
                             v-model="item.selected"
                             :true-value="item._id"
-                            :label="item.internalName ? `${localName(item.name)} - ${item.internalName}` : localName(item.name)"
+                            :label="
+                              item.internalName
+                                ? `${localName(item.name)} - ${item.internalName}`
+                                : localName(item.name)
+                            "
                             class="w-full"
                           />
                           <div class="w-12">
@@ -234,7 +238,11 @@
                           <VaCheckbox
                             v-model="item.selected"
                             :true-value="item._id"
-                            :label="item.internalName ? `${localName(item.name)} - ${item.internalName}` : localName(item.name)"
+                            :label="
+                              item.internalName
+                                ? `${localName(item.name)} - ${item.internalName}`
+                                : localName(item.name)
+                            "
                             class="w-full"
                           />
                           <div class="w-12">
@@ -261,9 +269,11 @@
               <div class="text-sm font-semibold text-blue-600 uppercase tracking-wide">Options</div>
               <button
                 class="text-xs font-medium px-2 py-0.5 rounded-full border transition-colors duration-150"
-                :class="allVisibleOptionsSelected
-                  ? 'bg-red-50 text-red-600 border-red-300 hover:bg-red-100'
-                  : 'bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100'"
+                :class="
+                  allVisibleOptionsSelected
+                    ? 'bg-red-50 text-red-600 border-red-300 hover:bg-red-100'
+                    : 'bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100'
+                "
                 @click="toggleAllVisibleOptions"
               >
                 {{ allVisibleOptionsSelected ? 'Deselect All' : 'Select All' }}
@@ -280,7 +290,7 @@
                   items
                     .filter((a) => a.isVisible)
                     .flatMap((item) => item.articlesOptionsGroup)
-                    .filter((a) => groupSearchQuery ? a.display : a.selected)
+                    .filter((a) => (groupSearchQuery ? a.display : a.selected))
                     .flatMap((a) => a.articlesOptions).length
                 "
                 class="w-full text-sm"
@@ -293,7 +303,7 @@
                       items
                         .filter((a) => a.isVisible)
                         .flatMap((item) => item.articlesOptionsGroup)
-                        .filter((a) => groupSearchQuery ? a.display : a.selected)
+                        .filter((a) => (groupSearchQuery ? a.display : a.selected))
                         .flatMap((a) => a.articlesOptions)
                         .filter((a) => a.display)
                     "
@@ -360,7 +370,7 @@
                   items
                     .filter((a) => a.selected)
                     .flatMap((item) => item.articlesOptionsGroup)
-                    .filter((a) => groupSearchQuery ? a.display : a.selected)
+                    .filter((a) => (groupSearchQuery ? a.display : a.selected))
                     .flatMap((a) => a.articlesOptions).length
                 "
                 class="w-full text-sm"
@@ -373,7 +383,7 @@
                       items
                         .filter((a) => a.selected)
                         .flatMap((item) => item.articlesOptionsGroup)
-                        .filter((a) => groupSearchQuery ? a.display : a.selected)
+                        .filter((a) => (groupSearchQuery ? a.display : a.selected))
                         .flatMap((a) => a.articlesOptions)
                         .filter((a) => a.display)
                     "
@@ -529,7 +539,7 @@ const debouncedSearch = ref('')
 // All currently-visible options (respects group search + option search)
 const visibleOptions = computed(() => {
   const articleFilter = (a: any) => a.isVisible || a.selected
-  const groupFilter = (g: any) => groupSearchQuery.value ? g.display : g.selected
+  const groupFilter = (g: any) => (groupSearchQuery.value ? g.display : g.selected)
   return items.value
     .filter(articleFilter)
     .flatMap((a: any) => a.articlesOptionsGroup)
@@ -538,8 +548,8 @@ const visibleOptions = computed(() => {
     .filter((o: any) => o.display)
 })
 
-const allVisibleOptionsSelected = computed(() =>
-  visibleOptions.value.length > 0 && visibleOptions.value.every((o: any) => !!o.selected)
+const allVisibleOptionsSelected = computed(
+  () => visibleOptions.value.length > 0 && visibleOptions.value.every((o: any) => !!o.selected),
 )
 
 function toggleAllVisibleOptions() {
@@ -737,7 +747,7 @@ const getArticles = async () => {
     res.data.forEach((e: any) => {
       const count = countMap[e._id] ?? 1
       for (let i = 0; i < count; i++) {
-        usedMap[e._id] = (usedMap[e._id] ?? 0)
+        usedMap[e._id] = usedMap[e._id] ?? 0
         expanded.push({ ...e, _instanceId: `${e._id}_${i}` })
         usedMap[e._id]++
       }

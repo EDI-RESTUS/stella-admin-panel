@@ -18,7 +18,17 @@ const searchTimeout = ref<number | null>(null)
 const stockUpdating = ref(new Set()) // Track which rows are currently updating stock
 const rowSelectedZones = reactive<Record<string, string[]>>({}) // Track selected delivery zones per row
 
-const emits = defineEmits(['getOptions', 'editOption', 'cloneArticle', 'sortBy', 'sortingOrder', 'updateOptionModal', 'getOptionsForPagination', 'update:currentPage', 'activeOnlyChanged'])
+const emits = defineEmits([
+  'getOptions',
+  'editOption',
+  'cloneArticle',
+  'sortBy',
+  'sortingOrder',
+  'updateOptionModal',
+  'getOptionsForPagination',
+  'update:currentPage',
+  'activeOnlyChanged',
+])
 const props = defineProps({
   items: { type: Array, required: true },
   count: { type: Number, default: 0 },
@@ -123,9 +133,13 @@ watch(searchQuery, () => {
 })
 
 // Emit activeOnly changes so parent can re-fetch with server-side filter
-watch(activeOnly, (val) => {
-  emits('activeOnlyChanged', val)
-}, { immediate: true })
+watch(
+  activeOnly,
+  (val) => {
+    emits('activeOnlyChanged', val)
+  },
+  { immediate: true },
+)
 
 // Update option
 async function updateData(rowData) {
@@ -446,9 +460,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
             <div class="editable-text cursor-pointer" @click="openEditModal(rowData)">
               <span
                 v-if="
-                  typeof rowData.name === 'object'
-                    ? rowData.name.en || Object.values(rowData.name)[0]
-                    : rowData.name
+                  typeof rowData.name === 'object' ? rowData.name.en || Object.values(rowData.name)[0] : rowData.name
                 "
               >
                 {{
@@ -476,7 +488,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
               autofocus
               @blur="
                 rowData.editPOSName = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editPOSName = true">
@@ -500,7 +512,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
               autofocus
               @blur="
                 rowData.editCode = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editCode = true">
@@ -559,7 +571,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
                 @click="
                   rowData.type = option.key || option;
                   updateData(rowData);
-                  rowData.showTypeDropdown = false
+                  rowData.showTypeDropdown = false;
                 "
               >
                 {{ option }}
@@ -579,7 +591,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
               autofocus
               @blur="
                 rowData.editPrice = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editPrice = true">
@@ -614,7 +626,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
               autofocus
               @blur="
                 rowData.editMinimumChoices = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editMinimumChoices = true">
@@ -639,7 +651,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
               autofocus
               @blur="
                 rowData.editMaximumChoices = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editMaximumChoices = true">
@@ -678,21 +690,33 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
                 <!-- Trigger button -->
                 <button
                   class="flex items-center justify-between w-full px-2 py-1.5 text-xs rounded-lg border transition-all duration-200"
-                  :class="(rowSelectedZones[rowData._id] || []).length > 0
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'"
+                  :class="
+                    (rowSelectedZones[rowData._id] || []).length > 0
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                  "
                   @click.stop="rowData._showZoneMenu = !rowData._showZoneMenu"
                 >
                   <span class="truncate">
                     <template v-if="(rowSelectedZones[rowData._id] || []).length > 0">
-                      {{ (rowSelectedZones[rowData._id] || []).length }} Zone{{ (rowSelectedZones[rowData._id] || []).length > 1 ? 's' : '' }}
+                      {{ (rowSelectedZones[rowData._id] || []).length }} Zone{{
+                        (rowSelectedZones[rowData._id] || []).length > 1 ? 's' : ''
+                      }}
                     </template>
-                    <template v-else>
-                      Select zone
-                    </template>
+                    <template v-else> Select zone </template>
                   </span>
-                  <svg class="w-3 h-3 flex-shrink-0 ml-1 transition-transform" :class="rowData._showZoneMenu ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                  <svg
+                    class="w-3 h-3 flex-shrink-0 ml-1 transition-transform"
+                    :class="rowData._showZoneMenu ? 'rotate-180' : ''"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                      clip-rule="evenodd"
+                    />
                   </svg>
                 </button>
 
@@ -754,7 +778,14 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
 
       <!-- Bottom Pagination -->
       <div v-if="pages > 1" class="flex justify-center py-3 border-t border-slate-200">
-        <VaPagination :model-value="props.currentPage" :pages="pages" buttons-preset="secondary" gapped="20" :visible-pages="3" @update:modelValue="changePage">
+        <VaPagination
+          :model-value="props.currentPage"
+          :pages="pages"
+          buttons-preset="secondary"
+          gapped="20"
+          :visible-pages="3"
+          @update:modelValue="changePage"
+        >
           <template #firstPageLink="{ onClick, disabled }">
             <button
               class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"

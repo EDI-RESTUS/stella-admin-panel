@@ -89,7 +89,10 @@
         </div>
 
         <div class="flex flex-col gap-2">
-          <label class="va-input-label va-input-wrapper__label va-input-wrapper__label--outer text-primary font-semibold">Image</label>
+          <label
+            class="va-input-label va-input-wrapper__label va-input-wrapper__label--outer text-primary font-semibold"
+            >Image</label
+          >
           <FileUpload
             :selected-rest="selectedRest"
             @uploadSuccess="(data) => ((formData.imageUrl = data.url), (formData.assetId = data._id))"

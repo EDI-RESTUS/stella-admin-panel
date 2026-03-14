@@ -438,19 +438,19 @@
                 </p>
 
                 <div class="flex flex-wrap gap-1 text-xs">
-  <span
-  v-for="addon in item.options || []"
-  :key="addon._id || addon.optionId || addon.name"
-  class="px-2 py-0.5 rounded-full"
-  :class="{
-    'bg-green-100 text-green-700': (addon.type || '').toLowerCase() === 'extra',
-    'bg-blue-100 text-blue-700': (addon.type || '').toLowerCase() === 'article',
-    'bg-red-100 text-red-700': (addon.type || '').toLowerCase() === 'hold',
-    'bg-amber-100 text-amber-700': (addon.type || '').toLowerCase() === 'modifier',
-  }"
->
-  {{ addon.name }}
-</span>
+                  <span
+                    v-for="addon in item.options || []"
+                    :key="addon._id || addon.optionId || addon.name"
+                    class="px-2 py-0.5 rounded-full"
+                    :class="{
+                      'bg-green-100 text-green-700': (addon.type || '').toLowerCase() === 'extra',
+                      'bg-blue-100 text-blue-700': (addon.type || '').toLowerCase() === 'article',
+                      'bg-red-100 text-red-700': (addon.type || '').toLowerCase() === 'hold',
+                      'bg-amber-100 text-amber-700': (addon.type || '').toLowerCase() === 'modifier',
+                    }"
+                  >
+                    {{ addon.name }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -525,21 +525,19 @@
               </p>
 
               <div class="flex flex-wrap gap-1 text-xs">
-<span
-  v-for="addon in item.articlesOptionsGroup
-    .flatMap((a) => a.articlesOptions)
-    .filter((a) => a.selected)"
-  :key="addon._id || addon.optionId || addon.name"
-  class="px-2 py-0.5 rounded-full"
-  :class="{
-    'bg-green-100 text-green-700': (addon.type || '').toLowerCase() === 'extra',
-    'bg-blue-100 text-blue-700': (addon.type || '').toLowerCase() === 'article',
-    'bg-red-100 text-red-700': (addon.type || '').toLowerCase() === 'hold',
-    'bg-amber-100 text-amber-700': (addon.type || '').toLowerCase() === 'modifier',
-  }"
->
-  {{ addon.name }}
-</span>
+                <span
+                  v-for="addon in item.articlesOptionsGroup.flatMap((a) => a.articlesOptions).filter((a) => a.selected)"
+                  :key="addon._id || addon.optionId || addon.name"
+                  class="px-2 py-0.5 rounded-full"
+                  :class="{
+                    'bg-green-100 text-green-700': (addon.type || '').toLowerCase() === 'extra',
+                    'bg-blue-100 text-blue-700': (addon.type || '').toLowerCase() === 'article',
+                    'bg-red-100 text-red-700': (addon.type || '').toLowerCase() === 'hold',
+                    'bg-amber-100 text-amber-700': (addon.type || '').toLowerCase() === 'modifier',
+                  }"
+                >
+                  {{ addon.name }}
+                </span>
               </div>
             </div>
             <span v-if="!item.overrideUnitPrice" class="font-bold">€ {{ getTotalPrice(item) }}</span>
@@ -1115,9 +1113,7 @@ const resolveOfferOptionPrice = (
   historyOption = null,
 ) => {
   const historyPrice =
-    historyOption?.price !== undefined && historyOption?.price !== null
-      ? Number(historyOption.price)
-      : null
+    historyOption?.price !== undefined && historyOption?.price !== null ? Number(historyOption.price) : null
 
   offerLog('resolveOfferOptionPrice -> start', {
     slotDefKeys: Object.keys(slotDef || {}),
@@ -1184,13 +1180,7 @@ const resolveOfferOptionPrice = (
     return 0
   }
 
-  const finalPrice = Number(
-    offerOpt.customPrice ??
-      offerOpt.price ??
-      historyPrice ??
-      fallbackOption?.price ??
-      0,
-  )
+  const finalPrice = Number(offerOpt.customPrice ?? offerOpt.price ?? historyPrice ?? fallbackOption?.price ?? 0)
 
   offerLog('resolveOfferOptionPrice -> resolved from offer', {
     groupId,
@@ -1219,9 +1209,7 @@ const resolveOfferOptionPriceForEdit = ({
   historyOption = null,
 }) => {
   const historyPrice =
-    historyOption?.price !== undefined && historyOption?.price !== null
-      ? Number(historyOption.price)
-      : null
+    historyOption?.price !== undefined && historyOption?.price !== null ? Number(historyOption.price) : null
 
   offerLog('resolveOfferOptionPriceForEdit -> start', {
     slotDefKeys: Object.keys(slotDef || {}),
@@ -1249,58 +1237,72 @@ const resolveOfferOptionPriceForEdit = ({
 
   const group = findOfferGroup(slotDef, groupId, fallbackGroupName)
 
-const isSizeGroup = String(fallbackGroupName || '').trim().toLowerCase() === 'size'
-const isCrustGroup = String(fallbackGroupName || '').trim().toLowerCase() === 'crust'
+  const isSizeGroup =
+    String(fallbackGroupName || '')
+      .trim()
+      .toLowerCase() === 'size'
+  const isCrustGroup =
+    String(fallbackGroupName || '')
+      .trim()
+      .toLowerCase() === 'crust'
 
-if (!group) {
-  let finalPrice = 0
+  if (!group) {
+    let finalPrice = 0
 
-  if (isSizeGroup) {
-    finalPrice = 0
-  } else if (isCrustGroup) {
-    finalPrice = historyPrice > 0 ? historyPrice : 0
-  } else {
-    finalPrice = historyPrice > 0 ? historyPrice : 0
+    if (isSizeGroup) {
+      finalPrice = 0
+    } else if (isCrustGroup) {
+      finalPrice = historyPrice > 0 ? historyPrice : 0
+    } else {
+      finalPrice = historyPrice > 0 ? historyPrice : 0
+    }
+
+    offerLog('resolveOfferOptionPriceForEdit -> group not found inside slot', {
+      groupId,
+      optionId,
+      fallbackGroupName,
+      historyPrice,
+      fallbackPrice: fallbackOption?.price,
+      finalPrice,
+      rule: isSizeGroup
+        ? 'size-forced-zero'
+        : isCrustGroup
+          ? 'crust-preserve-history'
+          : 'default-preserve-positive-history',
+    })
+
+    return finalPrice
   }
 
-  offerLog('resolveOfferOptionPriceForEdit -> group not found inside slot', {
-    groupId,
-    optionId,
-    fallbackGroupName,
-    historyPrice,
-    fallbackPrice: fallbackOption?.price,
-    finalPrice,
-    rule: isSizeGroup ? 'size-forced-zero' : isCrustGroup ? 'crust-preserve-history' : 'default-preserve-positive-history',
-  })
+  const offerOpt = findOfferOption(group, optionId, fallbackOptionName)
 
-  return finalPrice
-}
+  if (!offerOpt) {
+    let finalPrice = 0
 
-const offerOpt = findOfferOption(group, optionId, fallbackOptionName)
+    if (isSizeGroup) {
+      finalPrice = 0
+    } else if (isCrustGroup) {
+      finalPrice = historyPrice > 0 ? historyPrice : 0
+    } else {
+      finalPrice = historyPrice > 0 ? historyPrice : 0
+    }
 
-if (!offerOpt) {
-  let finalPrice = 0
+    offerLog('resolveOfferOptionPriceForEdit -> option not found inside matched slot group', {
+      groupId,
+      optionId,
+      fallbackGroupName,
+      historyPrice,
+      fallbackPrice: fallbackOption?.price,
+      finalPrice,
+      rule: isSizeGroup
+        ? 'size-forced-zero'
+        : isCrustGroup
+          ? 'crust-preserve-history'
+          : 'default-preserve-positive-history',
+    })
 
-  if (isSizeGroup) {
-    finalPrice = 0
-  } else if (isCrustGroup) {
-    finalPrice = historyPrice > 0 ? historyPrice : 0
-  } else {
-    finalPrice = historyPrice > 0 ? historyPrice : 0
+    return finalPrice
   }
-
-  offerLog('resolveOfferOptionPriceForEdit -> option not found inside matched slot group', {
-    groupId,
-    optionId,
-    fallbackGroupName,
-    historyPrice,
-    fallbackPrice: fallbackOption?.price,
-    finalPrice,
-    rule: isSizeGroup ? 'size-forced-zero' : isCrustGroup ? 'crust-preserve-history' : 'default-preserve-positive-history',
-  })
-
-  return finalPrice
-}
 
   if (offerOpt.isFree) {
     offerLog('resolveOfferOptionPriceForEdit -> option explicitly free', {
@@ -1328,13 +1330,16 @@ if (!offerOpt) {
 
   const finalPrice = historyPrice > 0 ? historyPrice : 0
 
-  offerLog('resolveOfferOptionPriceForEdit -> matched option but no explicit offer price, preserving paid history only', {
-    groupId,
-    optionId,
-    optionName: offerOpt?.name,
-    historyPrice,
-    finalPrice,
-  })
+  offerLog(
+    'resolveOfferOptionPriceForEdit -> matched option but no explicit offer price, preserving paid history only',
+    {
+      groupId,
+      optionId,
+      optionName: offerOpt?.name,
+      historyPrice,
+      finalPrice,
+    },
+  )
 
   return finalPrice
 }
@@ -1355,7 +1360,9 @@ const resolveOfferItemBasePrice = (slotDef, addedItem, freshOfferItemDef) => {
     return 0
   }
 
-  const finalPrice = Number(slotDef.customPrice ?? slotDef.price ?? freshOfferItemDef?.customPrice ?? freshOfferItemDef?.price ?? 0)
+  const finalPrice = Number(
+    slotDef.customPrice ?? slotDef.price ?? freshOfferItemDef?.customPrice ?? freshOfferItemDef?.price ?? 0,
+  )
 
   offerLog('resolveOfferItemBasePrice -> resolved', {
     itemId: addedItem?.itemId,
@@ -1552,7 +1559,6 @@ const restoreFullOrder = async (orderId) => {
           selectionIndex: selIndex,
           addedItems: sel?.addedItems,
         })
-
         ;(sel.addedItems || []).forEach((addedItem) => {
           const freshMenuItem = menuStore.unFilteredMenuItems.find((m) => String(m._id) === String(addedItem.itemId))
           if (!freshMenuItem) {
@@ -1946,9 +1952,7 @@ const mapOfferDetailsToSelections = (offerDetailsResponse, detailedOfferPayload)
         continue
       }
 
-      const offerMenuDef = (selection.menuItems || []).find(
-        (mi) => String(mi.menuItemId) === String(histItem.menuItem),
-      )
+      const offerMenuDef = (selection.menuItems || []).find((mi) => String(mi.menuItemId) === String(histItem.menuItem))
 
       let basePrice = 0
       if (offerMenuDef) {
@@ -2176,10 +2180,7 @@ const getTotalPrice = (item) => {
 
   const basePrice = Number(item.price || 0)
 
-  const selectedOptions =
-    item.articlesOptionsGroup
-      ?.flatMap((a) => a.articlesOptions)
-      .filter((a) => a.selected) || []
+  const selectedOptions = item.articlesOptionsGroup?.flatMap((a) => a.articlesOptions).filter((a) => a.selected) || []
 
   const optionsTotal = selectedOptions.reduce(
     (sum, opt) => sum + (Number(opt.price) || 0) * (Number(opt.quantity) || 1),

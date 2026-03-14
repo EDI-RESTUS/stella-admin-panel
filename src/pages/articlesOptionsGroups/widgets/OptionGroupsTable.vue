@@ -124,7 +124,16 @@ function resetColumnVisibility() {
   columns.forEach((c) => (columnVisibility[c.key] = true))
 }
 
-const emits = defineEmits(['getOptionGroups', 'editOptionGroup', 'sortBy', 'sortingOrder', 'updateOptionGroupModal', 'getOptionGroupsForPagination', 'update:currentPage', 'activeOnlyChanged'])
+const emits = defineEmits([
+  'getOptionGroups',
+  'editOptionGroup',
+  'sortBy',
+  'sortingOrder',
+  'updateOptionGroupModal',
+  'getOptionGroupsForPagination',
+  'update:currentPage',
+  'activeOnlyChanged',
+])
 const props = defineProps({
   items: { type: Array, required: true },
   count: { type: Number, default: 0 },
@@ -155,9 +164,13 @@ watch(searchQuery, () => {
 })
 
 // Emit activeOnly changes so parent can re-fetch with server-side filter
-watch(activeOnly, (val) => {
-  emits('activeOnlyChanged', val)
-}, { immediate: true })
+watch(
+  activeOnly,
+  (val) => {
+    emits('activeOnlyChanged', val)
+  },
+  { immediate: true },
+)
 
 async function updateData(rowData) {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -363,7 +376,7 @@ const openEditGroupModal = (group) => {
               @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
                 rowData.editName = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
@@ -391,7 +404,7 @@ const openEditGroupModal = (group) => {
               autofocus
               @blur="
                 rowData.editInternalName = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editInternalName = true">
@@ -411,7 +424,10 @@ const openEditGroupModal = (group) => {
 
         <!-- DESCRIPTION -->
         <template #cell(description)="{ rowData }">
-          <div class="editable-field relative group max-w-[200px] truncate" :title="getLocalizedValue(rowData.description)">
+          <div
+            class="editable-field relative group max-w-[200px] truncate"
+            :title="getLocalizedValue(rowData.description)"
+          >
             <textarea
               v-if="rowData.editDescription"
               :value="getEditableLocaleValue(rowData.description)"
@@ -421,7 +437,7 @@ const openEditGroupModal = (group) => {
               @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
                 rowData.editDescription = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
@@ -472,7 +488,7 @@ const openEditGroupModal = (group) => {
                 @click="
                   rowData.type = option.key || option;
                   updateData(rowData);
-                  rowData.showTypeDropdown = false
+                  rowData.showTypeDropdown = false;
                 "
               >
                 {{ option.label }}
@@ -510,7 +526,7 @@ const openEditGroupModal = (group) => {
               type="number"
               @blur="
                 rowData.editMinimumChoices = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div
@@ -537,7 +553,7 @@ const openEditGroupModal = (group) => {
               type="number"
               @blur="
                 rowData.editMaximumChoices = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div
@@ -634,7 +650,14 @@ const openEditGroupModal = (group) => {
 
       <!-- Bottom Pagination -->
       <div v-if="pages > 1" class="flex justify-center py-3 border-t border-slate-200">
-        <VaPagination :model-value="props.currentPage" :pages="pages" buttons-preset="secondary" gapped="20" :visible-pages="3" @update:modelValue="changePage">
+        <VaPagination
+          :model-value="props.currentPage"
+          :pages="pages"
+          buttons-preset="secondary"
+          gapped="20"
+          :visible-pages="3"
+          @update:modelValue="changePage"
+        >
           <template #firstPageLink="{ onClick, disabled }">
             <button
               class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
@@ -682,7 +705,7 @@ const openEditGroupModal = (group) => {
       @cancel="
         isEditArticleOptionGroupsModal = false;
         selectedOptionGroups = '';
-        emits('getOptionGroups', searchQuery)
+        emits('getOptionGroups', searchQuery);
       "
     />
     <EditArticleOptionGroupsOptionsModal
@@ -691,7 +714,7 @@ const openEditGroupModal = (group) => {
       @cancel="
         isEditArticleOptionsModal = false;
         selectedOptions = '';
-        emits('getOptionGroups', searchQuery)
+        emits('getOptionGroups', searchQuery);
       "
     />
     <EditArticleOptionGroupsItemsModal
@@ -700,7 +723,7 @@ const openEditGroupModal = (group) => {
       @cancel="
         isEditArticleOptionGroupsItemsModal = false;
         selectedItems = '';
-        emits('getOptionGroups', searchQuery)
+        emits('getOptionGroups', searchQuery);
       "
     />
     <EditOptionGroupArticlesModal
@@ -709,7 +732,7 @@ const openEditGroupModal = (group) => {
       @cancel="
         isEditOptionGroupArticlesModal = false;
         selectedItems = '';
-        emits('getOptionGroups', searchQuery)
+        emits('getOptionGroups', searchQuery);
       "
     />
   </div>

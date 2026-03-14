@@ -205,7 +205,7 @@ const pages = computed(() => {
 const getCategoryName = (cat: any) => {
   // If it's a string (ID), look it up
   if (typeof cat === 'string') {
-    const found = props.categories.find((c: any) => (c._id === cat || c.id === cat))
+    const found = props.categories.find((c: any) => c._id === cat || c.id === cat)
     return found ? getLocalizedValue(found.name) : cat
   }
 
@@ -216,7 +216,7 @@ const getCategoryName = (cat: any) => {
   // Prioritize 'id' (foreign key) over '_id' (subdocument id)
   const id = cat?.id || cat?._id
   if (id) {
-    const found = props.categories.find((c: any) => (c._id === id || c.id === id))
+    const found = props.categories.find((c: any) => c._id === id || c.id === id)
     return found ? getLocalizedValue(found.name) : ''
   }
 
@@ -228,7 +228,6 @@ const getCategoryKey = (cat: any, index: number) => {
   return cat?.wCode || cat?._id || cat?.id || index
 }
 
-
 const filteredItems = computed(() => {
   let result = props.items
 
@@ -236,7 +235,7 @@ const filteredItems = computed(() => {
   if (selectedCategoryFilter.value) {
     result = result.filter((item: any) =>
       item.categories.some((cat: any) => {
-        const id = typeof cat === 'string' ? cat : (cat._id || cat.id)
+        const id = typeof cat === 'string' ? cat : cat._id || cat.id
         return id === selectedCategoryFilter.value
       }),
     )
@@ -597,10 +596,10 @@ function openFileModal(data) {
               :selected-rest="selectedRest"
               @uploadSuccess="
                 (data) => {
-                  rowData.imageUrl = data.url
-                  rowData.assetId = data._id
-                  $emit('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value })
-                  rowData.editing = ''
+                  rowData.imageUrl = data.url;
+                  rowData.assetId = data._id;
+                  $emit('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value });
+                  rowData.editing = '';
                 }
               "
             />
@@ -618,7 +617,7 @@ function openFileModal(data) {
               @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
                 rowData.editName = false;
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value })
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value });
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
@@ -642,7 +641,7 @@ function openFileModal(data) {
               @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
                 rowData.editDescription = false;
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value })
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value });
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
@@ -651,10 +650,7 @@ function openFileModal(data) {
                 v-if="getLocalizedValue(rowData.description)"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
               />
-              <CirclePlus
-                v-else
-                class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors"
-              />
+              <CirclePlus v-else class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors" />
             </div>
           </div>
         </template>
@@ -668,8 +664,8 @@ function openFileModal(data) {
               class="editable-input"
               autofocus
               @blur="
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage }),
-                  (rowData.editing = '')
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage });
+                rowData.editing = '';
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'code'">
@@ -700,8 +696,8 @@ function openFileModal(data) {
               class="editable-input"
               autofocus
               @blur="
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage }),
-                  (rowData.editing = '')
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage });
+                rowData.editing = '';
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'price'">
@@ -736,7 +732,7 @@ function openFileModal(data) {
                     updating: 'category',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ getCategoryName(e) }}
@@ -753,7 +749,7 @@ function openFileModal(data) {
                     updating: 'category',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ getCategoryName(e) }}
@@ -766,7 +762,7 @@ function openFileModal(data) {
                     updating: 'category',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 +{{ rowData.categories.length - 2 }} more
@@ -836,7 +832,7 @@ function openFileModal(data) {
                     updating: 'subCategory',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ sub.name }}
@@ -853,7 +849,7 @@ function openFileModal(data) {
                     updating: 'subCategory',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ sub.name }}
@@ -866,7 +862,7 @@ function openFileModal(data) {
                     updating: 'subCategory',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 +{{ rowData.subCategories.length - 2 }} more
@@ -908,7 +904,7 @@ function openFileModal(data) {
                     updating: 'options',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 <CirclePlus class="w-4 h-4" />
@@ -950,7 +946,7 @@ function openFileModal(data) {
                     updating: 'allergens',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 <CirclePlus class="w-4 h-4" />
@@ -969,18 +965,12 @@ function openFileModal(data) {
                 class="sr-only"
                 @change="
                   (e) => {
-                    console.log(
-                      '🎯 Toggle clicked! e.target.checked =',
-                      e.target.checked,
-                      'rowData.isActive =',
-                      rowData.isActive,
-                    )
                     emits('updateArticle', {
                       ...rowData,
                       isActive: e.target.checked,
                       searchQuery: searchQuery.value,
                       page: currentPage.value,
-                    })
+                    });
                   }
                 "
               />
@@ -1006,21 +996,33 @@ function openFileModal(data) {
                 <!-- Trigger button -->
                 <button
                   class="flex items-center justify-between w-full px-2 py-1.5 text-xs rounded-lg border transition-all duration-200"
-                  :class="(rowSelectedZones[rowData._id] || []).length > 0
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'"
+                  :class="
+                    (rowSelectedZones[rowData._id] || []).length > 0
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                  "
                   @click.stop="rowData._showZoneMenu = !rowData._showZoneMenu"
                 >
                   <span class="truncate">
                     <template v-if="(rowSelectedZones[rowData._id] || []).length > 0">
-                      {{ (rowSelectedZones[rowData._id] || []).length }} Zone{{ (rowSelectedZones[rowData._id] || []).length > 1 ? 's' : '' }}
+                      {{ (rowSelectedZones[rowData._id] || []).length }} Zone{{
+                        (rowSelectedZones[rowData._id] || []).length > 1 ? 's' : ''
+                      }}
                     </template>
-                    <template v-else>
-                    Select zone
-                  </template>
+                    <template v-else> Select zone </template>
                   </span>
-                  <svg class="w-3 h-3 flex-shrink-0 ml-1 transition-transform" :class="rowData._showZoneMenu ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                  <svg
+                    class="w-3 h-3 flex-shrink-0 ml-1 transition-transform"
+                    :class="rowData._showZoneMenu ? 'rotate-180' : ''"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                      clip-rule="evenodd"
+                    />
                   </svg>
                 </button>
 

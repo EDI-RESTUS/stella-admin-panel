@@ -49,7 +49,12 @@
                     <td class="p-2">
                       <VaCheckbox
                         :model-value="isChecked(item._id)"
-                        :label="item.code + ' - ' + localName(item.name) + (props.type === 'options' ? ' - ' + item.posName : '')"
+                        :label="
+                          item.code +
+                          ' - ' +
+                          localName(item.name) +
+                          (props.type === 'options' ? ' - ' + item.posName : '')
+                        "
                         @update:modelValue="toggleSelection(String(item._id))"
                       />
                     </td>
@@ -60,7 +65,12 @@
                     <td class="p-2">
                       <VaCheckbox
                         :model-value="isChecked(item._id)"
-                        :label="item.code + ' - ' + localName(item.name) + (props.type === 'options' ? ' - ' + item.posName : '')"
+                        :label="
+                          item.code +
+                          ' - ' +
+                          localName(item.name) +
+                          (props.type === 'options' ? ' - ' + item.posName : '')
+                        "
                         @update:modelValue="toggleSelection(String(item._id))"
                       />
                     </td>
@@ -197,7 +207,7 @@ const { locale } = useI18n()
 const localName = (val: any): string => {
   if (!val) return ''
   if (typeof val === 'string') return val
-  if (typeof val === 'object') return val[locale.value] || val['en'] || Object.values(val)[0] as string || ''
+  if (typeof val === 'object') return val[locale.value] || val['en'] || (Object.values(val)[0] as string) || ''
   return String(val)
 }
 
@@ -472,7 +482,7 @@ const getOptionGroups = async () => {
     )
     // Handle response structures: array directly, { items: [...] }, or { result: [...] }
     const rawData = response.data
-    const item = Array.isArray(rawData) ? rawData : (rawData.items || rawData.result || [])
+    const item = Array.isArray(rawData) ? rawData : rawData.items || rawData.result || []
     groups.value = item.map((e) => {
       return {
         ...e,

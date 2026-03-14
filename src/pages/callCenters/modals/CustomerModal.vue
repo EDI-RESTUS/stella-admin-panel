@@ -21,8 +21,8 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label class="text-sm font-medium text-gray-500">Mobile Number *</label>
-                <div class="flex  mt-1 items-center">
-                   <VaSelect
+                <div class="flex mt-1 items-center">
+                  <VaSelect
                     v-model="phonePrefix"
                     :options="countryPrefixes"
                     class="min-w-0"
@@ -31,12 +31,7 @@
                     text-by="text"
                     track-by="value"
                   />
-                  <VaInput
-                    v-model="phoneLocal"
-                    placeholder="Mobile"
-                    class=" w-[65px]"
-                    @input="onPhoneInput"
-                  />
+                  <VaInput v-model="phoneLocal" placeholder="Mobile" class="w-[65px]" @input="onPhoneInput" />
                 </div>
               </div>
               <div>
@@ -424,33 +419,33 @@ const name = ref('')
 const phonePrefix = ref('357')
 const phoneLocal = ref('')
 
-// Computed phoneNumber to maintain compatibility with existing logic if references exist, 
+// Computed phoneNumber to maintain compatibility with existing logic if references exist,
 // though we will update main usages.
 const phoneNumber = computed({
   get: () => phonePrefix.value + phoneLocal.value,
   set: (val) => {
     // If setting full number externally, we try to parse it
     const raw = String(val || '').replace(/\D/g, '')
-    const found = countryPrefixes.find(p => raw.startsWith(p.value))
+    const found = countryPrefixes.find((p) => raw.startsWith(p.value))
     if (found) {
       phonePrefix.value = found.value
       phoneLocal.value = raw.slice(found.value.length)
     } else {
       // Default to 357 if no match or just local
       if (raw.length > 0 && !raw.startsWith('357')) {
-         // If it doesn't match any prefix, assume it's a local number for the default prefix?
-         // Or if it's empty, clear local.
-         phonePrefix.value = '357'
-         phoneLocal.value = raw
+        // If it doesn't match any prefix, assume it's a local number for the default prefix?
+        // Or if it's empty, clear local.
+        phonePrefix.value = '357'
+        phoneLocal.value = raw
       } else if (raw.startsWith('357')) {
-          phonePrefix.value = '357'
-          phoneLocal.value = raw.slice(3)
+        phonePrefix.value = '357'
+        phoneLocal.value = raw.slice(3)
       } else {
-          phonePrefix.value = '357'
-          phoneLocal.value = ''
+        phonePrefix.value = '357'
+        phoneLocal.value = ''
       }
     }
-  }
+  },
 })
 
 const countryPrefixes = [
@@ -508,8 +503,10 @@ const isAddressValid = computed(() => {
 if (props.selectedUser) {
   name.value = props.selectedUser['Name'] || ''
   // Initialize phone split
-  const raw = String(props.selectedUser['MobilePhone'] || props.selectedUser['Phone'] || '').trim().replace(/\D/g, '')
-  const found = countryPrefixes.find(p => raw.startsWith(p.value))
+  const raw = String(props.selectedUser['MobilePhone'] || props.selectedUser['Phone'] || '')
+    .trim()
+    .replace(/\D/g, '')
+  const found = countryPrefixes.find((p) => raw.startsWith(p.value))
   if (found) {
     phonePrefix.value = found.value
     phoneLocal.value = raw.slice(found.value.length)
@@ -518,7 +515,7 @@ if (props.selectedUser) {
     phonePrefix.value = '357'
     phoneLocal.value = raw.startsWith('357') ? raw.slice(3) : raw
   }
-  
+
   notifications.value = !!props.selectedUser['notifications']
 
   if (typeof props.selectedUser['isTick'] !== 'undefined') {
@@ -547,8 +544,10 @@ if (props.selectedUser) {
 } else {
   name.value = props.userName || ''
   // Initialize phone split from prop
-  const raw = String(props.userNumber ?? '').trim().replace(/\D/g, '')
-  const found = countryPrefixes.find(p => raw.startsWith(p.value))
+  const raw = String(props.userNumber ?? '')
+    .trim()
+    .replace(/\D/g, '')
+  const found = countryPrefixes.find((p) => raw.startsWith(p.value))
   if (found) {
     phonePrefix.value = found.value
     phoneLocal.value = raw.slice(found.value.length)

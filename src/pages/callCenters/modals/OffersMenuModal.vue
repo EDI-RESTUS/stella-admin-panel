@@ -94,7 +94,11 @@
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option.optionId),
                   'out-of-stock': option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
-                @click="option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK') ? null : updateSingleChoice(group, option)"
+                @click="
+                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                    ? null
+                    : updateSingleChoice(group, option)
+                "
               >
                 <div v-if="option.imageUrl" class="item-image">
                   <img
@@ -138,7 +142,11 @@
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option.optionId),
                   'out-of-stock': option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
-                @click.prevent="option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK') ? null : toggleMultipleChoiceNoQty(group, option)"
+                @click.prevent="
+                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                    ? null
+                    : toggleMultipleChoiceNoQty(group, option)
+                "
               >
                 <div v-if="option.imageUrl" class="item-image">
                   <img
@@ -216,7 +224,11 @@
                   <p v-if="option.isFree" class="text-xs text-gray-600 font-medium mr-1">Free</p>
                   <button
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
-                    :disabled="getQty(group.optionGroupId, option.optionId) === 0 || option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')"
+                    :disabled="
+                      getQty(group.optionGroupId, option.optionId) === 0 ||
+                      option.inStock === false ||
+                      option.name?.toUpperCase().includes('OUT OF STOCK')
+                    "
                     @click="() => updateMultipleChoice(group, option, getQty(group.optionGroupId, option.optionId) - 1)"
                   >
                     -
@@ -234,8 +246,9 @@
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                     :disabled="
                       getQty(group.optionGroupId, option.optionId) >=
-                      (option.maximumChoices || group.maximumChoices || 99) ||
-                      option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                        (option.maximumChoices || group.maximumChoices || 99) ||
+                      option.inStock === false ||
+                      option.name?.toUpperCase().includes('OUT OF STOCK')
                     "
                     @click="() => updateMultipleChoice(group, option, getQty(group.optionGroupId, option.optionId) + 1)"
                   >

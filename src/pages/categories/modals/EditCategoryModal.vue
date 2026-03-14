@@ -15,14 +15,14 @@
       <div v-if="formData.updating === '' || formData.updating === 'all'" class="flex items-center gap-x-10">
         <VaInput v-model="formData.wCode" class="mb-1 max-w-[150px]" label="Code" placeholder="Code" type="text" />
         <div class="flex flex-col gap-2 mb-1 max-w-[300px]">
-             <div v-for="lang in supportedLanguages" :key="lang">
-                 <VaInput
-                  v-model="formData.name[lang]"
-                  :label="`Name (${lang.toUpperCase()})`"
-                  placeholder="Name"
-                  type="text"
-                />
-            </div>
+          <div v-for="lang in supportedLanguages" :key="lang">
+            <VaInput
+              v-model="formData.name[lang]"
+              :label="`Name (${lang.toUpperCase()})`"
+              placeholder="Name"
+              type="text"
+            />
+          </div>
         </div>
         <VaSelect
           id="area"
@@ -308,10 +308,12 @@ if (props.selectedCategory) {
   formData.value = {
     ...formData.value,
     ...props.selectedCategory,
-    name: typeof props.selectedCategory.name === 'string'
+    name:
+      typeof props.selectedCategory.name === 'string'
         ? { en: props.selectedCategory.name }
         : { ...props.selectedCategory.name },
-    description: typeof props.selectedCategory.description === 'string'
+    description:
+      typeof props.selectedCategory.description === 'string'
         ? { en: props.selectedCategory.description }
         : { ...(props.selectedCategory.description || {}) },
     updating: '',

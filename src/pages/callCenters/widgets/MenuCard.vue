@@ -17,8 +17,6 @@
       :fetch-configurations="[]"
       @cancel="closeMenuModal"
     />
-
-
   </div>
 </template>
 
@@ -177,6 +175,4 @@ function closeMenuModal() {
   box-shadow: none;
   border-color: #e2e8f0;
 }
-
 </style>
-

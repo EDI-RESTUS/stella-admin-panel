@@ -128,14 +128,14 @@
         <VaCard class="order-card">
           <VaCardContent>
             <OrderDetails
-              @restore-context="updateContext"
-              @success="resetContext"
               :delivery-fee="deliveryFee"
               :date-selected="dateSelected ? new Date(dateSelected).toString() : ''"
               :is-delivery-zone-selected="isDeliveryZoneSelected"
               :customer-details-id="customerDetailsId"
               :order-type="orderType"
               :is-customer-open="accordian[0]"
+              @restoreContext="updateContext"
+              @success="resetContext"
             />
           </VaCardContent>
         </VaCard>
@@ -286,9 +286,7 @@ async function autoSetUserDeliveryZone() {
     const zones = response.data.data.filter((zone) => zone.isActive !== false)
 
     // Filter to user's allowed zones
-    const userZones = zones.filter((zone) =>
-      allowed.includes(zone._id) || allowed.includes(zone.id)
-    )
+    const userZones = zones.filter((zone) => allowed.includes(zone._id) || allowed.includes(zone.id))
 
     // If user has exactly one allowed zone, auto-set it
     if (userZones.length === 1) {

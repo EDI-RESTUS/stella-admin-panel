@@ -692,9 +692,14 @@
                   :placeholder="tpl.subjectPlaceholder"
                 />
                 <div class="relative w-full">
-                  <label class="va-input-label va-input-wrapper__label va-input-wrapper__label--outer" style="color: var(--va-primary)">
+                  <label
+                    class="va-input-label va-input-wrapper__label va-input-wrapper__label--outer"
+                    style="color: var(--va-primary)"
+                  >
                     HTML Body
-                    <span class="ml-1 text-gray-400 font-normal normal-case text-xs">(outer &lt;div&gt; added automatically)</span>
+                    <span class="ml-1 text-gray-400 font-normal normal-case text-xs"
+                      >(outer &lt;div&gt; added automatically)</span
+                    >
                   </label>
                   <textarea
                     :ref="'htmlarea-' + tpl.key"

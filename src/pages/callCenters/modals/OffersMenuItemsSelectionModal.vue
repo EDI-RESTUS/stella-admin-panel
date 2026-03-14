@@ -20,7 +20,9 @@
               selected: selectedArticle && selectedArticle.id === item.id,
               'out-of-stock': item.inStock === false || item.name?.toUpperCase().includes('OUT OF STOCK'),
             }"
-            @click.prevent="item.inStock === false || item.name?.toUpperCase().includes('OUT OF STOCK') ? null : selectArticle(item)"
+            @click.prevent="
+              item.inStock === false || item.name?.toUpperCase().includes('OUT OF STOCK') ? null : selectArticle(item)
+            "
           >
             <div class="pizza-image"><img :src="item.imageUrl" class="object-fit" /></div>
             <div class="pizza-content">
@@ -34,7 +36,6 @@
               </div>
             </div>
             <div class="selection-status"></div>
-
           </div>
         </div>
       </div>
@@ -142,8 +143,6 @@ function selectArticle(article) {
 }
 
 const { init } = useToast()
-
-
 </script>
 
 <style scoped>
@@ -370,6 +369,4 @@ const { init } = useToast()
   transform: none;
   box-shadow: none;
 }
-
-
 </style>
