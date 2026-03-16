@@ -97,9 +97,22 @@
                   <VaInput v-model="mpForm.streetNo" label="Street No" size="small" />
                 </div>
                 <div class="grid grid-cols-3 gap-2">
-                  <VaInput v-model="mpForm.city" label="City" size="small" />
+                  <VaSelect
+                    v-model="mpForm.city"
+                    label="City"
+                    size="small"
+                    :options="cityOptions"
+                    clearable
+                  />
                   <VaInput v-model="mpForm.postalCode" label="Postal Code" size="small" />
-                  <VaInput v-model="mpForm.district" label="District" size="small" />
+                  <VaSelect
+                    v-model="mpForm.district"
+                    label="District"
+                    size="small"
+                    :options="mpDistrictOptions"
+                    :disabled="!mpForm.city"
+                    clearable
+                  />
                 </div>
                 <div class="flex justify-end gap-2 mt-1">
                   <VaButton size="small" preset="secondary" @click="cancelEditMp">Cancel</VaButton>
@@ -122,9 +135,22 @@
                 <VaInput v-model="mpForm.streetNo" label="Street No" size="small" />
               </div>
               <div class="grid grid-cols-3 gap-2">
-                <VaInput v-model="mpForm.city" label="City" size="small" />
+                <VaSelect
+                  v-model="mpForm.city"
+                  label="City"
+                  size="small"
+                  :options="cityOptions"
+                  clearable
+                />
                 <VaInput v-model="mpForm.postalCode" label="Postal Code" size="small" />
-                <VaInput v-model="mpForm.district" label="District" size="small" />
+                <VaSelect
+                  v-model="mpForm.district"
+                  label="District"
+                  size="small"
+                  :options="mpDistrictOptions"
+                  :disabled="!mpForm.city"
+                  clearable
+                />
               </div>
               <div class="flex justify-end gap-2 mt-1">
                 <VaButton size="small" preset="secondary" @click="showAddMpForm = false">Cancel</VaButton>
@@ -154,11 +180,69 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import axios from 'axios'
 import { useToast, useModal } from 'vuestic-ui'
 import { useServiceStore } from '@/stores/services'
 import PostalCodeAddressesModal from './PostalCodeAddressesModal.vue'
+
+const cityDistrictMap: Record<string, string> = {
+  // Lemesos (Limassol)
+  Lemesos: 'Lemesos',
+  Limassol: 'Lemesos',
+  Germasogeia: 'Lemesos',
+  'Mesa Geitonia': 'Lemesos',
+  Ypsonas: 'Lemesos',
+  Polemidia: 'Lemesos',
+  Ekali: 'Lemesos',
+  Pyrgos: 'Lemesos',
+  Parekklisia: 'Lemesos',
+  'Agios Tychonas': 'Lemesos',
+  Souni: 'Lemesos',
+  Moni: 'Lemesos',
+  // Lefkosia (Nicosia)
+  Lefkosia: 'Lefkosia',
+  Nicosia: 'Lefkosia',
+  Strovolos: 'Lefkosia',
+  Lakatamia: 'Lefkosia',
+  Aglandjia: 'Lefkosia',
+  Engomi: 'Lefkosia',
+  Latsia: 'Lefkosia',
+  Dali: 'Lefkosia',
+  Geri: 'Lefkosia',
+  Kallithea: 'Lefkosia',
+  Archangelos: 'Lefkosia',
+  // Larnaka
+  Larnaka: 'Larnaka',
+  Larnaca: 'Larnaka',
+  Aradippou: 'Larnaka',
+  Livadia: 'Larnaka',
+  'Dromolaxia-Meneou': 'Larnaka',
+  Pervolia: 'Larnaka',
+  Kiti: 'Larnaka',
+  Mazotos: 'Larnaka',
+  // Pafos (Paphos)
+  Pafos: 'Pafos',
+  Paphos: 'Pafos',
+  Geroskipou: 'Pafos',
+  Chloraka: 'Pafos',
+  Emba: 'Pafos',
+  Peyia: 'Pafos',
+  Tala: 'Pafos',
+  Tremithousa: 'Pafos',
+  Mesogi: 'Pafos',
+  // Ammochostos (Famagusta)
+  Ammochostos: 'Ammochostos',
+  Paralimni: 'Ammochostos',
+  Deryneia: 'Ammochostos',
+  Sotira: 'Ammochostos',
+  'Ayia Napa': 'Ammochostos',
+  Protaras: 'Ammochostos',
+  Frenaros: 'Ammochostos',
+  Achna: 'Ammochostos',
+}
+
+const cityOptions = Object.keys(cityDistrictMap)
 
 const props = defineProps({
   rowData: {
@@ -202,6 +286,18 @@ const emptyMpForm = {
   postalCode: '',
 }
 const mpForm = ref({ ...emptyMpForm })
+
+const mpDistrictOptions = computed(() => {
+  const district = cityDistrictMap[mpForm.value.city]
+  return district ? [district] : []
+})
+
+watch(
+  () => mpForm.value.city,
+  (city) => {
+    mpForm.value.district = cityDistrictMap[city] ?? ''
+  },
+)
 
 watch(isVisible, (val) => {
   if (!val) emits('cancel')

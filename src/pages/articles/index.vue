@@ -108,7 +108,7 @@ const userStore = useUsersStore()
 const fetchDeliveryZones = async () => {
   try {
     const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/deliveryZones/${serviceStore.selectedRest}`)
-    let zones = response.data.data.filter((zone) => zone.isActive !== false)
+    let zones = response.data.data
 
     // Filter by user's allowed zones if applicable
     const allowed = userStore.userDetails?.allowedDeliveryZoneIds
@@ -192,10 +192,11 @@ async function deleteArticle(payload) {
     })
 }
 
-function getArticlesForPagination(payload) {
+async function getArticlesForPagination(payload) {
   pageNumber.value = payload.page
   searchQuery.value = payload.searchQuery
-  getArticles(serviceStore.selectedRest)
+  await getArticles(serviceStore.selectedRest)
+  buildStockMapFromItems()
 }
 const cloneArticle = (article) => {
   const clonedData = { ...article }

@@ -25,7 +25,7 @@ function editOffers(payload) {
 const fetchDeliveryZones = async () => {
   try {
     const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/deliveryZones/${servicesStore.selectedRest}`)
-    let zones = response.data.data.filter((zone) => zone.isActive !== false)
+    let zones = response.data.data
 
     // Filter by user's allowed zones if applicable
     const allowed = userStore.userDetails?.allowedDeliveryZoneIds

@@ -50,6 +50,7 @@
                 <tbody>
                   <VaVirtualScroller
                     v-slot="{ item, index }"
+                    :key="itemsVersion"
                     :items="items.filter((a) => a.display)"
                     :wrapper-size="400"
                   >
@@ -177,6 +178,7 @@
                 <tbody>
                   <VaVirtualScroller
                     v-slot="{ item, index }"
+                    :key="itemsVersion"
                     :items="
                       items
                         .filter((a) => a.isVisible)
@@ -223,6 +225,7 @@
                 <tbody>
                   <VaVirtualScroller
                     v-slot="{ item, index }"
+                    :key="itemsVersion"
                     :items="
                       items
                         .filter((a) => a.selected)
@@ -298,7 +301,7 @@
                 <tbody>
                   <VaVirtualScroller
                     v-slot="{ item, index }"
-                    :key="debouncedSearch"
+                    :key="`${debouncedSearch}-${itemsVersion}`"
                     :items="
                       items
                         .filter((a) => a.isVisible)
@@ -378,7 +381,7 @@
                 <tbody>
                   <VaVirtualScroller
                     v-slot="{ item, index }"
-                    :key="debouncedSearch"
+                    :key="`${debouncedSearch}-${itemsVersion}`"
                     :items="
                       items
                         .filter((a) => a.selected)
@@ -493,6 +496,7 @@ const isLoading = ref(false)
 const items = ref([])
 const sortBy = ref('name')
 const sortOrder = ref('asc')
+const itemsVersion = ref(0)
 
 // Outlet default language (same pattern as OfferModal)
 const primaryLanguage = ref('en')
@@ -692,6 +696,7 @@ watch(
     groupWorker.onmessage = (e) => {
       if (callId === lastWorkerCall.value) {
         items.value = JSON.parse(JSON.stringify(e.data))
+        itemsVersion.value++
       }
     }
   },
@@ -808,6 +813,7 @@ const getArticles = async () => {
     if (!a.selected && !!b.selected) return 1
     return localName(a.name).localeCompare(localName(b.name))
   })
+  itemsVersion.value++
   isLoading.value = false
 }
 
@@ -844,6 +850,7 @@ const viewItems = function (id) {
     groupWorker.onmessage = (e) => {
       // Only update if this is the latest call
       items.value = JSON.parse(JSON.stringify(e.data))
+      itemsVersion.value++
     }
   }
 }

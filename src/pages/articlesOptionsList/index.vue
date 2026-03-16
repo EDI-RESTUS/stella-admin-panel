@@ -26,7 +26,7 @@ const activeOnly = ref(true)
 const fetchDeliveryZones = async () => {
   try {
     const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/deliveryZones/${servicesStore.selectedRest}`)
-    let zones = response.data.data.filter((zone) => zone.isActive !== false)
+    let zones = response.data.data
 
     // Filter by user's allowed zones if applicable
     const allowed = userStore.userDetails?.allowedDeliveryZoneIds
@@ -156,10 +156,11 @@ function getOptionsForSearch(search) {
   getOptionsCount()
 }
 
-function getOptionsForPagination(payload) {
+async function getOptionsForPagination(payload) {
   pageNumber.value = payload.page
   searchValue.value = payload.searchQuery || ''
-  getOptions()
+  await getOptions()
+  buildStockMapFromItems()
 }
 
 function handleActiveOnlyChanged(val: boolean) {
