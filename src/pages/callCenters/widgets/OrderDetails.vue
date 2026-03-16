@@ -145,6 +145,13 @@
           <div class="flex items-start justify-between">
             <div class="flex items-center gap-2">
               <VaButton icon="mso-close" color="danger" size="small" class="rounded" @click="deleteOffer(item)" />
+              <VaButton
+                icon="mso-content_copy"
+                :style="{ '--va-background-color': outlet.primaryColor }"
+                size="small"
+                class="rounded"
+                @click="duplicateOffer(item)"
+              />
             </div>
 
             <div class="flex-1 px-2">
@@ -885,6 +892,13 @@ const deleteItem = (item) => {
 const deleteOffer = (item) => {
   const index = offerItems.value.findIndex((i) => i.itemId === item.id)
   orderStore.offerItems.splice(index, 1)
+}
+
+const duplicateOffer = (item) => {
+  const storeItem = offerItems.value[item.__storeIndex]
+  const clone = JSON.parse(JSON.stringify(storeItem))
+  clone.itemId = `dup_${Date.now()}`
+  orderStore.offersAdded(clone)
 }
 
 const decreaseQty = (item) => {

@@ -325,7 +325,9 @@
 
           <span
             v-else-if="
-              index === 0 && ['kds', 'preparing', 'onrack'].includes(String(orderStatuses || '').toLowerCase())
+              index === 0 &&
+              order.orderFor !== 'future' &&
+              ['kds', 'preparing', 'onrack'].includes(String(orderStatuses || '').toLowerCase())
             "
             class="px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors bg-yellow-500 text-white capitalize"
           >
