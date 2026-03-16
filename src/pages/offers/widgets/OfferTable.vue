@@ -8,7 +8,7 @@ import FileUpload from '@/components/file-uploader/FileUpload.vue'
 import AddSelectionModal from '../modals/AddSelectionModal.vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
-import { Plus, Search, CirclePlus, Pencil, Columns3 } from 'lucide-vue-next'
+import { Plus, Search, CirclePlus, Pencil, Columns3, Copy, ArrowUpDown } from 'lucide-vue-next'
 
 const { locale } = useI18n()
 
@@ -237,18 +237,23 @@ const selectionColumns = defineVaDataTableColumns([
 const totalVisibleCount = computed(() => filteredItems.value.length)
 const searchQuery = ref('')
 const filteredItems = ref([])
+const sortKey = ref<'name' | 'startDate' | 'isActive' | null>(null)
+const sortOrder = ref<'asc' | 'desc'>('asc')
+
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+}
+
 watch(
-  [() => props.items, searchQuery, filterMode],
+  [() => props.items, searchQuery, filterMode, sortKey, sortOrder],
   ([newItems, query, mode]) => {
     const lowerQuery = query.toLowerCase().trim()
     let mappedItems = newItems.map((item) => ({ ...item }))
 
     // Filter by active mode
     if (mode === 0) {
-      // Only inactive
       mappedItems = mappedItems.filter((item) => !item.isActive)
     } else if (mode === 2) {
-      // Only active
       mappedItems = mappedItems.filter((item) => item.isActive)
     }
 
@@ -259,6 +264,25 @@ watch(
           .filter(Boolean)
           .some((field) => field.toLowerCase().includes(lowerQuery)),
       )
+    }
+
+    // Sort
+    if (sortKey.value) {
+      const dir = sortOrder.value === 'asc' ? 1 : -1
+      mappedItems = [...mappedItems].sort((a, b) => {
+        if (sortKey.value === 'name') {
+          return getLocalizedValue(a.name).localeCompare(getLocalizedValue(b.name)) * dir
+        }
+        if (sortKey.value === 'startDate') {
+          const da = new Date(a.dateOffer?.startDate || 0).getTime()
+          const db = new Date(b.dateOffer?.startDate || 0).getTime()
+          return (da - db) * dir
+        }
+        if (sortKey.value === 'isActive') {
+          return (Number(b.isActive) - Number(a.isActive)) * dir
+        }
+        return 0
+      })
     }
 
     filteredItems.value = mappedItems
@@ -363,20 +387,14 @@ async function deleteOffer(payload) {
     })
 }
 
-async function duplicateOffer(payload) {
-  try {
-    const { _id, __v, createdAt, updatedAt, ...rest } = payload
-    const duplicate = {
-      ...rest,
-      code: rest.code || '',
-      isActive: false,
-    }
-    await axios.post(`${import.meta.env.VITE_API_BASE_URL}/offers`, duplicate)
-    init({ message: 'Offer duplicated successfully', color: 'success' })
-    emits('getOffers')
-  } catch (err) {
-    init({ message: err.response?.data?.error || 'Duplicate failed', color: 'danger' })
+function duplicateOffer(payload) {
+  const { _id, __v, createdAt, updatedAt, ...rest } = payload
+  const duplicate = {
+    ...rest,
+    code: rest.code || '',
+    isActive: true,
   }
+  emits('editOffers', duplicate)
 }
 
 async function deleteSelection(payload) {
@@ -512,6 +530,25 @@ function formatReadableDate(dateStr: string): string {
 
       <!-- Right: Buttons -->
       <div class="flex flex-wrap gap-2 justify-end items-center flex-shrink-0">
+        <!-- Sort controls -->
+        <div class="flex items-center gap-1">
+          <select
+            v-model="sortKey"
+            class="text-sm px-2 py-1.5 rounded-xl border border-slate-200 bg-white/60 backdrop-blur-md shadow-sm focus:outline-none text-slate-700"
+          >
+            <option :value="null">Sort by...</option>
+            <option value="name">Name</option>
+            <option value="startDate">Date Range</option>
+          </select>
+          <button
+            v-if="sortKey"
+            class="flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200 bg-white/60 backdrop-blur-md shadow-sm hover:bg-white/80 transition-all"
+            :title="sortOrder === 'asc' ? 'Ascending' : 'Descending'"
+            @click="toggleSortOrder"
+          >
+            <ArrowUpDown class="w-4 h-4 text-slate-600" :class="sortOrder === 'desc' ? 'rotate-180' : ''" />
+          </button>
+        </div>
         <!-- Active Only -->
         <div class="flex items-center gap-2">
           <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Active Only</span>
@@ -1099,7 +1136,7 @@ function formatReadableDate(dateStr: string): string {
               title="Duplicate Offer"
               @click="duplicateOffer(rowData)"
             >
-              <VaIcon name="mso-content" class="w-4.5 h-4.5 block" />
+              <Copy class="w-3.5 h-3.5" />
             </button>
 
             <!-- Delete -->

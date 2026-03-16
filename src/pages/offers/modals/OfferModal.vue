@@ -234,6 +234,33 @@ watch(
   async (val) => {
     if (!val) return
 
+    // Duplicate mode: no _id, pre-fill directly from passed data
+    if (!val._id) {
+      formData.value = {
+        _id: '',
+        name: toLocaleRecord(val.name, primaryLanguage.value),
+        description: toLocaleRecord(val.description, primaryLanguage.value),
+        price: val.price || 0,
+        code: val.code || '',
+        imageUrl: val.imageUrl || '',
+        assetId: val.assetId || '',
+        dateOffer: {
+          startDate: val.dateOffer?.startDate?.slice(0, 10) || '',
+          endDate: val.dateOffer?.endDate?.slice(0, 10) || '',
+        },
+        timeOffer: {
+          startTime: val.timeOffer?.startTime || '',
+          endTime: val.timeOffer?.endTime || '',
+        },
+        weeklyOffer: (val.weeklyOffer || []).map((d: string) => d.charAt(0).toUpperCase() + d.slice(1)),
+        orderType: Array.isArray(val.orderType) ? val.orderType : [],
+        selections: val.selections || [],
+        isActive: val.isActive ?? true,
+      }
+      selectionsJson.value = JSON.stringify(val.selections || [], null, 2)
+      return
+    }
+
     try {
       const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/offers/${val._id}?rawname=true`)
       const data = response.data.data

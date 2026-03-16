@@ -35,13 +35,23 @@
                but that might be just an example. I'll include all fields but pre-fill them locally.
           -->
           <div class="grid grid-cols-2 gap-3">
-            <VaInput
+            <VaSelect
               v-model="addressForm.municipality"
               label="Municipality / Community"
               placeholder="Municipality"
               size="small"
+              :options="municipalityOptions"
+              clearable
             />
-            <VaInput v-model="addressForm.district" label="District" placeholder="District" size="small" />
+            <VaSelect
+              v-model="addressForm.district"
+              label="District"
+              placeholder="District"
+              size="small"
+              :options="districtOptions"
+              :disabled="!addressForm.municipality"
+              clearable
+            />
           </div>
           <VaInput v-model="addressForm.postalCode" label="Postal Code" size="small" readonly disabled />
 
@@ -77,9 +87,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, reactive } from 'vue'
+import { ref, watch, reactive, computed } from 'vue'
 import axios from 'axios'
 import { useToast } from 'vuestic-ui'
+
+const municipalityDistrictMap: Record<string, string> = {
+  Nicosia: 'Nicosia',
+  Strovolos: 'Nicosia',
+  Lakatamia: 'Nicosia',
+  Aglandjia: 'Nicosia',
+  Engomi: 'Nicosia',
+  Latsia: 'Nicosia',
+  Dali: 'Nicosia',
+  Geri: 'Nicosia',
+  Limassol: 'Limassol',
+  Germasogeia: 'Limassol',
+  'Mesa Geitonia': 'Limassol',
+  Ypsonas: 'Limassol',
+  Polemidia: 'Limassol',
+  Ekali: 'Limassol',
+  Larnaca: 'Larnaca',
+  Aradippou: 'Larnaca',
+  Livadia: 'Larnaca',
+  'Dromolaxia-Meneou': 'Larnaca',
+  Paphos: 'Paphos',
+  Geroskipou: 'Paphos',
+  Chloraka: 'Paphos',
+  Emba: 'Paphos',
+  Paralimni: 'Famagusta',
+  Deryneia: 'Famagusta',
+  Sotira: 'Famagusta',
+  'Ayia Napa': 'Famagusta',
+  Protaras: 'Famagusta',
+}
+
+const municipalityOptions = Object.keys(municipalityDistrictMap)
 
 const props = defineProps({
   postalCode: {
@@ -108,6 +150,19 @@ const emptyForm = {
 }
 
 const addressForm = reactive({ ...emptyForm })
+
+const districtOptions = computed(() => {
+  if (!addressForm.municipality) return []
+  const district = municipalityDistrictMap[addressForm.municipality]
+  return district ? [district] : []
+})
+
+watch(
+  () => addressForm.municipality,
+  () => {
+    addressForm.district = municipalityDistrictMap[addressForm.municipality] ?? ''
+  },
+)
 
 watch(isVisible, (val) => {
   if (!val) emits('cancel')
