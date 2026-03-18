@@ -195,6 +195,15 @@
                   type="number"
                 />
               </div>
+              <div v-if="restaurantData.pos == 'winmax'" class="w-full mt-4">
+                <VaInput
+                  v-model="restaurantData.winmaxConfig.failureAlertPhonesRaw"
+                  label="Winmax Failure Alert Phones"
+                  name="failureAlertPhones"
+                  placeholder="e.g. 35799111111, 35799222222"
+                  helper-text="Comma-separated phone numbers in international format. An SMS is sent to these numbers when an order fails to reach Winmax."
+                />
+              </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mt-4">
@@ -886,6 +895,7 @@ export default {
           user: '',
           password: '',
           terminal: '',
+          failureAlertPhonesRaw: '',
         },
         openingTimes: {
           selected: '',
@@ -1355,6 +1365,10 @@ export default {
               res.emailSettings.templates[key].html = stripOuterDiv(res.emailSettings.templates[key].html)
             })
           }
+          // Convert failureAlertPhones array to comma-separated string for the input
+          if (res.winmaxConfig) {
+            res.winmaxConfig.failureAlertPhonesRaw = (res.winmaxConfig.failureAlertPhones ?? []).join(', ')
+          }
           this.restaurantData = res
           this.loading = false
         } catch (error) {
@@ -1387,6 +1401,11 @@ export default {
           ...this.restaurantData.winmaxConfig,
           terminal: this.restaurantData.winmaxConfig.terminal || null,
           serviceZoneId: this.restaurantData.winmaxConfig.serviceZoneId || null,
+          failureAlertPhones: (this.restaurantData.winmaxConfig.failureAlertPhonesRaw || '')
+            .split(',')
+            .map((p) => p.trim())
+            .filter(Boolean),
+          failureAlertPhonesRaw: undefined,
         },
         restusConfig: {
           operatingMode: this.restaurantData.operatingMode || '',

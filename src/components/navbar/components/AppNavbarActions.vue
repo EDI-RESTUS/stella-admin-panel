@@ -33,13 +33,14 @@
     >
       <VaIcon :component="VaIconDiscord" />
     </VaButton> -->
-    <!-- <NotificationDropdown class="app-navbar-actions__item" /> -->
+    <NotificationDropdown class="app-navbar-actions__item" />
     <ProfileDropdown class="app-navbar-actions__item app-navbar-actions__item--profile mr-1" />
   </div>
 </template>
 
 <script lang="ts" setup>
 import ProfileDropdown from './dropdowns/ProfileDropdown.vue'
+import NotificationDropdown from './dropdowns/NotificationDropdown.vue'
 
 defineProps({
   isMobile: { type: Boolean, default: false },
