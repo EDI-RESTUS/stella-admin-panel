@@ -48,6 +48,7 @@
       :offer-group="group"
       :selected-menu-item="selectedMenuItem"
       :show-menu-modal="showOptionsGroup"
+      :added-item-index="addedItemIndex"
       @itemsAdded="closeModal()"
       @cancel="showOptionsGroup = false"
     />

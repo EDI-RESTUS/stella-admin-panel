@@ -481,6 +481,16 @@ const promoOriginalOffers = computed(() => {
 })
 
 watch(
+  () => props.customerDetailsId,
+  (newVal, oldVal) => {
+    if (oldVal && newVal !== oldVal) {
+      clearPromoCode()
+      appliedPromoCodes.value = []
+    }
+  },
+)
+
+watch(
   [cartItems, offerItems],
   async (newVal, oldVal) => {
     // If no promo is applied, skip
@@ -1048,6 +1058,7 @@ async function applyPromoCode() {
       isPromoValid.value = true
       // ✅ keep the input readable and in sync
       promoCode.value = codes.join(', ')
+      appliedPromoCodes.value = codes
       init({ message: `PromoCode${codes.length > 1 ? 's' : ''} selected`, color: 'success' })
     } else {
       orderStore.setOrderTotal(null)
@@ -1068,7 +1079,7 @@ function clearPromoCode() {
   promoCode.value = ''
   isPromoValid.value = false
   if (promotionRef.value) {
-    promotionRef.value.selectedCode = ''
+    promotionRef.value.clearSelection()
   }
   orderStore.setOrderTotal(null)
 }
