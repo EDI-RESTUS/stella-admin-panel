@@ -481,6 +481,16 @@ const promoOriginalOffers = computed(() => {
 })
 
 watch(
+  () => props.customerDetailsId,
+  (newVal, oldVal) => {
+    if (oldVal && newVal !== oldVal) {
+      clearPromoCode()
+      appliedPromoCodes.value = []
+    }
+  },
+)
+
+watch(
   [cartItems, offerItems],
   async (newVal, oldVal) => {
     // If no promo is applied, skip
