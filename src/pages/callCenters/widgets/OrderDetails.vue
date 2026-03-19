@@ -1048,6 +1048,7 @@ async function applyPromoCode() {
       isPromoValid.value = true
       // ✅ keep the input readable and in sync
       promoCode.value = codes.join(', ')
+      appliedPromoCodes.value = codes
       init({ message: `PromoCode${codes.length > 1 ? 's' : ''} selected`, color: 'success' })
     } else {
       orderStore.setOrderTotal(null)
