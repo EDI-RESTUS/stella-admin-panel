@@ -296,6 +296,10 @@ const props = defineProps({
     required: true,
   },
   menuItemId: String,
+  addedItemIndex: {
+    type: Number,
+    default: -1,
+  },
 })
 const selectedOptions = ref([])
 const menuStore = useMenuStore()
@@ -360,9 +364,12 @@ watch(
         )
           ? offer.value.selections[groupItemIndex].addedItems.find((offerItem) => offerItem.itemId === props.item.id)
           : null
-        addedItemIndex = offer.value.selections[groupItemIndex].addedItems.findIndex(
-          (offerItem) => offerItem.itemId === props.item.id,
-        )
+        addedItemIndex =
+          props.addedItemIndex >= 0
+            ? props.addedItemIndex
+            : offer.value.selections[groupItemIndex].addedItems.findIndex(
+                (offerItem) => offerItem.itemId === props.item.id,
+              )
         if (addedItems && addedItems.selectedOptions.length) {
           selectedOptions.value = addedItems.selectedOptions
           selectedOptions.value.forEach((group) => {
