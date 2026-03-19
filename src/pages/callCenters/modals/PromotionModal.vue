@@ -233,4 +233,6 @@ watch(
     }
   },
 )
+
+defineExpose({ clearSelection })
 </script>

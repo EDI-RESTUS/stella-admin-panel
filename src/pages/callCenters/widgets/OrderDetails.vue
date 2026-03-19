@@ -1079,7 +1079,7 @@ function clearPromoCode() {
   promoCode.value = ''
   isPromoValid.value = false
   if (promotionRef.value) {
-    promotionRef.value.selectedCode = ''
+    promotionRef.value.clearSelection()
   }
   orderStore.setOrderTotal(null)
 }
