@@ -342,7 +342,7 @@ const sharedGroupNotice = computed(() => {
             v-for="sub in filteredSubcategories"
             :key="sub._id"
             :class="['item-card', selectedSubcategory?._id === sub._id ? 'selected' : '']"
-            @click="(selectedSubcategory = sub), (selectedArticle = null), (selectedGroup = null), getArticles()"
+            @click="(selectedSubcategory = sub), (selectedArticle = null), (selectedGroup = null)"
           >
             <VaIcon name="drag_indicator" class="cursor-move text-slate-400" /> {{ getLocalizedValue(sub.name) }}
           </div>
