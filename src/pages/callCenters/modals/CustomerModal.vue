@@ -267,12 +267,14 @@
 <script setup lang="ts">
 import { useOrderStore } from '@/stores/order-store'
 import { ref, watch, reactive, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import { useToast } from 'vuestic-ui'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 import axios from 'axios'
 import { useServiceStore } from '@/stores/services.ts'
 import { Circle, CircleDot } from 'lucide-vue-next'
 
-const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
+const { log } = useCallCenterLogger()
 const addressNote = ref('')
 const emits = defineEmits(['cancel', 'setUser', 'close', 'selectAddress'])
 const orderStore = useOrderStore()
@@ -601,7 +603,7 @@ function setAddress(addr: any) {
 
 async function addAddress() {
   if (!isAddressValid.value) {
-    init({ color: 'danger', message: 'Please fill all required address fields.' })
+    showAlert('Please fill all required address fields.')
     addressSet.value = null
     return
   }
@@ -618,11 +620,11 @@ async function addAddress() {
       })
 
       if (!response.data.data || response.data.data.length === 0) {
-        init({ color: 'danger', message: 'Address not available for Delivery' })
+        showAlert('Address not available for Delivery.')
         return
       }
     } catch (error) {
-      init({ color: 'danger', message: 'Failed to verify delivery availability' })
+      showAlert('Failed to verify delivery availability.')
       return
     }
   }
@@ -733,11 +735,11 @@ async function fetchStreetName() {
       })
     } else {
       streetList.value = []
-      init({ color: 'danger', message: 'Address not available for Delivery' })
+      showAlert('Address not available for Delivery.')
     }
   } catch (error) {
     streetList.value = []
-    init({ color: 'danger', message: 'Failed to fetch address data' })
+    showAlert('Failed to fetch address data.')
   }
 }
 async function stellaUpsertFromForm(
@@ -867,6 +869,7 @@ async function addOrUpdateCustomerDetails() {
     // 1) Forced anonymous update of an existing Stella doc (never Winmax)
     if ((props as any).forceUpdateId) {
       await stellaUpsertFromForm(base, outletId, (props as any).forceUpdateId /* maybeId */, /* wmMeta */ null)
+      log('CUSTOMER_UPDATED', { phone: base.phone, name: base.name, isForceUpdate: true })
       emits('setUser', { phoneNumber: base.phone, name: base.name })
       return
     }
@@ -887,6 +890,7 @@ async function addOrUpdateCustomerDetails() {
         await stellaUpsertFromForm(base, outletId, selected._id || selected.id, null)
       }
 
+      log('CUSTOMER_UPDATED', { phone: base.phone, name: base.name })
       emits('setUser', { phoneNumber: base.phone, name: base.name })
       return
     }
@@ -895,6 +899,7 @@ async function addOrUpdateCustomerDetails() {
     const wmCreated = await winmaxCreateOrUpdate(base, outletId, null)
     await stellaUpsertFromForm(base, outletId, /* maybeId */ undefined, wmCreated)
 
+    log('CUSTOMER_CREATED', { phone: base.phone, name: base.name })
     emits('setUser', { phoneNumber: base.phone, name: base.name })
   } catch (error: any) {
     const msg =
@@ -903,7 +908,8 @@ async function addOrUpdateCustomerDetails() {
       (Array.isArray(error?.response?.data?.errors) ? error.response.data.errors.join(', ') : null) ||
       error?.message ||
       'Something went wrong.'
-    init({ color: 'danger', message: msg })
+    log('ERROR_CUSTOMER_SAVE', { errorMessage: msg })
+    showAlert(msg)
   }
 }
 
@@ -912,16 +918,16 @@ async function handleSubmit() {
 
   // basic guards for brand-new customers
   if (!String(name.value || '').trim()) {
-    init({ color: 'danger', message: 'Please enter a customer name.' })
+    showAlert('Please enter a customer name.')
     return
   }
   const digits = String(phoneNumber.value || '').replace(/\D+/g, '')
   if (!digits) {
-    init({ color: 'danger', message: 'Please enter a valid mobile number.' })
+    showAlert('Please enter a valid mobile number.')
     return
   }
   if (isTick.value === null) {
-    init({ color: 'danger', message: 'Choose “Save Data” or “Don’t Save”.' })
+    showAlert(`Choose “Save Data” or “Don’t Save”.`)
     return
   }
 
@@ -938,7 +944,7 @@ async function handleSubmit() {
       if (selectedAddressObj.value) {
         emits('selectAddress', selectedAddressObj.value)
       } else {
-        init({ color: 'warning', message: 'Please select an address.' })
+        showAlert('Please select an address.')
         isSubmitting.value = false
         return
       }
@@ -948,7 +954,7 @@ async function handleSubmit() {
     showCustomerModal.value = false
   } catch (e: any) {
     const msg = e?.response?.data?.error || e?.response?.data?.message || e?.message || 'Something went wrong.'
-    init({ color: 'danger', message: msg })
+    showAlert(msg)
   } finally {
     isSubmitting.value = false
   }

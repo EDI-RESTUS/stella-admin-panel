@@ -254,8 +254,10 @@ import { useOrderStore } from '@/stores/order-store'
 import { useMenuStore } from '@/stores/getMenu'
 import { useToast } from 'vuestic-ui'
 import axios from 'axios'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 const orderStore = useOrderStore()
 const menuStore = useMenuStore()
+const { log } = useCallCenterLogger()
 
 const showMenuModal = ref(true)
 const emits = defineEmits(['cancel', 'cancel-edit'])
@@ -489,6 +491,11 @@ function addToBasket(item: any) {
   selectedOptions.value = []
   showMenuModal.value = false
   formSubmitted.value = false
+
+  log(props.isEdit ? 'CART_ITEM_UPDATED' : 'CART_ITEM_ADDED_WITH_OPTIONS', {
+    itemId: props.isEdit ? item.itemId : item._id,
+    itemName: props.isEdit ? item.itemName : item.name,
+  })
 
   if (props.isEdit) {
     emits('cancel-edit')

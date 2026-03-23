@@ -390,7 +390,9 @@ import MenuModal from '../modals/MenuModal.vue'
 import CheckOutModal from '../modals/CheckOutModal.vue'
 import OfferModal from '../modals/OfferModal.vue'
 import axios from 'axios'
-import { useToast, useModal } from 'vuestic-ui'
+import { useModal } from 'vuestic-ui'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 import PromotionModal from '../modals/PromotionModal.vue'
 
 import { useMenuStore } from '@/stores/getMenu.js'
@@ -563,9 +565,10 @@ function showRestrictedMessage() {
 }
 
 function openCheckoutModal() {
+  log('CHECKOUT_OPENED', { orderType: props.orderType, itemCount: items.value.length + offersItems.value.length })
   if (!isFutureTimeAllowed.value) {
     const msg = 'Future orders must be between 11:00–23:00.'
-    init({ color: 'danger', message: msg })
+    showAlert(msg)
     return
   }
 
@@ -890,17 +893,20 @@ const increaseQty = (item) => {
   if (index !== -1) {
     orderStore.cartItems[index].quantity++
     orderStore.calculateItemTotal(index)
+    log('CART_ITEM_QTY_INCREASED', { itemId: item.id, itemName: item.name, newQty: orderStore.cartItems[index].quantity })
   }
 }
 
 const deleteItem = (item) => {
   const index = cartItems.value.findIndex((i) => i.itemId === item.id)
+  log('CART_ITEM_REMOVED', { itemId: item.id, itemName: item.name })
   orderStore.cartItems.splice(index, 1)
   orderStore.calculateItemTotal(index)
 }
 
 const deleteOffer = (item) => {
   const index = offerItems.value.findIndex((i) => i.itemId === item.id)
+  log('CART_OFFER_REMOVED', { itemId: item.id, offerName: item.name })
   orderStore.offerItems.splice(index, 1)
 }
 
@@ -916,6 +922,7 @@ const decreaseQty = (item) => {
   if (index !== -1 && orderStore.cartItems[index].quantity > 1) {
     orderStore.cartItems[index].quantity--
     orderStore.calculateItemTotal(index)
+    log('CART_ITEM_QTY_DECREASED', { itemId: item.id, itemName: item.name, newQty: orderStore.cartItems[index].quantity })
   }
 }
 
@@ -939,8 +946,9 @@ const selectedItemWithArticlesOptionsGroups = ref({})
 const showMenuModal = ref(false)
 const isEdit = ref(false)
 const isLoading = ref(false)
-const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
 const { confirm } = useModal()
+const { log } = useCallCenterLogger()
 
 async function openPromotionModal() {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -954,10 +962,11 @@ async function openPromotionModal() {
       promotionData.value = validPromotions
       showPromotionModal.value = true
     } else {
-      init({ message: 'No promotions available at Call Center.', color: 'danger' })
+      showAlert('No promotions available at Call Center.')
     }
   } catch (error) {
-    init({ message: 'Invalid or expired promotion code.', color: 'danger' })
+    log('ERROR_FETCH_PROMOTIONS', { errorMessage: error?.response?.data?.message || 'Invalid or expired promotion code.' })
+    showAlert('Invalid or expired promotion code.')
   }
 }
 function parseCodes(raw) {
@@ -1033,19 +1042,19 @@ function buildPromoPayloadFromState(promoCodes) {
 async function applyPromoCode() {
   const codes = parseCodes(promoCode.value)
   if (!codes.length) {
-    init({ message: 'Please enter a promotion code.', color: 'warning' })
+    showAlert('Please enter a promotion code.')
     return
   }
   if (props.orderType === 'takeaway' && !props.isDeliveryZoneSelected) {
-    init({ message: 'Please select a delivery zone first.', color: 'warning' })
+    showAlert('Please select a delivery zone first.')
     return
   }
   if (!props.customerDetailsId) {
-    init({ message: 'Please select a customer first.', color: 'warning' })
+    showAlert('Please select a customer first.')
     return
   }
   if (total.value === 0) {
-    init({ message: 'Cart is empty. Please add items to the cart.', color: 'warning' })
+    showAlert('Cart is empty. Please add items to the cart.')
     return
   }
 
@@ -1054,6 +1063,7 @@ async function applyPromoCode() {
     const response = await orderStore.validatePromoCode(payload)
 
     if (response.data && response.data.success) {
+      log('PROMO_CODE_APPLIED', { codes, success: true })
       orderStore.setOrderTotal(response.data.data)
       isPromoValid.value = true
       // ✅ keep the input readable and in sync
@@ -1063,15 +1073,14 @@ async function applyPromoCode() {
     } else {
       orderStore.setOrderTotal(null)
       isPromoValid.value = false
-      init({ message: (response.data && response.data.message) || 'PromoCode invalid', color: 'danger' })
+      log('PROMO_CODE_FAILED', { codes, success: false, errorMessage: response.data?.message || 'PromoCode invalid' })
+      showAlert((response.data && response.data.message) || 'PromoCode invalid')
     }
   } catch (err) {
     orderStore.setOrderTotal(null)
     isPromoValid.value = false
-    init({
-      message: (err && err.response && err.response.data && err.response.data.message) || 'PromoCode invalid',
-      color: 'danger',
-    })
+    log('PROMO_CODE_FAILED', { codes, errorMessage: err?.response?.data?.message || 'PromoCode invalid' })
+    showAlert((err && err.response && err.response.data && err.response.data.message) || 'PromoCode invalid')
   }
 }
 
@@ -1106,7 +1115,8 @@ const getMenuOptions = async (selectedItem) => {
       openMenuModal()
     }
   } catch (error) {
-    init({ message: 'Something went wrong', color: 'danger' })
+    log('ERROR_EDIT_ITEM_FETCH', { itemId: selectedItem?.itemId, errorMessage: error?.response?.data?.message || 'Failed to fetch item options.' })
+    showAlert('Something went wrong. Please try again.')
   } finally {
     isLoading.value = false
   }
@@ -1200,7 +1210,7 @@ onMounted(async () => {
 
         if (menuStore.unFilteredMenuItems.length === 0) {
           console.error('[PaymentRetry] Menu items failed to load after timeout. Cart restoration may be incomplete.')
-          init({ message: 'Menu data missing. Order details may be incomplete.', color: 'warning' })
+          showAlert('Menu data missing. Order details may be incomplete.')
         } else {
           console.log('[PaymentRetry] Menu items loaded. Proceeding with restoration.')
         }
@@ -1232,7 +1242,8 @@ onMounted(async () => {
       }
     } catch (e) {
       console.error('Failed to restore failed payment order', e)
-      init({ message: 'Failed to restore order for retry', color: 'danger' })
+      log('ERROR_PAYMENT_RETRY_RESTORE', { orderId: oid, errorMessage: e?.message || 'Failed to restore order for retry.' })
+      showAlert('Failed to restore order for retry.')
     } finally {
       isLoading.value = false
     }

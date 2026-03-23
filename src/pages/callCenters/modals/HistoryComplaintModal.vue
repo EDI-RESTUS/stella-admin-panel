@@ -32,6 +32,8 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
+const { log } = useCallCenterLogger()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -58,17 +60,20 @@ const close = () => {
 
 const saveComplaint = () => {
   if (!pComplaint.value.trim()) return
+  log('ORDER_COMPLAINT_ADDED', { orderId: props.orderId })
   emits('saved', { orderId: props.orderId, text: pComplaint.value })
   close()
 }
 
 const updateComplaint = () => {
   if (!pComplaint.value.trim()) return
+  log('ORDER_COMPLAINT_UPDATED', { orderId: props.complaint.orderId })
   emits('updated', { orderId: props.complaint.orderId, text: pComplaint.value })
   close()
 }
 
 const removeComplaint = () => {
+  log('ORDER_COMPLAINT_REMOVED', { orderId: props.complaint.orderId })
   emits('removed', { orderId: props.complaint.orderId })
   close()
 }

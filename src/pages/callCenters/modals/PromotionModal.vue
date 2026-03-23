@@ -70,11 +70,15 @@
 <script setup>
 import { useToast } from 'vuestic-ui'
 import { computed, ref, watch } from 'vue'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 import { useOrderStore } from '@/stores/order-store'
 import { useServiceStore } from '@/stores/services'
 
 const emits = defineEmits(['cancel', 'select-code', 'select-codes'])
 const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
+const { log } = useCallCenterLogger()
 
 const props = defineProps({
   promotion: { type: Array, default: () => [] },
@@ -113,7 +117,7 @@ function copyToClipboard(text) {
   navigator.clipboard
     .writeText(text)
     .then(() => init({ message: 'Copied', color: 'success' }))
-    .catch(() => init({ message: 'Copy failed.', color: 'danger' }))
+    .catch(() => showAlert('Copy failed.'))
 }
 
 // Build payload shared by single/multi
@@ -180,6 +184,7 @@ async function applySelectedCodes(hideToast = false) {
       if (!hideToast)
         init({ message: `Promotion${selectedCodes.value.length > 1 ? 's' : ''} applied`, color: 'success' })
       orderStore.setOrderTotal(response.data.data)
+      log('PROMO_SELECTED', { codes: selectedCodes.value, success: true })
 
       // Emit both for compatibility; parent can listen to either
       if (selectedCodes.value.length === 1) {
@@ -191,10 +196,12 @@ async function applySelectedCodes(hideToast = false) {
       emits('cancel')
     } else {
       orderStore.setOrderTotal(null)
-      init({ message: response.data?.message || 'Invalid promotion(s)', color: 'danger' })
+      log('PROMO_SELECTED', { codes: selectedCodes.value, success: false, errorMessage: response.data?.message || 'Invalid promotion(s)' })
+      showAlert(response.data?.message || 'Invalid promotion(s)')
     }
   } catch (err) {
-    init({ message: err?.response?.data?.message || 'Promotion validation failed', color: 'danger' })
+    log('ERROR_PROMO_VALIDATION', { codes: selectedCodes.value, errorMessage: err?.response?.data?.message || 'Promotion validation failed' })
+    showAlert(err?.response?.data?.message || 'Promotion validation failed')
     console.error(err)
   } finally {
     apiLoading.value = false
