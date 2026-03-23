@@ -24,17 +24,22 @@
 </template>
 
 <script setup>
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
+const { log } = useCallCenterLogger()
+
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
 })
 const emit = defineEmits(['update:modelValue', 'confirm', 'confirm-clear-all'])
 
 function onYes() {
+  log('CUSTOMER_REMOVED', { clearOrder: false })
   emit('confirm') // tell parent to clear customer only
   emit('update:modelValue', false) // close modal
 }
 
 function onYesClearAll() {
+  log('CUSTOMER_REMOVED', { clearOrder: true })
   emit('confirm-clear-all') // tell parent to clear customer AND items
   emit('update:modelValue', false) // close modal
 }

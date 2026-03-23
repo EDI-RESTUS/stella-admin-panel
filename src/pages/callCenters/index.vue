@@ -1,4 +1,5 @@
 <template>
+  <CallCenterAlertModal />
   <div class="grid grid-cols-1 md:grid-cols-7 gap-4">
     <!-- LEFT SECTION -->
     <div
@@ -161,6 +162,12 @@ const customerRef = useTemplateRef('customerRef')
 import MenuSection from '@/pages/callCenters/widgets/MenuSections.vue'
 import CustomerDetails from '@/pages/callCenters/widgets/CustomerDetails.vue'
 import OrderDetails from '@/pages/callCenters/widgets/OrderDetails.vue'
+import CallCenterAlertModal from '@/pages/callCenters/modals/CallCenterAlertModal.vue'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
+
+const { showAlert } = useCallCenterAlert()
+const { log, queueRefreshLog, flushPendingRefreshLogs } = useCallCenterLogger()
 import { storeToRefs } from 'pinia'
 
 const props = defineProps({
@@ -203,10 +210,12 @@ const selectCategory = (category) => {
   if (category === 'offers') {
     selectedItem.value = 'offers'
     activeSubCategories.value = []
+    log('CATEGORY_CLICKED', { categoryId: 'offers', categoryName: 'Offers' })
     return
   }
 
   selectedItem.value = category._id
+  log('CATEGORY_CLICKED', { categoryId: category._id, categoryName: category.name })
 
   if (category.subCategories && category.subCategories.length) {
     activeSubCategories.value = category.subCategories.filter((sub) => sub.menuItems && sub.menuItems.length > 0)
@@ -217,6 +226,7 @@ const selectCategory = (category) => {
 
 const selectSubCategory = (subId) => {
   selectedSubCategory.value = subId
+  log('SUBCATEGORY_CLICKED', { subCategoryId: subId })
 
   const el = document.getElementById(subId)
   if (el) {
@@ -300,7 +310,7 @@ async function autoSetUserDeliveryZone() {
       orderStore.setDeliveryZone(zone)
     }
   } catch (err) {
-    console.error('Failed to auto-set user delivery zone:', err)
+    showAlert('Failed to set delivery zone. Please try again.')
   }
 }
 
@@ -318,6 +328,10 @@ const menuItems = computed(() => {
   }))
 })
 
+function onBeforeUnload() {
+  queueRefreshLog({})
+}
+
 onMounted(() => {
   currentTime.value = new Date().toLocaleTimeString('en-GB', {
     hour: '2-digit',
@@ -331,9 +345,13 @@ onMounted(() => {
       hour12: false,
     })
   }, 3000)
+
+  window.addEventListener('beforeunload', onBeforeUnload)
+  flushPendingRefreshLogs()
 })
 
 onUnmounted(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
   orderStore.cartItems = []
   orderStore.offerItems = []
   orderStore.paymentId = ''

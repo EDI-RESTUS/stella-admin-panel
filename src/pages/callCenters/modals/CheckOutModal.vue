@@ -192,7 +192,7 @@
                       :key="payment.paymentTypeId"
                       class="payment-option transition-all p-4 flex items-center justify-center text-center"
                       :class="selectedPayment == payment ? 'selected' : ''"
-                      @click="selectedPayment = payment"
+                      @click="selectedPayment = payment; log('PAYMENT_METHOD_SELECTED', { paymentMethod: payment?.name || payment?.paymentTypeId })"
                     >
                       <div class="payment-label font-bold text-lg">{{ payment.name }}</div>
                     </div>
@@ -309,6 +309,8 @@
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useToast } from 'vuestic-ui'
 import { useOrderStore } from '@/stores/order-store'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 import { useUsersStore } from '@/stores/users'
 import { useServiceStore } from '@/stores/services'
 import { storeToRefs } from 'pinia'
@@ -320,6 +322,8 @@ const selectedPayment: any = ref(null)
 const apiLoading = ref(false)
 const emits = defineEmits(['cancel', 'success'])
 const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
+const { log, queueRefreshLog } = useCallCenterLogger()
 const props = defineProps<{
   deliveryFee: number
   customerDetailsId: string
@@ -340,6 +344,8 @@ const userDetails = computed(() => userStore.userDetails)
 const checkInterval: any = ref('')
 const paymentTypes: any = ref([])
 const orderFor = computed(() => orderStore.orderFor)
+const programmaticClose = ref(false)
+const completedOrderData = ref<any>(null)
 
 // Cash payment state
 const selectedCashAmount = ref<number | null>(null)
@@ -440,6 +446,10 @@ const getTotalPrice = computed(() => {
   return total.toFixed(2)
 })
 
+function onBeforeUnload() {
+  queueRefreshLog({ orderId: orderId.value || null, orderType: props.orderType })
+}
+
 onMounted(() => {
   console.log('[CheckOutModal] Mounted. Cart items LEN:', orderStore.cartItems.length)
   console.log('[CheckOutModal] Mounted. Offer items LEN:', orderStore.offerItems.length)
@@ -448,6 +458,8 @@ onMounted(() => {
   if (serviceStore.selectedRest) {
     getPaymentOptions()
   }
+
+  window.addEventListener('beforeunload', onBeforeUnload)
 })
 
 const getPaymentOptions = () => {
@@ -467,7 +479,13 @@ const getPaymentOptions = () => {
 watch(
   () => showCheckoutModal.value,
   (val) => {
-    if (!val) emits('cancel')
+    if (!val) {
+      if (!programmaticClose.value) {
+        log('CHECKOUT_DISMISSED', { orderId: orderId.value || null, orderType: props.orderType })
+      }
+      programmaticClose.value = false
+      emits('cancel')
+    }
   },
   { immediate: true },
 )
@@ -609,11 +627,13 @@ async function checkPaymentStatus(requestId: string, paymentId: string, isPollin
 
       if ((isWallee || isDeviceSuccess) && responseData.status === 'Completed') {
         console.log('WalleePOS/Device Success Detected - Triggering Success Handler')
+        completedOrderData.value = responseData.order || responseData
         handlePaymentSuccess()
         return
       }
 
       if (responseData.status === 'Completed') {
+        completedOrderData.value = responseData.order || responseData
         handlePaymentSuccess()
         return
       }
@@ -637,34 +657,43 @@ async function checkPaymentStatus(requestId: string, paymentId: string, isPollin
 
     if ((isWallee || isDeviceSuccess) && status === 'Completed') {
       console.log('WalleePOS/Device Success Detected (GET) - Triggering Success Handler')
+      completedOrderData.value = responseData
       handlePaymentSuccess()
       return
     }
 
     if (status === 'Completed') {
+      completedOrderData.value = responseData
       handlePaymentSuccess()
     } else if (status === 'In Progress') {
       if (isPolling) return
       // Payment flow finished (iframe returned) but status is still In Progress => Failed/Unpaid
-      init({
-        color: 'danger',
-        message: 'Payment not completed. Please retry or cancel.',
-      })
+      showAlert('Payment not completed. Please retry or cancel.')
       orderStore.setPaymentLink('') // Hide iframe
       // UI will show "Retry Payment" because orderId exists
     } else if (status === 'Cancelled') {
-      init({ color: 'warning', message: 'Order was cancelled.' })
+      showAlert('Order was cancelled.')
       orderStore.setPaymentLink('')
       emits('cancel')
     }
   } catch (err: any) {
     console.error('Status check failed', err)
-    init({ color: 'danger', message: 'Could not verify payment status.' })
+    log('ERROR_PAYMENT_STATUS_CHECK', { orderId: orderId.value, errorMessage: err?.message || 'Could not verify payment status.' })
+    showAlert('Could not verify payment status.')
     orderStore.setPaymentLink('')
   }
 }
 
 function handlePaymentSuccess() {
+  log('ORDER_PLACED', {
+    orderId: orderResponse.value?.data?.data?._id || orderId.value,
+    tableNumber: completedOrderData.value?.tableNumber || orderStore.editOrder?.tableNumber || null,
+    phoneNo: orderStore.phoneNumber || null,
+    paymentRequestId: orderId.value,
+    paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+    orderType: props.orderType,
+    success: true,
+  })
   init({
     color: 'success',
     message: 'Payment Success',
@@ -683,6 +712,7 @@ function handlePaymentSuccess() {
     } catch (e) {
       console.error('Error clearing cart', e)
     }
+    programmaticClose.value = true
     emits('success')
     showCheckoutModal.value = false
   }, 800)
@@ -792,6 +822,7 @@ function resetInter() {
 async function cancelOrder() {
   if (!orderId.value) return
   resetInter() // Stop polling
+  log('ORDER_CANCELLED', { orderId: orderId.value, orderType: props.orderType })
   try {
     apiLoading.value = true
     // Use new cancel endpoint
@@ -802,12 +833,14 @@ async function cancelOrder() {
     // Reset everything by emitting event, similar to success flow
     setTimeout(() => {
       orderStore.cartItems = []
+      programmaticClose.value = true
       emits('cancel')
       showCheckoutModal.value = false
     }, 800)
   } catch (e) {
     console.error(e)
-    init({ color: 'danger', message: 'Failed to cancel order' })
+    log('ERROR_CANCEL_ORDER', { orderId: orderId.value, errorMessage: e?.message || 'Failed to cancel order.' })
+    showAlert('Failed to cancel order.')
   } finally {
     apiLoading.value = false
   }
@@ -826,7 +859,7 @@ async function manualRetry() {
       return
     } else {
       // If In Progress or Cancelled, just reset the view so they can try again
-      init({ color: 'warning', message: 'Payment not confirmed. You can try again.' })
+      showAlert('Payment not confirmed. You can try again.')
       orderStore.setPaymentLink('')
     }
   } catch (e) {
@@ -839,6 +872,7 @@ async function manualRetry() {
 
 onUnmounted(() => {
   resetInter()
+  window.removeEventListener('beforeunload', onBeforeUnload)
 })
 
 async function updateOrder() {
@@ -935,10 +969,11 @@ async function updateOrder() {
         },
       },
     )
-    init({
-      message: res.data.message,
-      color: res.data.status !== 'Failed' ? 'success' : 'danger',
-    })
+    if (res.data.status === 'Failed') {
+      showAlert(res.data.message)
+    } else {
+      init({ message: res.data.message, color: 'success' })
+    }
     orderStore.editOrder = null as any
     try {
       orderStore.cartItems = [] as any
@@ -950,7 +985,7 @@ async function updateOrder() {
     return res.data
   } catch (err: any) {
     console.error('Order edit failed:', err)
-    init({ message: err.response.data.message, color: 'danger' })
+    showAlert(err.response.data.message)
     apiLoading.value = false
     throw err
   }
@@ -1105,10 +1140,11 @@ async function updateOrderWithPromo(promoCodes: string[]) {
     // 4. PATCH the entire order
     const res = await orderStore.patchOrder(orderStore.editOrder._id, patchPayload)
 
-    init({
-      message: res.data?.message || 'Order updated with promo',
-      color: res.data?.status !== 'Failed' ? 'success' : 'danger',
-    })
+    if (res.data?.status === 'Failed') {
+      showAlert(res.data?.message || 'Order edit failed')
+    } else {
+      init({ message: res.data?.message || 'Order updated with promo', color: 'success' })
+    }
     orderStore.editOrder = null as any
     try {
       orderStore.cartItems = [] as any
@@ -1120,7 +1156,7 @@ async function updateOrderWithPromo(promoCodes: string[]) {
     return res.data
   } catch (err: any) {
     console.error('Order edit with promo failed:', err)
-    init({ message: err.response?.data?.message || 'Order edit failed', color: 'danger' })
+    showAlert(err.response?.data?.message || 'Order edit failed')
     apiLoading.value = false
     throw err
   }
@@ -1152,14 +1188,15 @@ const applyOrderEdit = async (orderId: string, action: string, tableNumber: stri
         },
       },
     )
-    init({
-      message: res.data.message,
-      color: res.data.status !== 'Failed' ? 'success' : 'danger',
-    })
+    if (res.data.status === 'Failed') {
+      showAlert(res.data.message)
+    } else {
+      init({ message: res.data.message, color: 'success' })
+    }
     return res.data
   } catch (err: any) {
     console.error('Order edit failed:', err)
-    init({ message: err.response.data.message, color: 'danger' })
+    showAlert(err.response.data.message)
     throw err
   }
 }
@@ -1238,6 +1275,11 @@ function normalizeCodes(singleStr, codesArr) {
 }
 
 async function createOrder() {
+  log('PAYMENT_INITIATED', {
+    paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+    orderType: props.orderType,
+    isEdit: !!orderStore.editOrder,
+  })
   apiLoading.value = true
 
   try {
@@ -1321,6 +1363,12 @@ async function createOrder() {
         } else {
           // orderStore.setPaymentLink(response.data.data.redirectUrl)
           orderId.value = response.data.data.requestId
+          log('ORDER_AWAITING_PAYMENT', {
+            orderId: orderResponse.value?.data?.data?._id,
+            paymentRequestId: response.data.data.requestId,
+            paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+            orderType: props.orderType,
+          })
           // setInter()
           window.top.location.href = response.data.data.redirectUrl
         }
@@ -1331,6 +1379,7 @@ async function createOrder() {
           init({ color: 'success', message: 'Order sent to Winmax' })
         }
 
+        completedOrderData.value = response?.data?.data || orderResponse.value?.data?.data || null
         handlePaymentSuccess()
       }
     } else {
@@ -1353,10 +1402,14 @@ async function createOrder() {
       errorMessage = `${errorMessage} Items: ${errorData.outOfStockItems.join(', ')}`
     }
 
-    init({
-      color: 'danger',
-      message: errorMessage,
+    log('ORDER_FAILED', {
+      errorMessage,
+      errorCode: err?.response?.data?.code || null,
+      paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+      orderType: props.orderType,
+      success: false,
     })
+    showAlert(errorMessage)
 
     if (err?.response?.data?.data?.requestId) {
       orderId.value = err.response.data.data.requestId

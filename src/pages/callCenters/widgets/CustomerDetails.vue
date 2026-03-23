@@ -19,7 +19,7 @@
             :class="selectedTab == 'takeaway' ? ` text-white font-semibold` : 'text-gray-600 hover:bg-gray-200'"
             class="flex-1 py-1 transition-colors"
             :style="{ backgroundColor: selectedTab == 'takeaway' ? outlet.primaryColor : '' }"
-            @click="selectedTab = 'takeaway'"
+            @click="selectedTab = 'takeaway'; log('ORDER_TYPE_SELECTED', { orderType: 'takeaway' })"
           >
             Takeaway
             <span v-if="(selectedZoneDetails?.takeawayPromiseTime ?? 0) > 0">
@@ -30,7 +30,7 @@
             :class="selectedTab == 'delivery' ? `text-white font-semibold` : 'text-gray-600 hover:bg-gray-200'"
             class="flex-1 py-1 transition-colors"
             :style="{ backgroundColor: selectedTab == 'delivery' ? outlet.primaryColor : '' }"
-            @click="selectedTab = 'delivery'"
+            @click="selectedTab = 'delivery'; log('ORDER_TYPE_SELECTED', { orderType: 'delivery' })"
           >
             Delivery
             <span v-if="(selectedZoneDetails?.deliveryPromiseTime ?? 0) > 0">
@@ -361,7 +361,9 @@
 
 <script setup>
 import { ref, watch, defineEmits, computed, defineExpose, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
-import { useToast, useModal } from 'vuestic-ui'
+import { useModal } from 'vuestic-ui'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 import axios from 'axios'
 import { useServiceStore } from '@/stores/services.ts'
 import CustomerModal from '../modals/CustomerModal.vue'
@@ -386,8 +388,9 @@ const isOpen = ref(true)
 const selectedTab = ref('')
 const isUserLoading = ref(false)
 const selectedAddress = ref('')
-const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
 const { confirm } = useModal()
+const { log } = useCallCenterLogger()
 const orderStore = useOrderStore()
 const userStore = useUsersStore() // Instantiate User Store
 const showCustomerModal = ref(false)
@@ -639,6 +642,9 @@ watch(
 
     // Set + emit immediately (do not modify the user's choice)
     selectedDate.value = chosen
+    if (orderFor.value === 'future') {
+      log('FUTURE_ORDER_DATETIME_SET', { datetime: chosen.toISOString() })
+    }
     emits('setDateSelected', chosen)
 
     // For future orders, show a soft warning if outside opening hours
@@ -701,6 +707,7 @@ const stopAutoUpdateTime = () => {
 
 watch(orderFor, (mode) => {
   orderStore.setOrderFor(mode)
+  log('ORDER_TIMING_SELECTED', { mode })
 
   if (mode !== 'future') return
 
@@ -712,7 +719,7 @@ watch(orderFor, (mode) => {
   const win = getOpenCloseFor(dt)
 
   if (!win) {
-    init({ color: 'danger', message: 'Selected day is closed. Please choose another day.' })
+    showAlert('Selected day is closed. Please choose another day.')
     return // don't force back to current; let user pick another date
   }
 
@@ -743,12 +750,10 @@ function closeCustomerModal() {
 async function fetchCustomerDetails(setUser = false) {
   userResults.value = []
   isUserLoading.value = true
+  log('CUSTOMER_SEARCHED', { phone: phoneNumber.value, name: name.value, orderType: selectedTab.value })
 
   if (!phoneNumber.value && !name.value) {
-    init({
-      color: 'danger',
-      message: 'Please provide name or phone number',
-    })
+    showAlert('Please provide name or phone number.')
     isUserLoading.value = false
     return
   } else {
@@ -943,6 +948,7 @@ function selectUser(user) {
   // normalize different payload shapes
   const normName = user['Name'] ?? user['customerName'] ?? user['name'] ?? ''
   const normPhone = user['MobilePhone'] ?? user['Phone'] ?? user['phoneNo'] ?? user['phone'] ?? ''
+  log('CUSTOMER_SELECTED', { customerName: normName, phone: normPhone, orderType: selectedTab.value })
 
   name.value = String(normName)
   phoneNumber.value = String(normPhone)
@@ -1063,6 +1069,7 @@ function selectDeliveryZone(zone) {
     }
 
     // Existing logic continues if valid...
+    log('DELIVERY_ZONE_SELECTED', { zoneId: zone._id, zoneName: zone.name, orderType: selectedTab.value })
     emits('setDeliveryFee', selectedTab.value === 'takeaway' ? 0 : zone.deliveryCharge)
     emits('setDeliveryFee', selectedTab.value === 'takeaway' ? 0 : zone.deliveryCharge)
     emits('setDeliveryZone', true)
@@ -1161,10 +1168,7 @@ async function handleDeliveryZoneFetch() {
       if (selectedTab.value === 'delivery') {
         serviceZoneId.value = ''
       }
-      init({
-        color: 'danger',
-        message: 'No delivery zones found.',
-      })
+      showAlert('No delivery zones found.')
     }
   } catch (err) {
     console.log(err)
@@ -1172,10 +1176,7 @@ async function handleDeliveryZoneFetch() {
     if (selectedTab.value === 'delivery') {
       serviceZoneId.value = ''
     }
-    init({
-      color: 'danger',
-      message: err?.response?.data?.message || 'Failed to fetch delivery zones.',
-    })
+    showAlert(err?.response?.data?.message || 'Failed to fetch delivery zones.')
   }
 }
 function prefillNotesFromUser(user) {
@@ -1432,10 +1433,7 @@ watch(
           orderStore.setAddress(fullAddress)
         } else {
           if (!currentText.includes('Meeting') && selectedTab.value === 'delivery') {
-            init({
-              color: 'danger',
-              message: `No delivery zone found for postal code: ${postalCode}`,
-            })
+            showAlert(`No delivery zone found for postal code: ${postalCode}`)
           }
           selectedZone.value = ''
           serviceZoneId.value = ''

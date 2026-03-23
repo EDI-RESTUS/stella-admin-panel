@@ -748,8 +748,12 @@ import HistoryComplaintModal from './HistoryComplaintModal.vue'
 import CustomerModal from './CustomerModal.vue'
 import { useToast } from 'vuestic-ui'
 import { useServiceStore } from '@/stores/services.ts'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 
 const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
+const { log } = useCallCenterLogger()
 
 const props = defineProps({
   customer: { type: Object, required: true },
@@ -954,11 +958,15 @@ const applyOrderEdit = async (orderId, action, tableNumber, payload = {}) => {
       },
     )
 
-    init({ message: res.data.message, color: res.data.status !== 'Failed' ? 'success' : 'danger' })
+    if (res.data.status === 'Failed') {
+      showAlert(res.data.message)
+    } else {
+      init({ message: res.data.message, color: 'success' })
+    }
     return res.data
   } catch (err) {
     const msg = err?.response?.data?.message || err?.message || 'Failed to apply edit'
-    init({ message: msg, color: 'danger' })
+    showAlert(msg)
     throw err
   }
 }
@@ -1677,6 +1685,7 @@ const restoreFullOrder = async (orderId) => {
 }
 
 const editSelected = async (orderId) => {
+  log('ORDER_EDIT_STARTED', { orderId })
   await restoreFullOrder(orderId)
   selectedItems[orderId] = []
   selectedOfferItems[orderId] = []
@@ -1687,6 +1696,7 @@ const editSelected = async (orderId) => {
 const cancelOrder = async (orderId) => {
   const order = orders.value.find((o) => o._id === orderId)
   if (!order) return
+  log('ORDER_CANCEL_STARTED', { orderId, tableNumber: order.tableNumber, status: order.status })
 
   if (order.status === 'In Progress') {
     const orderStore = useOrderStore()
@@ -1695,7 +1705,7 @@ const cancelOrder = async (orderId) => {
       init({ message: 'Order cancelled successfully', color: 'success' })
     } catch (err) {
       console.error(err)
-      init({ message: 'Failed to cancel order', color: 'danger' })
+      showAlert('Failed to cancel order.')
     }
   } else {
     await applyOrderEdit(orderId, 'cancel', order.tableNumber)
@@ -2043,6 +2053,7 @@ const fetchOrders = async () => {
 
   try {
     const phone = props.customer?.MobilePhone || props.customer?.Phone || props.customer?.phoneNo || ''
+    log('HISTORY_VIEWED', { phone })
     const res = await axios.get(
       `${url}/orders/history?phone=${phone}&page=1&limit=500&from=2025-01-01&status=Completed`,
     )
@@ -2218,6 +2229,7 @@ onMounted(async () => {
 const repeatOrder = async (orderId) => {
   const order = orders.value.find((o) => o._id === orderId)
   if (!order) return
+  log('ORDER_REPEATED', { orderId, tableNumber: order.tableNumber })
 
   const menuStore = useMenuStore()
   const orderStore = useOrderStore()
@@ -2504,7 +2516,7 @@ const saveReschedule = async () => {
     fetchOrders()
   } catch (e) {
     const msg = e?.response?.data?.message || e?.message || 'Failed to reschedule'
-    init({ message: msg, color: 'danger' })
+    showAlert(msg)
     isLoading.value = false
   }
 }

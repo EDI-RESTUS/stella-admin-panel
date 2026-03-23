@@ -24,9 +24,10 @@
 <script setup>
 import { ref } from 'vue'
 import axios from 'axios'
-import { useToast } from 'vuestic-ui'
 import OfferModal from '../modals/OfferModal.vue'
 import { useOrderStore } from '@/stores/order-store'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 
 const props = defineProps({
   item: Object,
@@ -37,7 +38,8 @@ const isLoading = ref(false)
 const itemWithOffers = ref({})
 const orderStore = useOrderStore()
 
-const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
+const { log } = useCallCenterLogger()
 
 // Check if offer is available based on weekly days, time, and date
 function isOfferAvailable(item) {
@@ -75,20 +77,15 @@ function isOfferAvailable(item) {
 }
 
 function getOffers() {
+  log('OFFER_CLICKED', { offerId: props.item._id, offerName: props.item.name, price: props.item.price })
   // If offer is out of stock, show toast & stop
   if (props.item.inStock === false) {
-    init({
-      message: 'This offer is out of stock!',
-      color: 'danger',
-    })
+    showAlert('This offer is out of stock!')
     return
   }
-  // If offer is not available, show toast & stop
+  // If offer is not available, show popup & stop
   if (!isOfferAvailable(props.item)) {
-    init({
-      message: 'This offer is not available right now!',
-      color: 'danger',
-    })
+    showAlert('This offer is not available right now!')
     return
   }
   openMenuModal()
