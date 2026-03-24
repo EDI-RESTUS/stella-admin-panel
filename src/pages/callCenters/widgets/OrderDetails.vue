@@ -22,7 +22,7 @@
           size="small"
           class="flex-1 min-w-[200px]"
           input-class="text-xs pr-6"
-          @keypress.enter="applyPromoCode"
+          @keyup.enter="applyPromoCode"
         >
           <template #appendInner>
             <VaIcon v-if="isPromoValid" name="close" color="danger" class="cursor-pointer" @click="clearPromoCode" />
@@ -949,6 +949,8 @@ const isLoading = ref(false)
 const { showAlert } = useCallCenterAlert()
 const { confirm } = useModal()
 const { log } = useCallCenterLogger()
+import { useToast } from 'vuestic-ui'
+const { init } = useToast()
 
 async function openPromotionModal() {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -1041,6 +1043,11 @@ function buildPromoPayloadFromState(promoCodes) {
 
 async function applyPromoCode() {
   const codes = parseCodes(promoCode.value)
+console.log({
+  promoCodeRaw: promoCode.value,
+  parsedCodes: codes,
+})
+  
   if (!codes.length) {
     showAlert('Please enter a promotion code.')
     return
