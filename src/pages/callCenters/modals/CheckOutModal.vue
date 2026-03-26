@@ -1289,6 +1289,7 @@ async function createOrder() {
     // When we already have an orderId (from a failed payment redirect),
     // skip building the full payload and just retry the payment.
     if (orderId.value) {
+      console.log('[CheckOutModal] RETRY path — orderId:', orderId.value, 'paymentTypeId:', selectedPayment.value?.paymentTypeId)
       response = await orderStore.retryPayment(orderId.value, selectedPayment.value?.paymentTypeId)
     } else {
       // ── New Order path ──
