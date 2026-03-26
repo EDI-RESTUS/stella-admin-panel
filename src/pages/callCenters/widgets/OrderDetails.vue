@@ -931,12 +931,14 @@ const showCheckoutModal = ref(false)
 
 function closeCheckoutModal() {
   showCheckoutModal.value = false
+  existingOrderId.value = ''
 }
 
 function onCheckoutSuccess() {
   clearPromoCode()
   appliedPromoCodes.value = []
   showCheckoutModal.value = false
+  existingOrderId.value = ''
   emit('success')
 }
 
