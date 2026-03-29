@@ -1018,9 +1018,26 @@ export default {
         {
           key: 'orderConfirmation',
           label: 'Order Confirmation',
-          vars: ['{{customerName}}', '{{orderNo}}', '{{total}}'],
+          vars: [
+            '{{customerName}}',
+            '{{orderNo}}',
+            '{{createdAt}}',
+            '{{phoneNo}}',
+            '{{paymentMethod}}',
+            '{{orderType}}',
+            '{{promiseTime}}',
+            '{{subtotal}}',
+            '{{total}}',
+            '{{outletName}}',
+            '{{supportPhone}}',
+            '{{supportEmail}}',
+            '{{websiteUrl}}',
+            '{{itemsHtml}}',
+            '{{totalsHtml}}',
+          ],
           subjectPlaceholder: 'Order Confirmation #{{orderNo}}',
-          htmlPlaceholder: '<div>Hi {{customerName}}, your order <b>#{{orderNo}}</b> total €{{total}}</div>',
+          htmlPlaceholder:
+            '<div>Hi {{customerName}}, your order <b>#{{orderNo}}</b> from {{outletName}}.<br/>Date: {{createdAt}}<br/>Phone: {{phoneNo}}<br/>Payment: {{paymentMethod}}<br/>{{orderType}}<br/>Total: €{{total}}</div>',
           hasToOverride: false,
         },
         {
