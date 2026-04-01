@@ -974,21 +974,10 @@ async function openPromotionModal() {
   }
 }
 function parseCodes(raw) {
-  const tokens = (raw || '')
+  return (raw || '')
     .split(/[\s,;\n\r]+/g)
     .map((s) => s.trim())
     .filter(Boolean)
-
-  const seen = new Set()
-  const out = []
-  for (const t of tokens) {
-    const k = t.toLowerCase()
-    if (!seen.has(k)) {
-      seen.add(k)
-      out.push(t)
-    }
-  }
-  return out
 }
 
 // Build payload identical to the modal (keys + types)

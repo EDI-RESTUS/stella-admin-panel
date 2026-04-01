@@ -17,7 +17,7 @@
             <div
               class="flex items-center justify-between px-3 py-2 rounded-full shadow-sm cursor-pointer transition"
               :class="isSelected(code) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'"
-              @click="toggleCode(code)"
+              @click="toggleCode(code, promo.promotionType)"
             >
               <span class="text-sm truncate">
                 <strong>{{ promo.name }}</strong> - {{ code }}
@@ -103,10 +103,20 @@ function isSelected(code) {
   return selectedCodes.value.includes(code)
 }
 
-function toggleCode(code) {
-  const idx = selectedCodes.value.indexOf(code)
-  if (idx >= 0) selectedCodes.value.splice(idx, 1)
-  else selectedCodes.value.push(code)
+function toggleCode(code, promotionType) {
+  if (promotionType === 'TAKE_X_PAY_Y') {
+    const count = selectedCodes.value.filter((c) => c === code).length
+    if (count < 2) {
+      selectedCodes.value.push(code)
+    } else {
+      // third click clears all instances
+      selectedCodes.value = selectedCodes.value.filter((c) => c !== code)
+    }
+  } else {
+    const idx = selectedCodes.value.indexOf(code)
+    if (idx >= 0) selectedCodes.value.splice(idx, 1)
+    else selectedCodes.value.push(code)
+  }
 }
 
 function clearSelection() {
