@@ -1261,17 +1261,7 @@ function normalizeCodes(singleStr, codesArr) {
       .filter(Boolean)
   }
 
-  // De-dupe case-insensitively
-  const seen = new Set()
-  const out = []
-  for (const c of codes) {
-    const k = c.toLowerCase()
-    if (!seen.has(k)) {
-      seen.add(k)
-      out.push(c)
-    }
-  }
-  return out
+  return codes
 }
 
 async function createOrder() {

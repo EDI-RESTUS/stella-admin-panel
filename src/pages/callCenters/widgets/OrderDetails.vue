@@ -974,21 +974,10 @@ async function openPromotionModal() {
   }
 }
 function parseCodes(raw) {
-  const tokens = (raw || '')
+  return (raw || '')
     .split(/[\s,;\n\r]+/g)
     .map((s) => s.trim())
     .filter(Boolean)
-
-  const seen = new Set()
-  const out = []
-  for (const t of tokens) {
-    const k = t.toLowerCase()
-    if (!seen.has(k)) {
-      seen.add(k)
-      out.push(t)
-    }
-  }
-  return out
 }
 
 // Build payload identical to the modal (keys + types)
@@ -1181,7 +1170,7 @@ import { onMounted } from 'vue'
 const existingOrderId = ref('')
 
 onMounted(async () => {
-  if (route.query.payment === 'failed' && route.query.orderId) {
+if ((route.query.payment === 'failed' || route.query.payment === 'Cancel') && route.query.orderId) {
     console.log('[PaymentRetry] Detected failed payment redirect', route.query)
     isLoading.value = true
     try {
@@ -1235,6 +1224,7 @@ onMounted(async () => {
           deliveryFee: Number(order.deliveryFee || 0),
           isDeliveryZoneSelected: !!order.deliveryZoneId,
           dateSelected: order.orderDateTime || order.createdAt,
+          order,
         })
 
         existingOrderId.value = oid
