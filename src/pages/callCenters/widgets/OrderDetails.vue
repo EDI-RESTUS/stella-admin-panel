@@ -1224,6 +1224,7 @@ if ((route.query.payment === 'failed' || route.query.payment === 'Cancel') && ro
           deliveryFee: Number(order.deliveryFee || 0),
           isDeliveryZoneSelected: !!order.deliveryZoneId,
           dateSelected: order.orderDateTime || order.createdAt,
+          order,
         })
 
         existingOrderId.value = oid

@@ -255,8 +255,27 @@ const updateContext = (ctx) => {
   deliveryFee.value = ctx.deliveryFee
   isDeliveryZoneSelected.value = ctx.isDeliveryZoneSelected
   dateSelected.value = ctx.dateSelected
-  // Force customer tab to appear active if needed, but OrderDetails logic handles modal opening
   if (ctx.customerDetailsId) isCustomerTabActivated.value = true
+
+  // Restore customer details panel when returning from a failed payment redirect
+  if (ctx.order && customerRef.value) {
+    const order = ctx.order
+    const addr = order.address
+    const fullAddress = addr
+      ? typeof addr === 'string'
+        ? addr
+        : [addr.line1, addr.line2, addr.city, addr.postcode].filter(Boolean).join(', ')
+      : ''
+    customerRef.value.fromEditOrder({
+      orderType: order.orderType,
+      phone: order.phoneNo || order.customer?.MobilePhone || '',
+      name: order.customerName || order.customer?.Name || '',
+      deliveryAddress: fullAddress,
+      postCode: addr?.postcode || '',
+      customerDetailsId: order.customerDetailId,
+      deliveryZoneId: order.deliveryZoneId,
+    })
+  }
 }
 
 const resetContext = () => {
@@ -405,10 +424,14 @@ watch(
       // getOffers is first in Promise.all to ensure it hits the browser queue first
       await Promise.all([getOffers(), getMenu()])
 
-      orderStore.cartItems = []
-      orderStore.paymentId = ''
-      orderStore.redirectUrl = ''
-      forceRemount.value++
+      // Don't wipe the cart or reset CustomerDetails when returning from a failed payment redirect
+      const isPaymentRetry = route.query.payment === 'failed' || route.query.payment === 'Cancel'
+      if (!isPaymentRetry) {
+        orderStore.cartItems = []
+        orderStore.paymentId = ''
+        orderStore.redirectUrl = ''
+        forceRemount.value++
+      }
       isLoading.value = false
     }
   },
