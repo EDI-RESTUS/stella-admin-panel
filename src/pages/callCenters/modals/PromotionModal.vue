@@ -17,7 +17,7 @@
             <div
               class="flex items-center justify-between px-3 py-2 rounded-full shadow-sm cursor-pointer transition"
               :class="isSelected(code) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'"
-              @click="toggleCode(code, promo.promotionType)"
+              @click="toggleCode(code, promo)"
             >
               <span class="text-sm truncate">
                 <strong>{{ promo.name }}</strong> - {{ code }}
@@ -103,13 +103,32 @@ function isSelected(code) {
   return selectedCodes.value.includes(code)
 }
 
-function toggleCode(code, promotionType) {
-  if (promotionType === 'TAKE_X_PAY_Y') {
+function countEligibleItems(promo) {
+  const menuIdSet = new Set((promo.menuItem || []).map(String))
+  const optionIdSet = new Set((promo.option || []).map(String))
+  let total = 0
+  for (const item of orderStore.cartItems) {
+    const itemEligible = menuIdSet.has(String(item.itemId))
+    const optionEligible = (item.selectedOptions || []).some((group) =>
+      (group.selected || []).some((opt) => optionIdSet.has(String(opt.optionId))),
+    )
+    if (itemEligible || optionEligible) {
+      total += item.quantity || 1
+    }
+  }
+  return total
+}
+
+function toggleCode(code, promo) {
+  if (promo.promotionType === 'TAKE_X_PAY_Y') {
+    const takeQty = Number(promo.takeQuantity) || 2
+    const eligible = countEligibleItems(promo)
+    const maxTimes = Math.floor(eligible / takeQty)
     const count = selectedCodes.value.filter((c) => c === code).length
-    if (count < 2) {
+    if (count < maxTimes) {
       selectedCodes.value.push(code)
     } else {
-      // third click clears all instances
+      // at max → clear all instances on next click
       selectedCodes.value = selectedCodes.value.filter((c) => c !== code)
     }
   } else {
