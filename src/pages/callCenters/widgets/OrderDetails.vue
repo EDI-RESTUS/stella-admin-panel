@@ -1170,7 +1170,7 @@ import { onMounted } from 'vue'
 const existingOrderId = ref('')
 
 onMounted(async () => {
-  if (route.query.payment === 'failed' && route.query.orderId) {
+if ((route.query.payment === 'failed' || route.query.payment === 'Cancel') && route.query.orderId) {
     console.log('[PaymentRetry] Detected failed payment redirect', route.query)
     isLoading.value = true
     try {
