@@ -413,6 +413,10 @@ watch(
       }
       isLoading.value = true
 
+      // Capture before any awaits — OrderDetails cleans the query params during menu load,
+      // so checking route.query after the awaits would always be false
+      const isPaymentRetry = route.query.payment === 'failed' || route.query.payment === 'Cancel'
+
       // 1. Setup Zone (awaited)
       await autoSetUserDeliveryZone()
 
@@ -425,7 +429,6 @@ watch(
       await Promise.all([getOffers(), getMenu()])
 
       // Don't wipe the cart or reset CustomerDetails when returning from a failed payment redirect
-      const isPaymentRetry = route.query.payment === 'failed' || route.query.payment === 'Cancel'
       if (!isPaymentRetry) {
         orderStore.cartItems = []
         orderStore.paymentId = ''
