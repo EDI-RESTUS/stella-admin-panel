@@ -364,6 +364,18 @@ export const useOrderStore = defineStore('order', {
       this.setOrderNotes(order.orderNotes || order.note)
       this.setDeliveryNotes(order.deliveryNotes)
       this.setPhoneNumber(order.phoneNo || order.customer?.MobilePhone || '')
+
+      // 5. Restore promo discount display if the order had a discount applied
+      const discount = Number(order.discount || 0)
+      if (discount > 0) {
+        this.setOrderTotal({
+          originalTotal: Number(order.subtotal || 0),
+          updatedTotal: Number(order.total || 0),
+          menuItems: [],
+          offerDetails: [],
+          updatedOffersTotal: 0,
+        })
+      }
     },
     async cancelOrder(orderId: string) {
       const url = import.meta.env.VITE_API_BASE_URL
