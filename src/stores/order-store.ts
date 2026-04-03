@@ -292,19 +292,12 @@ export const useOrderStore = defineStore('order', {
           })
           .filter(Boolean)
 
-        // Derive base price from the order's stored unit price minus option prices to avoid
-        // double-counting when the menu item's .price already reflects a particular size.
-        const orderOptionTotal = (menuItem.options || []).reduce((sum: number, opt: any) => {
-          return sum + (parseFloat(opt.price || 0) * (Number(opt.quantity) || 1))
-        }, 0)
-        const derivedBasePrice = Math.max(0, parseFloat(menuItem.price || 0) - orderOptionTotal)
-
         return {
           orderId: orderId,
           itemId: originalMenuItem?._id || menuItem.menuItem,
           itemName: originalMenuItem?.name || menuItem.name || 'Unknown Item',
-          basePrice: derivedBasePrice,
-          price: derivedBasePrice,
+          basePrice: parseFloat(originalMenuItem?.price || menuItem.originalPrice || menuItem.price) || 0,
+          price: parseFloat(originalMenuItem?.price || menuItem.originalPrice || menuItem.price) || 0,
           totalPrice: 0,
           imageUrl: menuItem.imageUrl || originalMenuItem?.imageUrl || '',
           promotionCode: menuItem.promotionCode || '',
@@ -372,17 +365,6 @@ export const useOrderStore = defineStore('order', {
       this.setDeliveryNotes(order.deliveryNotes)
       this.setPhoneNumber(order.phoneNo || order.customer?.MobilePhone || '')
 
-      // 5. Restore promo discount display if the order had a discount applied
-      const discount = Number(order.discount || 0)
-      if (discount > 0) {
-        this.setOrderTotal({
-          originalTotal: Number(order.subtotal || 0),
-          updatedTotal: Number(order.total || 0),
-          menuItems: [],
-          offerDetails: [],
-          updatedOffersTotal: 0,
-        })
-      }
     },
     async cancelOrder(orderId: string) {
       const url = import.meta.env.VITE_API_BASE_URL

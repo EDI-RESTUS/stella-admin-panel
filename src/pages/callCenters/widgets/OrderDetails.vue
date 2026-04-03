@@ -1240,6 +1240,16 @@ if ((route.query.payment === 'failed' || route.query.payment === 'Cancel') && ro
           promoCode.value = codes.join(', ')
           appliedPromoCodes.value = codes
           isPromoValid.value = true
+          // Re-validate promo so cartTotal has correct per-item breakdown
+          try {
+            const payload = buildPromoPayloadFromState(codes)
+            const promoRes = await orderStore.validatePromoCode(payload)
+            if (promoRes.data?.success) {
+              orderStore.setOrderTotal(promoRes.data.data)
+            }
+          } catch {
+            // promo may have expired — ignore, user can retry manually
+          }
         }
 
         console.log('[OrderDetails] Setting showCheckoutModal = true. Cart items LEN:', orderStore.cartItems.length)
