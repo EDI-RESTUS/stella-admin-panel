@@ -1263,7 +1263,9 @@ function fromEditOrder(order) {
   selectedUser.value = {
     _id: order.customerDetailsId || order.customerId || undefined,
     customerName: name.value,
+    Name: name.value,
     phoneNo: phoneNumber.value,
+    MobilePhone: phoneNumber.value,
     OtherAddresses: [
       {
         Designation: designation,

@@ -1315,6 +1315,8 @@ onMounted(async () => {
 
         existingOrderId.value = oid
         orderStore.orderDateTime = order.orderDateTime || order.createdAt
+        console.log('[OrderDetails] Restored payment retry state. Opening checkout modal.')
+        showCheckoutModal.value = true
 
         // Restore promo codes so the input field shows the applied codes
         const codes = Array.isArray(order.promotionCodes) && order.promotionCodes.length
@@ -1343,9 +1345,6 @@ onMounted(async () => {
             // promo may have expired — ignore, user can retry manually
           }
         }
-
-        console.log('[OrderDetails] Setting showCheckoutModal = true. Cart items LEN:', orderStore.cartItems.length)
-        showCheckoutModal.value = true
 
         const q = { ...route.query }
         delete q.payment

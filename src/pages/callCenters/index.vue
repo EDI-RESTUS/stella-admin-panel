@@ -146,7 +146,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted, useTemplateRef, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, useTemplateRef, onBeforeUnmount, nextTick } from 'vue'
 import { useMenuStore } from '@/stores/getMenu.js'
 import { useServiceStore } from '@/stores/services.ts'
 import { useOrderStore } from '@/stores/order-store'
@@ -189,6 +189,7 @@ const accordian = ref([true, true])
 const deliveryFee = ref(0)
 const orderStore = useOrderStore()
 const userStore = useUsersStore()
+const pendingRestoreContext = ref(null)
 const toTitleCase = (text) => {
   if (!text) return ''
   return text
@@ -249,6 +250,39 @@ const getOffers = async () => {
 // All offers shown; OfferCard handles disabling out-of-stock ones visually
 const filteredOffers = computed(() => offers.value)
 
+function buildRestoreCustomerPayload(order) {
+  const addr = order.address
+  const fullAddress = addr
+    ? typeof addr === 'string'
+      ? addr
+      : [addr.line1, addr.line2, addr.city, addr.postcode].filter(Boolean).join(', ')
+    : ''
+
+  return {
+    orderType: order.orderType,
+    phone: order.phoneNo || order.customer?.MobilePhone || '',
+    name: order.customerName || order.customer?.Name || '',
+    deliveryAddress: fullAddress,
+    postCode: order.postCode || order.postalCode || addr?.postcode || '',
+    customerDetailsId: order.customerDetailId,
+    deliveryZoneId: order.deliveryZoneId,
+    deliveryNotes: order.deliveryNotes || '',
+    addressDesignation: order.addressDesignation || '',
+  }
+}
+
+async function restoreCustomerContext(order) {
+  if (!order) return
+
+  pendingRestoreContext.value = buildRestoreCustomerPayload(order)
+  await nextTick()
+
+  if (customerRef.value?.fromEditOrder) {
+    customerRef.value.fromEditOrder(pendingRestoreContext.value)
+    pendingRestoreContext.value = null
+  }
+}
+
 const updateContext = (ctx) => {
   customerDetailsId.value = ctx.customerDetailsId
   orderType.value = ctx.orderType
@@ -258,27 +292,24 @@ const updateContext = (ctx) => {
   if (ctx.customerDetailsId) isCustomerTabActivated.value = true
 
   // Restore customer details panel when returning from a failed payment redirect
-  if (ctx.order && customerRef.value) {
-    const order = ctx.order
-    const addr = order.address
-    const fullAddress = addr
-      ? typeof addr === 'string'
-        ? addr
-        : [addr.line1, addr.line2, addr.city, addr.postcode].filter(Boolean).join(', ')
-      : ''
-    customerRef.value.fromEditOrder({
-      orderType: order.orderType,
-      phone: order.phoneNo || order.customer?.MobilePhone || '',
-      name: order.customerName || order.customer?.Name || '',
-      deliveryAddress: fullAddress,
-      postCode: addr?.postcode || '',
-      customerDetailsId: order.customerDetailId,
-      deliveryZoneId: order.deliveryZoneId,
-    })
+  if (ctx.order) {
+    void restoreCustomerContext(ctx.order)
   }
 }
 
+watch(
+  () => customerRef.value,
+  (refVal) => {
+    if (refVal?.fromEditOrder && pendingRestoreContext.value) {
+      refVal.fromEditOrder(pendingRestoreContext.value)
+      pendingRestoreContext.value = null
+    }
+  },
+  { immediate: true },
+)
+
 const resetContext = () => {
+  pendingRestoreContext.value = null
   orderStore.cartItems = []
   orderStore.offerItems = []
   orderStore.editOrder = null
@@ -389,6 +420,7 @@ watch(
 )
 
 function resetState() {
+  pendingRestoreContext.value = null
   selectedItem.value = null
   offers.value = []
   orderStore.cartItems = []
