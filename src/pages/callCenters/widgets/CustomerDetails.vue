@@ -788,8 +788,11 @@ async function fetchCustomerDetails(setUser = false) {
                 const stellaUser = hits[0]
                 const stellaAddrs = Array.isArray(stellaUser.address) ? stellaUser.address : []
 
-                // Merge deliveryNote into Winmax list
+                // Merge Stella _id and deliveryNote into Winmax list
                 wmList.forEach((u) => {
+                  if (!u._id && stellaUser._id) {
+                    u._id = stellaUser._id
+                  }
                   if (u.OtherAddresses) {
                     u.OtherAddresses.forEach((wmAddr) => {
                       const match = stellaAddrs.find(
