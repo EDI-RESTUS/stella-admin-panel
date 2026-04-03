@@ -253,29 +253,30 @@ export const useOrderStore = defineStore('order', {
           console.log(`[OrderStore] Found original item: ${originalMenuItem.name} (${originalMenuItem._id})`)
         }
 
+        // Build a mutable pool so each stored option is consumed only once,
+        // preventing the same option ID matching into multiple groups (e.g. Half & Half).
+        const remainingOptions = [...(menuItem.options || [])]
+
         const mappedOptions = (originalMenuItem?.articlesOptionsGroup || [])
           .map((group: any) => {
             const selected = (group.articlesOptions || [])
-              .filter((opt: any) => {
-                const found = (menuItem.options || []).find(
+              .reduce((acc: any[], opt: any) => {
+                const idx = remainingOptions.findIndex(
                   (o: any) => o.option === opt._id || o.option?._id === opt._id,
                 )
-                return !!found
-              })
-              .map((opt: any) => {
-                const found = (menuItem.options || []).find(
-                  (o: any) => o.option === opt._id || o.option?._id === opt._id,
-                )
-                return {
+                if (idx === -1) return acc
+                const found = remainingOptions.splice(idx, 1)[0]
+                acc.push({
                   ...opt,
                   optionId: opt._id,
                   optionName: opt.name,
                   price: parseFloat(opt.price) || 0,
                   type: opt.type,
-                  quantity: found ? Number(found.quantity) || 1 : 1,
+                  quantity: Number(found.quantity) || 1,
                   selected: true,
-                }
-              })
+                })
+                return acc
+              }, [])
 
             if (!selected.length) return null
 

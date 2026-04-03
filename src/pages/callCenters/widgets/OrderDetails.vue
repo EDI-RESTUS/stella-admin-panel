@@ -1240,10 +1240,46 @@ if ((route.query.payment === 'failed' || route.query.payment === 'Cancel') && ro
           promoCode.value = codes.join(', ')
           appliedPromoCodes.value = codes
           isPromoValid.value = true
-          // Re-validate promo so cartTotal has correct per-item breakdown
+          // Re-validate promo using order data directly (props/store zone not ready yet)
           try {
-            const payload = buildPromoPayloadFromState(codes)
-            const promoRes = await orderStore.validatePromoCode(payload)
+            const menuItems = orderStore.cartItems.map((e) => ({
+              menuItem: e.itemId,
+              quantity: e.quantity,
+              options: e.selectedOptions.flatMap((g) =>
+                g.selected.map((o) => ({ option: o.optionId, quantity: o.quantity })),
+              ),
+            }))
+            const offerMenuItems = orderStore.offerItems.map((offer) => ({
+              offerId: offer.offerId,
+              menuItems: offer.selections.flatMap((s) =>
+                s.addedItems.map((item) => ({
+                  menuItem: item.itemId,
+                  quantity: item.quantity || 1,
+                  options: (item.selectedOptions || []).flatMap((g) =>
+                    g.selected.map((o) => ({ option: o.optionId, quantity: o.quantity })),
+                  ),
+                })),
+              ),
+            }))
+            const single = codes.length === 1 ? codes[0] : null
+            const promoPayload = {
+              orderFor: order.orderFor || 'current',
+              customerDetailId: order.customerDetailId,
+              orderType: order.orderType || 'Takeaway',
+              deliveryZoneId: order.deliveryZoneId,
+              address: order.address,
+              menuItems,
+              offerMenuItems,
+              orderNotes: order.orderNotes || '',
+              deliveryFee: order.deliveryFee || 0,
+              outletId: order.outletId,
+              orderDateTime: order.orderDateTime || order.createdAt,
+              paymentMode: '',
+              promoCodes: codes,
+              hasOtherOffers: offerMenuItems.length,
+              ...(single ? { promoCode: single } : {}),
+            }
+            const promoRes = await orderStore.validatePromoCode(promoPayload)
             if (promoRes.data?.success) {
               orderStore.setOrderTotal(promoRes.data.data)
             }
