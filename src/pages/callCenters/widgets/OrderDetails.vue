@@ -382,7 +382,7 @@
 </template>
 
 <script setup>
-import { ref, computed, useTemplateRef, watch, nextTick } from 'vue'
+import { ref, computed, useTemplateRef, watch, nextTick, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useOrderStore } from '@/stores/order-store'
 import { useServiceStore } from '@/stores/services.ts'
@@ -536,6 +536,67 @@ function onCodesSelected(codes) {
   promoCode.value = codes.length === 1 ? codes[0] : ''
   isPromoValid.value = codes.length > 0
   showPromotionModal.value = false
+}
+
+function getSelectedDeliveryZoneId() {
+  const zone = orderStore.deliveryZone
+  if (!zone) return ''
+  if (typeof zone === 'string') return zone
+  return zone._id || zone.id || ''
+}
+
+function resolvePromoOrderDateTime(fallback = new Date().toISOString()) {
+  if (!props.dateSelected) return fallback
+
+  const parsedDate = new Date(props.dateSelected)
+  return Number.isNaN(parsedDate.getTime()) ? fallback : parsedDate.toISOString()
+}
+
+function isFailedPaymentReturn() {
+  const paymentState = String(route.query.payment || route.query.status || '').toLowerCase()
+  return ['failed', 'cancel', 'cancelled', 'canceled'].includes(paymentState)
+}
+
+async function waitForRestoredCheckoutContext({ customerDetailId, deliveryZoneId, orderType }) {
+  const requiresZone = String(orderType || '').toLowerCase() === 'delivery' && !!deliveryZoneId
+
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const currentCustomerId = String(props.customerDetailsId || '')
+    const currentDeliveryZoneId = String(getSelectedDeliveryZoneId() || '')
+    const hasCustomer = !customerDetailId || currentCustomerId === String(customerDetailId)
+    const hasDeliveryZone = !requiresZone || currentDeliveryZoneId === String(deliveryZoneId)
+
+    if (hasCustomer && hasDeliveryZone) {
+      return
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+}
+
+async function restorePromoAfterPaymentRetry(codes, restoreContext) {
+  if (!codes.length) return
+
+  await waitForRestoredCheckoutContext(restoreContext)
+
+  const single = codes.length === 1 ? codes[0] : null
+  const promoPayload = buildPromoPayloadFromState(codes, {
+    orderFor: restoreContext.orderFor || orderFor.value,
+    customerDetailId: restoreContext.customerDetailId || props.customerDetailsId,
+    orderType: restoreContext.orderType || (props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'),
+    deliveryZoneId: getSelectedDeliveryZoneId() || restoreContext.deliveryZoneId,
+    address: orderStore.address || restoreContext.address || '',
+    orderNotes: orderStore.orderNotes || restoreContext.orderNotes || '',
+    deliveryFee: Number(props.deliveryFee ?? restoreContext.deliveryFee ?? 0),
+    outletId: restoreContext.outletId || serviceStore.selectedRest,
+    orderDateTime: resolvePromoOrderDateTime(restoreContext.orderDateTime || new Date().toISOString()),
+    ...(single ? { promoCode: single } : {}),
+  })
+
+  const promoRes = await orderStore.validatePromoCode(promoPayload)
+  if (promoRes.data?.success) {
+    orderStore.setOrderTotal(promoRes.data.data)
+  }
 }
 
 // Check if the current service is restricted for the selected zone
@@ -981,7 +1042,7 @@ function parseCodes(raw) {
 }
 
 // Build payload identical to the modal (keys + types)
-function buildPromoPayloadFromState(promoCodes) {
+function buildPromoPayloadFromState(promoCodes, overrides = {}) {
   const menuItems = orderStore.cartItems.map((e) => ({
     menuItem: e.itemId,
     quantity: e.quantity,
@@ -1015,20 +1076,21 @@ function buildPromoPayloadFromState(promoCodes) {
     orderFor: orderFor.value,
     customerDetailId: props.customerDetailsId,
     orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
-    deliveryZoneId: orderStore.deliveryZone?._id,
+    deliveryZoneId: getSelectedDeliveryZoneId(),
     address: orderStore.address,
     menuItems,
     offerMenuItems,
     orderNotes: orderStore.orderNotes || '',
     deliveryFee: props.deliveryFee,
     outletId: serviceStore.selectedRest,
-    orderDateTime: new Date(props.dateSelected).toISOString(),
+    orderDateTime: resolvePromoOrderDateTime(),
     paymentMode: '',
     promoCodes: promoCodes, // array (no empty strings)
     hasOtherOffers: offerMenuItems.length, // number (not boolean)
+    ...overrides,
   }
 
-  if (single) payload.promoCode = single
+  if (single && !payload.promoCode) payload.promoCode = single
   return payload
 }
 
@@ -1165,12 +1227,11 @@ function closeOfferModal() {
 function closePromotionModal() {
   showPromotionModal.value = false
 }
-import { onMounted } from 'vue'
 
 const existingOrderId = ref('')
 
 onMounted(async () => {
-if ((route.query.payment === 'failed' || route.query.payment === 'Cancel') && route.query.orderId) {
+  if (isFailedPaymentReturn() && route.query.orderId) {
     console.log('[PaymentRetry] Detected failed payment redirect', route.query)
     isLoading.value = true
     try {
@@ -1226,15 +1287,30 @@ if ((route.query.payment === 'failed' || route.query.payment === 'Cancel') && ro
         const customerPhone = savedCustomer?.phone || order.phoneNo || ''
         const customerName = savedCustomer?.customerName || order.customerName || ''
         const deliveryZoneId = savedCustomer?.deliveryZoneId || order.deliveryZoneId || ''
+        const customerDetailsId = savedCustomer?.customerDetailId || order.customerDetailId
+        const restoredAddress = savedCustomer?.address || order.address || ''
+        const restoredDeliveryNotes = savedCustomer?.deliveryNotes ?? order.deliveryNotes ?? ''
+        const restoredOrderType = String(order.orderType || savedCustomer?.orderType || '').toLowerCase() === 'delivery'
+          ? 'Delivery'
+          : 'Takeaway'
+        orderStore.setCustomerName(customerName)
 
         // 2c. Emit context to parent (index.vue) to update props
         emit('restore-context', {
-          customerDetailsId: savedCustomer?.customerDetailId || order.customerDetailId,
-          orderType: (order.orderType || savedCustomer?.orderType || '').toLowerCase(),
+          customerDetailsId: customerDetailsId,
+          orderType: restoredOrderType.toLowerCase(),
           deliveryFee: Number(order.deliveryFee || 0),
           isDeliveryZoneSelected: !!deliveryZoneId,
           dateSelected: order.orderDateTime || order.createdAt,
-          order: { ...order, phoneNo: customerPhone, customerName, deliveryZoneId },
+          order: {
+            ...order,
+            phoneNo: customerPhone,
+            customerName,
+            deliveryZoneId,
+            customerDetailId,
+            address: restoredAddress,
+            deliveryNotes: restoredDeliveryNotes,
+          },
         })
 
         existingOrderId.value = oid
@@ -1250,49 +1326,19 @@ if ((route.query.payment === 'failed' || route.query.payment === 'Cancel') && ro
           promoCode.value = codes.join(', ')
           appliedPromoCodes.value = codes
           isPromoValid.value = true
-          // Re-validate promo using order data directly (props/store zone not ready yet)
+          // Re-validate promo after the customer + zone restore has settled.
           try {
-            const menuItems = orderStore.cartItems.map((e) => ({
-              menuItem: e.itemId,
-              quantity: e.quantity,
-              options: e.selectedOptions.flatMap((g) =>
-                g.selected.map((o) => ({ option: o.optionId, quantity: o.quantity })),
-              ),
-            }))
-            const offerMenuItems = orderStore.offerItems.map((offer) => ({
-              offerId: offer.offerId,
-              menuItems: offer.selections.flatMap((s) =>
-                s.addedItems.map((item) => ({
-                  menuItem: item.itemId,
-                  quantity: item.quantity || 1,
-                  options: (item.selectedOptions || []).flatMap((g) =>
-                    g.selected.map((o) => ({ option: o.optionId, quantity: o.quantity })),
-                  ),
-                })),
-              ),
-            }))
-            const single = codes.length === 1 ? codes[0] : null
-            const promoPayload = {
+            await restorePromoAfterPaymentRetry(codes, {
               orderFor: order.orderFor || 'current',
-              customerDetailId: order.customerDetailId,
-              orderType: order.orderType || 'Takeaway',
-              deliveryZoneId: order.deliveryZoneId,
-              address: order.address,
-              menuItems,
-              offerMenuItems,
+              customerDetailId,
+              orderType: restoredOrderType,
+              deliveryZoneId,
+              address: restoredAddress,
               orderNotes: order.orderNotes || '',
               deliveryFee: order.deliveryFee || 0,
               outletId: order.outletId,
               orderDateTime: order.orderDateTime || order.createdAt,
-              paymentMode: '',
-              promoCodes: codes,
-              hasOtherOffers: offerMenuItems.length,
-              ...(single ? { promoCode: single } : {}),
-            }
-            const promoRes = await orderStore.validatePromoCode(promoPayload)
-            if (promoRes.data?.success) {
-              orderStore.setOrderTotal(promoRes.data.data)
-            }
+            })
           } catch {
             // promo may have expired — ignore, user can retry manually
           }

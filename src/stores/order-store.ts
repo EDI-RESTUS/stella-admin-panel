@@ -360,8 +360,7 @@ export const useOrderStore = defineStore('order', {
 
       // 4. Set context
       this.setOrderFor(order.orderFor)
-      // deliveryZoneId is a string in the order
-      this.setDeliveryZone(order.deliveryZoneId)
+      this.setDeliveryZone(order.deliveryZoneId ? { _id: order.deliveryZoneId } : '')
       this.setAddress(order.address)
       this.setOrderNotes(order.orderNotes || order.note)
       this.setDeliveryNotes(order.deliveryNotes)

@@ -415,7 +415,8 @@ watch(
 
       // Capture before any awaits — OrderDetails cleans the query params during menu load,
       // so checking route.query after the awaits would always be false
-      const isPaymentRetry = route.query.payment === 'failed' || route.query.payment === 'Cancel'
+      const paymentState = String(route.query.payment || route.query.status || '').toLowerCase()
+      const isPaymentRetry = ['failed', 'cancel', 'cancelled', 'canceled'].includes(paymentState)
 
       // 1. Setup Zone (awaited)
       await autoSetUserDeliveryZone()

@@ -446,6 +446,8 @@ const selectedZoneDetails = ref(null)
 const orderFor = ref('current')
 const showConfirmRemove = ref(false)
 const showHistoryModal = ref(false)
+const isRestoringOrderContext = ref(false)
+const restoredDeliveryZoneId = ref('')
 
 watch(phoneNumber, (val) => {
   orderStore.setPhoneNumber(val)
@@ -996,6 +998,10 @@ function selectUser(user) {
 
 // Auto-select location when phone number is 1-15 by matching serviceZoneId to phone number
 function autoSelectLocationForShortPhone() {
+  if (isRestoringOrderContext.value && restoredDeliveryZoneId.value) {
+    return
+  }
+
   const phone = String(phoneLocal.value || '').trim()
   const phoneNum = Number(phone)
 
@@ -1017,6 +1023,12 @@ function autoSelectLocationForShortPhone() {
 }
 
 const deliveryZoneOptions = ref([])
+
+function findDeliveryZoneById(zoneId) {
+  if (!zoneId) return null
+
+  return deliveryZoneOptions.value.find((zone) => String(zone._id || zone.id) === String(zoneId)) || null
+}
 
 // Check if location should be locked (for phone numbers 1-15)
 // Use phoneLocal (no country prefix) so "15" stays "15" instead of "35715"
@@ -1043,8 +1055,9 @@ const filteredDeliveryZones = computed(() => {
   return deliveryZoneOptions.value
 })
 
-function selectDeliveryZone(zone) {
+function selectDeliveryZone(zone, options = {}) {
   if (zone) {
+    const bypassAvailability = options.bypassAvailability === true
     // Debug logging
     console.log('[selectDeliveryZone] Checking availability for:', zone.name)
     console.log('[selectDeliveryZone] Current Tab:', selectedTab.value)
@@ -1056,7 +1069,7 @@ function selectDeliveryZone(zone) {
 
     console.log(`[selectDeliveryZone] Is available for ${currentService} (cc):`, isAvailable)
 
-    if (isAvailable === false) {
+    if (!bypassAvailability && isAvailable === false) {
       confirm({
         message: `${selectedTab.value === 'takeaway' ? 'Takeaway' : 'Delivery'} not available for this Zone`,
         okText: 'Close',
@@ -1130,7 +1143,7 @@ async function handleDeliveryZoneFetch() {
   const servicesStore = useServiceStore()
   if (deliveryZoneOptions.value.length) {
     // Zones already cached – still try auto-select for short phone numbers
-    if (selectedUser.value) {
+    if (selectedUser.value && !(isRestoringOrderContext.value && restoredDeliveryZoneId.value)) {
       autoSelectLocationForShortPhone()
     }
     return
@@ -1157,13 +1170,18 @@ async function handleDeliveryZoneFetch() {
       })
 
     // Auto-select location if phone is 1-15 and user is already selected
-    if (selectedUser.value) {
+    if (selectedUser.value && !(isRestoringOrderContext.value && restoredDeliveryZoneId.value)) {
       autoSelectLocationForShortPhone()
     }
 
     // Auto-select if user is restricted to exactly one zone
     const allowed = userStore.userDetails?.allowedDeliveryZoneIds
-    if (allowed && allowed.length > 0 && deliveryZoneOptions.value.length === 1) {
+    if (
+      !(isRestoringOrderContext.value && restoredDeliveryZoneId.value) &&
+      allowed &&
+      allowed.length > 0 &&
+      deliveryZoneOptions.value.length === 1
+    ) {
       selectDeliveryZone(deliveryZoneOptions.value[0])
     }
 
@@ -1224,6 +1242,7 @@ function getParsedAddress(payload) {
 }
 function fromEditOrder(order) {
   if (!order) return
+  isRestoringOrderContext.value = true
   // open & switch tab based on type (adjust keys if yours differ)
   isOpen.value = true
   selectedTab.value = /takeaway/i.test(order.orderType || order.type) ? 'takeaway' : 'delivery'
@@ -1231,11 +1250,15 @@ function fromEditOrder(order) {
   // set identity
   phoneNumber.value = order.customerPhone || order.phone || ''
   name.value = order.customerName || order.name || ''
+  orderStore.setCustomerName(name.value)
 
   // build a minimal Winmax-like "OtherAddresses" array so filteredAddresses works unchanged
   const fullAddr = order.deliveryAddress || order.address || order.delivery_address || '' // pick what you store
   const postal = order.postalCode || order.postCode || '' // optional, used for zone match
   const designation = order.addressDesignation || 'From order'
+  const deliveryNote = order.deliveryNotes || ''
+  const zoneMongoId = order.deliveryZoneId || ''
+  restoredDeliveryZoneId.value = zoneMongoId
 
   selectedUser.value = {
     _id: order.customerDetailsId || order.customerId || undefined,
@@ -1246,6 +1269,8 @@ function fromEditOrder(order) {
         Designation: designation,
         Address: fullAddr,
         ZipCode: postal,
+        deliveryNote: deliveryNote,
+        deliveryZoneId: zoneMongoId,
       },
     ],
   }
@@ -1258,19 +1283,30 @@ function fromEditOrder(order) {
   })
 
   // Restore delivery zone by looking up the MongoDB _id in the loaded zone list
-  const zoneMongoId = order.deliveryZoneId || ''
   if (zoneMongoId) {
     const trySelectZone = () => {
-      const zone = deliveryZoneOptions.value.find(
-        (z) => z._id === zoneMongoId || z.id === zoneMongoId,
-      )
-      if (zone) selectDeliveryZone(zone)
+      const zone = findDeliveryZoneById(zoneMongoId)
+      if (!zone) {
+        isRestoringOrderContext.value = false
+        restoredDeliveryZoneId.value = ''
+        return
+      }
+
+      selectDeliveryZone(zone, { bypassAvailability: true })
+      if (fullAddr) {
+        orderStore.setAddress(fullAddr)
+      }
+      if (selectedTab.value === 'delivery') {
+        orderStore.deliveryNotes = deliveryNote || ''
+      }
     }
     if (deliveryZoneOptions.value.length) {
       trySelectZone()
     } else {
       handleDeliveryZoneFetch().then(trySelectZone)
     }
+  } else {
+    isRestoringOrderContext.value = false
   }
 
   // emit to parent like the rest of your watchers do
@@ -1294,6 +1330,7 @@ const filteredAddresses = computed(() => {
           postalCode: e.ZipCode,
           fullAddress: e.Address || '',
           deliveryNote: e.deliveryNote || '', // Add this
+          deliveryZoneId: e.deliveryZoneId || e.DeliveryZoneId || '',
         }
       } else {
         const addressArray = e.Address.split(',')
@@ -1305,6 +1342,7 @@ const filteredAddresses = computed(() => {
           postalCode: postalCode,
           fullAddress: e.Address,
           deliveryNote: e.deliveryNote || '',
+          deliveryZoneId: e.deliveryZoneId || e.DeliveryZoneId || '',
         }
       }
     })
@@ -1372,6 +1410,7 @@ watch(
       const postalCode = newAddress.postalCode
       const currentText = newAddress.text
       const fullAddress = newAddress.fullAddress
+      const explicitDeliveryZoneId = newAddress.deliveryZoneId || ''
 
       // Update delivery notes from the selected address (only for delivery, not takeaway)
       if (selectedTab.value === 'delivery') {
@@ -1385,12 +1424,21 @@ watch(
       const matchingZone = deliveryZoneOptions.value.find((zone) =>
         zone.postalCodes.some((zoneCode) => String(zoneCode).trim() === String(postalCode).trim()),
       )
+      const explicitZone = findDeliveryZoneById(explicitDeliveryZoneId)
       // Check for meeting point match first
       const meetingPoints = deliveryZoneOptions.value
         .map((zone) => zone.meetingPoints?.find((mp) => currentText.includes(mp.designation)))
         .filter(Boolean)
 
       if (selectedTab.value === 'delivery') {
+        if (explicitZone) {
+          selectDeliveryZone(explicitZone, { bypassAvailability: true })
+          orderStore.setAddress(fullAddress)
+          isRestoringOrderContext.value = false
+          restoredDeliveryZoneId.value = ''
+          return
+        }
+
         const isMeetingPointAddress = currentText.includes('Meeting Point') || currentText.includes('M.P')
 
         let foundZone = null
@@ -1456,6 +1504,10 @@ watch(
           serviceZoneId.value = ''
           selectedZoneDetails.value = null
           emits('setDeliveryZone', false)
+          if (explicitDeliveryZoneId) {
+            isRestoringOrderContext.value = false
+            restoredDeliveryZoneId.value = ''
+          }
         }
       }
     } else {
@@ -1490,6 +1542,8 @@ watch(
     showCustomerModal.value = false
     deliveryZoneOptions.value = []
     orderStore.deliveryNotes = ''
+    isRestoringOrderContext.value = false
+    restoredDeliveryZoneId.value = ''
   },
 )
 

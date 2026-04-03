@@ -380,6 +380,13 @@ const handleDenominationClick = (amount: number) => {
 
 const finalTotal = computed(() => currentEditedTotal.value)
 
+function getSelectedDeliveryZoneId() {
+  const zone = orderStore.deliveryZone
+  if (!zone) return ''
+  if (typeof zone === 'string') return zone
+  return zone._id || zone.id || ''
+}
+
 const changeAmount = computed(() => {
   if (!selectedCashAmount.value) return 0
   return selectedCashAmount.value - finalTotal.value
@@ -1116,7 +1123,7 @@ async function updateOrderWithPromo(promoCodes: string[]) {
       orderFor: orderFor.value,
       customerDetailId: props.customerDetailsId,
       orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
-      deliveryZoneId: orderStore.deliveryZone?._id,
+      deliveryZoneId: getSelectedDeliveryZoneId(),
       outletId: serviceStore.selectedRest,
       orderDateTime,
       phoneNo: orderStore.phoneNumber || '',
@@ -1319,7 +1326,7 @@ async function createOrder() {
         orderFor: orderFor.value,
         customerDetailId: props.customerDetailsId,
         orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
-        deliveryZoneId: orderStore.deliveryZone?._id,
+        deliveryZoneId: getSelectedDeliveryZoneId(),
         menuItems,
         deliveryNotes: orderStore.deliveryNotes || '',
         offerMenuItems,
@@ -1360,13 +1367,16 @@ async function createOrder() {
             paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
             orderType: props.orderType,
           })
+          const deliveryZoneId = getSelectedDeliveryZoneId()
           // Save customer context so it can be restored on failed-payment return
           sessionStorage.setItem('cc_pending_customer', JSON.stringify({
             phone: orderStore.phoneNumber || '',
             customerName: orderStore.customerName || '',
             customerDetailId: props.customerDetailsId || '',
-            deliveryZoneId: orderStore.deliveryZone?._id || '',
+            deliveryZoneId,
             orderType: props.orderType || '',
+            address: orderStore.address || '',
+            deliveryNotes: orderStore.deliveryNotes || '',
           }))
           // setInter()
           window.top.location.href = response.data.data.redirectUrl
