@@ -1258,7 +1258,7 @@ function fromEditOrder(order) {
   if (zoneMongoId) {
     const trySelectZone = () => {
       const zone = deliveryZoneOptions.value.find(
-        (z: any) => z._id === zoneMongoId || z.id === zoneMongoId,
+        (z) => z._id === zoneMongoId || z.id === zoneMongoId,
       )
       if (zone) selectDeliveryZone(zone)
     }
