@@ -1230,6 +1230,18 @@ if ((route.query.payment === 'failed' || route.query.payment === 'Cancel') && ro
         existingOrderId.value = oid
         orderStore.orderDateTime = order.orderDateTime || order.createdAt
 
+        // Restore promo codes so the input field shows the applied codes
+        const codes: string[] = Array.isArray(order.promotionCodes) && order.promotionCodes.length
+          ? order.promotionCodes
+          : order.promotionCode
+          ? [order.promotionCode]
+          : []
+        if (codes.length) {
+          promoCode.value = codes.join(', ')
+          appliedPromoCodes.value = codes
+          isPromoValid.value = true
+        }
+
         console.log('[OrderDetails] Setting showCheckoutModal = true. Cart items LEN:', orderStore.cartItems.length)
         showCheckoutModal.value = true
 

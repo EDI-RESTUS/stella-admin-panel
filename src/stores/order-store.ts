@@ -292,12 +292,19 @@ export const useOrderStore = defineStore('order', {
           })
           .filter(Boolean)
 
+        // Derive base price from the order's stored unit price minus option prices to avoid
+        // double-counting when the menu item's .price already reflects a particular size.
+        const orderOptionTotal = (menuItem.options || []).reduce((sum: number, opt: any) => {
+          return sum + (parseFloat(opt.price || 0) * (Number(opt.quantity) || 1))
+        }, 0)
+        const derivedBasePrice = Math.max(0, parseFloat(menuItem.price || 0) - orderOptionTotal)
+
         return {
           orderId: orderId,
           itemId: originalMenuItem?._id || menuItem.menuItem,
           itemName: originalMenuItem?.name || menuItem.name || 'Unknown Item',
-          basePrice: parseFloat(originalMenuItem?.price || menuItem.originalPrice || menuItem.price) || 0,
-          price: parseFloat(originalMenuItem?.price || menuItem.originalPrice || menuItem.price) || 0, // Fallback for some UI components that might check .price
+          basePrice: derivedBasePrice,
+          price: derivedBasePrice,
           totalPrice: 0,
           imageUrl: menuItem.imageUrl || originalMenuItem?.imageUrl || '',
           promotionCode: menuItem.promotionCode || '',

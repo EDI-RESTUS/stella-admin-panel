@@ -1253,8 +1253,21 @@ function fromEditOrder(order) {
     selectedAddress.value = filteredAddresses.value[0] || null
   })
 
-  // set zone id label if you show it on the button
-  serviceZoneId.value = order.deliveryZoneId || order.serviceZoneId || ''
+  // Restore delivery zone by looking up the MongoDB _id in the loaded zone list
+  const zoneMongoId = order.deliveryZoneId || ''
+  if (zoneMongoId) {
+    const trySelectZone = () => {
+      const zone = deliveryZoneOptions.value.find(
+        (z: any) => z._id === zoneMongoId || z.id === zoneMongoId,
+      )
+      if (zone) selectDeliveryZone(zone)
+    }
+    if (deliveryZoneOptions.value.length) {
+      trySelectZone()
+    } else {
+      handleDeliveryZoneFetch().then(trySelectZone)
+    }
+  }
 
   // emit to parent like the rest of your watchers do
   emits('setOrderType', selectedTab.value)
