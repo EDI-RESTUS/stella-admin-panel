@@ -375,8 +375,8 @@
       :delivery-fee="deliveryFee"
       :customer-details-id="customerDetailsId"
       @cancel="closePromotionModal"
-      @selectCode="onCodeSelected"
-      @selectCodes="onCodesSelected"
+      @select-code="onCodeSelected"
+      @select-codes="onCodesSelected"
     />
   </div>
 </template>

@@ -1550,6 +1550,7 @@ watch(
 )
 
 watch(name, (newVal) => {
+  orderStore.setCustomerName(newVal || '')
   if (!newVal.trim()) {
     userResults.value = []
   }

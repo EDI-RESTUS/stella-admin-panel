@@ -135,7 +135,7 @@
               :customer-details-id="customerDetailsId"
               :order-type="orderType"
               :is-customer-open="accordian[0]"
-              @restoreContext="updateContext"
+              @restore-context="updateContext"
               @success="resetContext"
             />
           </VaCardContent>
