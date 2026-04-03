@@ -1306,7 +1306,7 @@ onMounted(async () => {
             phoneNo: customerPhone,
             customerName,
             deliveryZoneId,
-            customerDetailId,
+            customerDetailId: customerDetailsId,
             address: restoredAddress,
             deliveryNotes: restoredDeliveryNotes,
           },
@@ -1331,7 +1331,7 @@ onMounted(async () => {
           try {
             await restorePromoAfterPaymentRetry(codes, {
               orderFor: order.orderFor || 'current',
-              customerDetailId,
+              customerDetailId: customerDetailsId,
               orderType: restoredOrderType,
               deliveryZoneId,
               address: restoredAddress,
