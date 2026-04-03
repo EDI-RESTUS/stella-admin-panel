@@ -1360,6 +1360,14 @@ async function createOrder() {
             paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
             orderType: props.orderType,
           })
+          // Save customer context so it can be restored on failed-payment return
+          sessionStorage.setItem('cc_pending_customer', JSON.stringify({
+            phone: orderStore.phoneNumber || '',
+            customerName: orderStore.customerName || '',
+            customerDetailId: props.customerDetailsId || '',
+            deliveryZoneId: orderStore.deliveryZone?._id || '',
+            orderType: props.orderType || '',
+          }))
           // setInter()
           window.top.location.href = response.data.data.redirectUrl
         }

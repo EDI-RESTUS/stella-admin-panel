@@ -13,6 +13,7 @@ export const useOrderStore = defineStore('order', {
     deliveryZone: '',
     address: '',
     phoneNumber: '',
+    customerName: '',
     orderFor: 'current',
     orderNotes: '',
     deliveryNotes: '',
@@ -396,6 +397,9 @@ export const useOrderStore = defineStore('order', {
     },
     setPhoneNumber(payload: string) {
       this.phoneNumber = payload
+    },
+    setCustomerName(payload: string) {
+      this.customerName = payload
     },
 
     // --- additions inside `actions: { ... }` ---

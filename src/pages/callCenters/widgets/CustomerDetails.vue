@@ -955,6 +955,7 @@ function selectUser(user) {
 
   name.value = String(normName)
   phoneNumber.value = String(normPhone)
+  orderStore.setCustomerName(String(normName))
 
   selectedUser.value = {
     ...user,
