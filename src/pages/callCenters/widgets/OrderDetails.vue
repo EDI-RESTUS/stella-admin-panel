@@ -1217,14 +1217,33 @@ if ((route.query.payment === 'failed' || route.query.payment === 'Cancel') && ro
         await orderStore.restoreCartFromOrder(order, menuStore)
         console.log('[PaymentRetry] Cart restored. Cart items:', orderStore.cartItems)
 
-        // 2b. Emit context to parent (index.vue) to update props
+        // 2b. Enrich order with customer phone/name from Stella if not already present
+        let customerPhone = order.phoneNo || ''
+        let customerName = order.customerName || ''
+        if (order.customerDetailId && (!customerPhone || !customerName)) {
+          try {
+            const url = import.meta.env.VITE_API_BASE_URL
+            const cRes = await axios.get(`${url}/customers/search`, {
+              params: { outletId: serviceStore.selectedRest, id: order.customerDetailId },
+            })
+            const hit = Array.isArray(cRes.data?.data) ? cRes.data.data[0] : null
+            if (hit) {
+              customerPhone = customerPhone || hit.phoneNo || ''
+              customerName = customerName || hit.customerName || hit.name || ''
+            }
+          } catch {
+            // non-fatal – proceed with whatever we have
+          }
+        }
+
+        // 2c. Emit context to parent (index.vue) to update props
         emit('restore-context', {
           customerDetailsId: order.customerDetailId,
           orderType: (order.orderType || '').toLowerCase(),
           deliveryFee: Number(order.deliveryFee || 0),
           isDeliveryZoneSelected: !!order.deliveryZoneId,
           dateSelected: order.orderDateTime || order.createdAt,
-          order,
+          order: { ...order, phoneNo: customerPhone, customerName },
         })
 
         existingOrderId.value = oid
