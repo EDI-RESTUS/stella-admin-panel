@@ -489,7 +489,9 @@ watch(
   () => orderStore.cartItems,
   () => {
     if (orderStore.cartItems.length) {
-      customerRef.value.isOpen = false
+      if (customerRef.value) {
+        customerRef.value.isOpen = false
+      }
       accordian.value[0] = false
     }
   },
@@ -510,7 +512,9 @@ watch(
   () => orderStore.offerItems,
   () => {
     if (orderStore.offerItems.length) {
-      customerRef.value.isOpen = false
+      if (customerRef.value) {
+        customerRef.value.isOpen = false
+      }
       accordian.value[0] = false
     }
   },

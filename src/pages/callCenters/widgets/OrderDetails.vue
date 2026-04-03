@@ -355,7 +355,6 @@
     />
     <CheckOutModal
       v-if="showCheckoutModal"
-      v-model="showCheckoutModal"
       :date-selected="orderStore.orderDateTime || dateSelected"
       :delivery-fee="deliveryFee"
       :customer-details-id="customerDetailsId"
