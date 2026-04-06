@@ -13,14 +13,26 @@
     <div class="items-grid">
       <div
         v-for="(item, index) in group.addedItems"
-        :key="item"
+        :key="index"
         class="selection-item selected"
-        @click="openSelectionItemModal(group, true, item)"
+        @click="openSelectionItemModal(group, true, item, index)"
       >
         <div class="item-image"><img :src="item.imageUrl" /></div>
         <div class="item-content">
           <div class="item-name">{{ item.itemName }}</div>
           <div class="item-description">{{ item.itemDescription }}</div>
+          <div
+            v-if="item.selectedOptions && item.selectedOptions.flatMap(g => g.selected).length"
+            class="item-extras"
+          >
+            <span
+              v-for="opt in item.selectedOptions.flatMap(g => g.selected)"
+              :key="opt.optionId"
+              class="item-extra-tag"
+            >
+              {{ opt.name }}{{ opt.price > 0 ? ` (+€${Number(opt.price).toFixed(2)})` : '' }}
+            </span>
+          </div>
         </div>
         <div class="selection-status"></div>
       </div>
@@ -44,6 +56,7 @@
       v-if="isItemSelectionModalVisible"
       :is-edit="isEdit"
       :selected-menu-item="selectedMenuItem"
+      :slot-index="selectedSlotIndex"
       :group="group"
       :menu-items="group.menuItems"
       :default-selected="group.menuItemDefaultOptions"
@@ -64,12 +77,13 @@ const props = defineProps({
 const emit = defineEmits(['update:selectedItems'])
 const menuStore = useMenuStore()
 const isItemSelectionModalVisible = ref(false)
-const pizzaModal = ref(null)
 const menuItems = ref(null)
 const isEdit = ref(false)
 const selectedMenuItem = ref('')
-function openSelectionItemModal(payload, editing = false, item = null) {
+const selectedSlotIndex = ref(-1)
+function openSelectionItemModal(payload, editing = false, item = null, slotIndex = -1) {
   isEdit.value = editing
+  selectedSlotIndex.value = slotIndex
   selectedMenuItem.value = item
   menuItems.value = payload.menuItems || null
   isItemSelectionModalVisible.value = true
@@ -339,6 +353,22 @@ if (!props.isEdit) {
 .selection-item.placeholder .item-name {
   color: #adb5bd;
   font-style: italic;
+}
+
+.item-extras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.item-extra-tag {
+  font-size: 10px;
+  background: rgba(45, 80, 22, 0.12);
+  color: #2d5016;
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
 }
 
 .selection-status {

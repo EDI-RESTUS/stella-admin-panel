@@ -141,7 +141,7 @@
         </div>
 
         <!-- Offers -->
-        <div v-for="(item, index) in offersItems" :key="item.id" class="mb-2 border-b pb-2 last:border-none">
+        <div v-for="(item, index) in offersItems" :key="item.__storeIndex" class="mb-2 border-b pb-2 last:border-none">
           <div class="flex items-start justify-between">
             <div class="flex items-center gap-2">
               <VaButton icon="mso-close" color="danger" size="small" class="rounded" @click="deleteOffer(item)" />
@@ -965,9 +965,8 @@ const deleteItem = (item) => {
 }
 
 const deleteOffer = (item) => {
-  const index = offerItems.value.findIndex((i) => i.itemId === item.id)
   log('CART_OFFER_REMOVED', { itemId: item.id, offerName: item.name })
-  orderStore.offerItems.splice(index, 1)
+  orderStore.offerItems.splice(item.__storeIndex, 1)
 }
 
 const duplicateOffer = (item) => {

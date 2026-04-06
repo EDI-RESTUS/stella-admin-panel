@@ -104,7 +104,7 @@ function getMenu() {
           const hasSelection = props.isEdit ? props.item.selections.find((a) => a._id === group._id) : null
           return {
             ...group,
-            addedItems: props.isEdit && hasSelection ? hasSelection.addedItems : [],
+            addedItems: props.isEdit && hasSelection ? JSON.parse(JSON.stringify(hasSelection.addedItems)) : [],
           }
         }),
       }
@@ -152,7 +152,7 @@ const { addOnPrice } = storeToRefs(menuStore)
 function addToBasket() {
   if (!props.isEdit) {
     orderStore.offersAdded({
-      ...offer.value,
+      ...JSON.parse(JSON.stringify(offer.value)),
       offerId: offer.value._id,
       selectionTotalPrice: addOnPrice.value,
       quantity: 1,
@@ -160,7 +160,7 @@ function addToBasket() {
     })
   } else {
     orderStore.offersUpdated({
-      ...offer.value,
+      ...JSON.parse(JSON.stringify(offer.value)),
       offerId: offer.value._id,
       selectionTotalPrice: addOnPrice.value,
       quantity: 1,

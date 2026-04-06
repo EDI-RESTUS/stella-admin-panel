@@ -64,6 +64,7 @@ import { useToast } from 'vuestic-ui'
 const props = defineProps({
   group: Object,
   selectedMenuItem: Object,
+  slotIndex: { type: Number, default: -1 },
   defaultSelected: Array,
   isEdit: Boolean,
   menuItems: {
@@ -82,17 +83,12 @@ const { offer } = storeToRefs(menuStore)
 onMounted(() => {
   if (props.isEdit) {
     groupItemIndex = offer.value.selections.findIndex((a) => a._id === props.group._id)
-    if (groupItemIndex !== -1) {
-      offer.value.selections[groupItemIndex].addedItems.forEach((offerItem, index) => {
-        if (
-          props.menuItems.find(
-            (menuItem) => menuItem.id === offerItem.itemId && props.selectedMenuItem.itemId === offerItem.itemId,
-          )
-        ) {
-          addedItemIndex = index
-          selectedArticle.value = props.menuItems.find((menuItem) => menuItem.id === offerItem.itemId)
-        }
-      })
+    if (groupItemIndex !== -1 && props.slotIndex !== -1) {
+      addedItemIndex = props.slotIndex
+      const offerItem = offer.value.selections[groupItemIndex].addedItems[addedItemIndex]
+      if (offerItem) {
+        selectedArticle.value = props.menuItems.find((menuItem) => menuItem.id === offerItem.itemId) || null
+      }
     }
   }
 })
