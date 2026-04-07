@@ -380,6 +380,13 @@ const handleDenominationClick = (amount: number) => {
 
 const finalTotal = computed(() => currentEditedTotal.value)
 
+function getSelectedDeliveryZoneId() {
+  const zone = orderStore.deliveryZone
+  if (!zone) return ''
+  if (typeof zone === 'string') return zone
+  return zone._id || zone.id || ''
+}
+
 const changeAmount = computed(() => {
   if (!selectedCashAmount.value) return 0
   return selectedCashAmount.value - finalTotal.value
@@ -450,13 +457,67 @@ function onBeforeUnload() {
   queueRefreshLog({ orderId: orderId.value || null, orderType: props.orderType })
 }
 
-onMounted(() => {
+onMounted(async () => {
   console.log('[CheckOutModal] Mounted. Cart items LEN:', orderStore.cartItems.length)
   console.log('[CheckOutModal] Mounted. Offer items LEN:', orderStore.offerItems.length)
   console.log('[CheckOutModal] Store ID ref:', orderStore.$id)
 
   if (serviceStore.selectedRest) {
     getPaymentOptions()
+  }
+
+  // Re-validate promo on open if codes are present but cartTotal was cleared (e.g. after failed payment redirect)
+  const codes = (props.promoCodes?.length ? props.promoCodes : props.promoCode ? [props.promoCode] : [])
+    .map((c) => c.trim()).filter(Boolean)
+
+  if (codes.length && !orderStore.cartTotal) {
+    try {
+      const menuItems = orderStore.cartItems.map((e: any) => ({
+        menuItem: e.itemId,
+        quantity: e.quantity,
+        options: e.selectedOptions.flatMap((g: any) =>
+          g.selected.map((o: any) => ({ option: o.optionId, quantity: o.quantity })),
+        ),
+      }))
+      const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
+        offerId: offer.offerId,
+        menuItems: offer.selections.flatMap((s: any) =>
+          s.addedItems.map((item: any) => ({
+            menuItem: item.itemId,
+            quantity: item.quantity || 1,
+            options: (item.selectedOptions || []).flatMap((g: any) =>
+              g.selected.map((o: any) => ({ option: o.optionId, quantity: o.quantity })),
+            ),
+          })),
+        ),
+      }))
+      const dateVal = props.dateSelected ? new Date(props.dateSelected) : new Date()
+      const orderDateTime = !isNaN(dateVal.getTime()) ? dateVal.toISOString() : new Date().toISOString()
+      const single = codes.length === 1 ? codes[0] : null
+      const payload: any = {
+        orderFor: orderFor.value,
+        customerDetailId: props.customerDetailsId,
+        orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
+        deliveryZoneId: getSelectedDeliveryZoneId(),
+        address: orderStore.address,
+        menuItems,
+        offerMenuItems,
+        orderNotes: orderStore.orderNotes || '',
+        deliveryFee: props.deliveryFee,
+        outletId: serviceStore.selectedRest,
+        orderDateTime,
+        paymentMode: '',
+        promoCodes: codes,
+        hasOtherOffers: offerMenuItems.length,
+        ...(single ? { promoCode: single } : {}),
+      }
+      const res = await orderStore.validatePromoCode(payload)
+      if (res.data?.success) {
+        orderStore.setOrderTotal(res.data.data)
+      }
+    } catch {
+      // promo may have expired — leave cartTotal null, user sees normal prices
+    }
   }
 
   window.addEventListener('beforeunload', onBeforeUnload)
@@ -1116,7 +1177,7 @@ async function updateOrderWithPromo(promoCodes: string[]) {
       orderFor: orderFor.value,
       customerDetailId: props.customerDetailsId,
       orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
-      deliveryZoneId: orderStore.deliveryZone?._id,
+      deliveryZoneId: getSelectedDeliveryZoneId(),
       outletId: serviceStore.selectedRest,
       orderDateTime,
       phoneNo: orderStore.phoneNumber || '',
@@ -1319,7 +1380,7 @@ async function createOrder() {
         orderFor: orderFor.value,
         customerDetailId: props.customerDetailsId,
         orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
-        deliveryZoneId: orderStore.deliveryZone?._id,
+        deliveryZoneId: getSelectedDeliveryZoneId(),
         menuItems,
         deliveryNotes: orderStore.deliveryNotes || '',
         offerMenuItems,
@@ -1360,6 +1421,17 @@ async function createOrder() {
             paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
             orderType: props.orderType,
           })
+          const deliveryZoneId = getSelectedDeliveryZoneId()
+          // Save customer context so it can be restored on failed-payment return
+          sessionStorage.setItem('cc_pending_customer', JSON.stringify({
+            phone: orderStore.phoneNumber || '',
+            customerName: orderStore.customerName || '',
+            customerDetailId: props.customerDetailsId || '',
+            deliveryZoneId,
+            orderType: props.orderType || '',
+            address: orderStore.address || '',
+            deliveryNotes: orderStore.deliveryNotes || '',
+          }))
           // setInter()
           window.top.location.href = response.data.data.redirectUrl
         }

@@ -359,19 +359,16 @@ watch(
     if (props.isEdit) {
       groupItemIndex = offer.value.selections.findIndex((a) => a._id === props.offerGroup._id)
       if (groupItemIndex !== -1) {
-        const addedItems = offer.value.selections[groupItemIndex].addedItems.find(
-          (offerItem) => offerItem.itemId === props.item.id && props.selectedMenuItem.itemId === offerItem.itemId,
-        )
-          ? offer.value.selections[groupItemIndex].addedItems.find((offerItem) => offerItem.itemId === props.item.id)
-          : null
         addedItemIndex =
           props.addedItemIndex >= 0
             ? props.addedItemIndex
             : offer.value.selections[groupItemIndex].addedItems.findIndex(
                 (offerItem) => offerItem.itemId === props.item.id,
               )
-        if (addedItems && addedItems.selectedOptions.length) {
-          selectedOptions.value = addedItems.selectedOptions
+        const addedItem =
+          addedItemIndex >= 0 ? offer.value.selections[groupItemIndex].addedItems[addedItemIndex] : null
+        if (addedItem && addedItem.selectedOptions.length) {
+          selectedOptions.value = JSON.parse(JSON.stringify(addedItem.selectedOptions))
           selectedOptions.value.forEach((group) => {
             if (group.selected.find((a) => a.type.toLowerCase() === 'article')) {
               getArticlesConfiguration(

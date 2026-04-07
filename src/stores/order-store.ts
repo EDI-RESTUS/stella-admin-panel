@@ -13,6 +13,7 @@ export const useOrderStore = defineStore('order', {
     deliveryZone: '',
     address: '',
     phoneNumber: '',
+    customerName: '',
     orderFor: 'current',
     orderNotes: '',
     deliveryNotes: '',
@@ -253,29 +254,30 @@ export const useOrderStore = defineStore('order', {
           console.log(`[OrderStore] Found original item: ${originalMenuItem.name} (${originalMenuItem._id})`)
         }
 
+        // Build a mutable pool so each stored option is consumed only once,
+        // preventing the same option ID matching into multiple groups (e.g. Half & Half).
+        const remainingOptions = [...(menuItem.options || [])]
+
         const mappedOptions = (originalMenuItem?.articlesOptionsGroup || [])
           .map((group: any) => {
             const selected = (group.articlesOptions || [])
-              .filter((opt: any) => {
-                const found = (menuItem.options || []).find(
+              .reduce((acc: any[], opt: any) => {
+                const idx = remainingOptions.findIndex(
                   (o: any) => o.option === opt._id || o.option?._id === opt._id,
                 )
-                return !!found
-              })
-              .map((opt: any) => {
-                const found = (menuItem.options || []).find(
-                  (o: any) => o.option === opt._id || o.option?._id === opt._id,
-                )
-                return {
+                if (idx === -1) return acc
+                const found = remainingOptions.splice(idx, 1)[0]
+                acc.push({
                   ...opt,
                   optionId: opt._id,
                   optionName: opt.name,
                   price: parseFloat(opt.price) || 0,
                   type: opt.type,
-                  quantity: found ? Number(found.quantity) || 1 : 1,
+                  quantity: Number(found.quantity) || 1,
                   selected: true,
-                }
-              })
+                })
+                return acc
+              }, [])
 
             if (!selected.length) return null
 
@@ -296,8 +298,8 @@ export const useOrderStore = defineStore('order', {
           orderId: orderId,
           itemId: originalMenuItem?._id || menuItem.menuItem,
           itemName: originalMenuItem?.name || menuItem.name || 'Unknown Item',
-          basePrice: parseFloat(originalMenuItem?.price || menuItem.originalPrice || menuItem.price) || 0,
-          price: parseFloat(originalMenuItem?.price || menuItem.originalPrice || menuItem.price) || 0, // Fallback for some UI components that might check .price
+          basePrice: parseFloat(originalMenuItem?.price) || 0,
+          price: parseFloat(originalMenuItem?.price) || 0,
           totalPrice: 0,
           imageUrl: menuItem.imageUrl || originalMenuItem?.imageUrl || '',
           promotionCode: menuItem.promotionCode || '',
@@ -358,12 +360,12 @@ export const useOrderStore = defineStore('order', {
 
       // 4. Set context
       this.setOrderFor(order.orderFor)
-      // deliveryZoneId is a string in the order
-      this.setDeliveryZone(order.deliveryZoneId)
+      this.setDeliveryZone(order.deliveryZoneId ? { _id: order.deliveryZoneId } : '')
       this.setAddress(order.address)
       this.setOrderNotes(order.orderNotes || order.note)
       this.setDeliveryNotes(order.deliveryNotes)
       this.setPhoneNumber(order.phoneNo || order.customer?.MobilePhone || '')
+
     },
     async cancelOrder(orderId: string) {
       const url = import.meta.env.VITE_API_BASE_URL
@@ -394,6 +396,9 @@ export const useOrderStore = defineStore('order', {
     },
     setPhoneNumber(payload: string) {
       this.phoneNumber = payload
+    },
+    setCustomerName(payload: string) {
+      this.customerName = payload
     },
 
     // --- additions inside `actions: { ... }` ---
