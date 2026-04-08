@@ -75,6 +75,13 @@
         >
           Configure Wallee
         </VaButton>
+        <VaButton
+          v-if="isUpdating && formData.paymentGateway === 'VivaWalletPOS'"
+          color="secondary"
+          @click="showVivaWalletPOSConfig = true"
+        >
+          Configure VivaWalletPOS
+        </VaButton>
         <VaButton type="submit" :disabled="isSubmitDisabled">{{ isUpdating ? 'Update' : 'Add' }}</VaButton>
       </div>
     </VaForm>
@@ -84,6 +91,13 @@
       :outlet-id="servicesStore.selectedRest"
       :payment-type-id="formData.paymentTypeId"
       @cancel="showWalleeConfig = false"
+    />
+
+    <VivaWalletPOSConfigModal
+      v-if="showVivaWalletPOSConfig"
+      :outlet-id="servicesStore.selectedRest"
+      :payment-type-id="formData.paymentTypeId"
+      @cancel="showVivaWalletPOSConfig = false"
     />
   </VaModal>
 </template>
@@ -95,6 +109,7 @@ import { validators } from '@/services/utils'
 import { useForm, useToast } from 'vuestic-ui'
 import { useServiceStore } from '@/stores/services'
 import WalleeConfigModal from './WalleeConfigModal.vue'
+import VivaWalletPOSConfigModal from './VivaWalletPOSConfigModal.vue'
 
 const emits = defineEmits(['cancel'])
 const props = defineProps({
@@ -108,6 +123,7 @@ const { validate } = useForm('form')
 const { init } = useToast()
 const servicesStore = useServiceStore()
 const showWalleeConfig = ref(false)
+const showVivaWalletPOSConfig = ref(false)
 
 // Form data
 const formData = ref({
