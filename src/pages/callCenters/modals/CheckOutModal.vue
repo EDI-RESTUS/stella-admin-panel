@@ -861,12 +861,66 @@ function setInter() {
     }
   }, 2000)
 }
-const currentEditedTotal = computed(() => {
-  if (promoTotal.value) {
-    return Number(promoTotal.value.updatedTotal || 0)
+const editUntouchedTotals = computed(() => {
+  if (!orderStore.editOrder) return { items: 0, offers: 0 }
+
+  // Menu items: sum prices of original items that are NOT currently in the cart
+  const originalMenuItems: any[] = orderStore.editOrder.menuItems || []
+  const cartCountMap = new Map<string, number>()
+  for (const c of orderStore.cartItems as any[]) {
+    const id = String(c.itemId)
+    cartCountMap.set(id, (cartCountMap.get(id) || 0) + 1)
+  }
+  const removedCountMap = new Map<string, number>()
+  let itemsTotal = 0
+  for (const item of originalMenuItems) {
+    const menuItemId = String(item._id || (item.menuItem?._id ?? item.menuItem) || '')
+    const allowed = cartCountMap.get(menuItemId) || 0
+    const removed = removedCountMap.get(menuItemId) || 0
+    if (allowed > 0 && removed < allowed) {
+      removedCountMap.set(menuItemId, removed + 1)
+    } else {
+      itemsTotal += Number(item.totalPrice) || Number(item.unitPrice || item.price || 0) * Number(item.quantity || 1)
+    }
   }
 
-  return Number(totalAmount.value + props.deliveryFee)
+  // Offers: sum prices of original offers not currently in the cart
+  const originalOffers: any[] = orderStore.editOrder.offerDetails || []
+  const cartOfferCountMap = new Map<string, number>()
+  for (const o of orderStore.offerItems as any[]) {
+    cartOfferCountMap.set(String(o.offerId), (cartOfferCountMap.get(String(o.offerId)) || 0) + 1)
+  }
+  const removedOfferCountMap = new Map<string, number>()
+  let offersTotal = 0
+  for (const offer of originalOffers) {
+    const offerId = String(offer.offerId || offer._id)
+    const allowed = cartOfferCountMap.get(offerId) || 0
+    const removed = removedOfferCountMap.get(offerId) || 0
+    if (allowed > 0 && removed < allowed) {
+      removedOfferCountMap.set(offerId, removed + 1)
+    } else {
+      offersTotal += Number(offer.totalPrice || offer.price || 0)
+    }
+  }
+
+  return { items: itemsTotal, offers: offersTotal }
+})
+
+const currentEditedTotal = computed(() => {
+  const { items: untouchedItemsTotal, offers: untouchedOffersTotal } = editUntouchedTotals.value
+
+  if (promoTotal.value) {
+    // promoTotal.updatedTotal already includes delivery fee for the cart items.
+    // Add untouched original items at their stored (already-discounted) prices.
+    return Number((Number(promoTotal.value.updatedTotal || 0) + untouchedItemsTotal + untouchedOffersTotal).toFixed(2))
+  }
+
+  if (!orderStore.editOrder) {
+    return Number(totalAmount.value + props.deliveryFee)
+  }
+
+  const effectiveDeliveryFee = Number(props.deliveryFee || orderStore.editOrder.deliveryFee || 0)
+  return Number((totalAmount.value + untouchedItemsTotal + untouchedOffersTotal + effectiveDeliveryFee).toFixed(2))
 })
 
 const paidAmount = computed(() => {

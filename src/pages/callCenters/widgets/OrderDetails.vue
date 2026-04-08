@@ -506,6 +506,28 @@ watch(
   { deep: true }, // watch nested changes in arrays/objects
 )
 
+// When an edit order is loaded, restore its promo codes and re-validate
+watch(
+  () => orderStore.editOrder,
+  async (editOrder) => {
+    if (!editOrder) return
+    const codes = Array.isArray(editOrder.promotionCodes) && editOrder.promotionCodes.length
+      ? editOrder.promotionCodes
+      : editOrder.promoCode
+      ? [editOrder.promoCode]
+      : []
+    if (!codes.length) return
+    appliedPromoCodes.value = codes
+    promoCode.value = codes.length === 1 ? codes[0] : codes.join(', ')
+    isPromoValid.value = true
+    // Cart is already populated by now — the cart-change watcher won't fire,
+    // so we must explicitly re-validate here.
+    await nextTick()
+    applyPromoCode()
+  },
+  { immediate: true },
+)
+
 const itemsAfterPromos = computed(() => {
   const v = promoTotal.value
   if (!v?.menuItems) return 0

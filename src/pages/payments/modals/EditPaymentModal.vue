@@ -251,7 +251,6 @@ const submit = async () => {
   }
 }
 
-getPaymentconfig()
 </script>
 
 <style scoped>
