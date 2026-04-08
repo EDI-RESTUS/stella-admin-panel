@@ -192,7 +192,7 @@ const isSubmitDisabled = computed(() => {
   if (formData.value.paymentGateway === 'WalleePOS') return false
   const selectedGateway = paymentOptions.value.find((a) => a.paymentMethodName === formData.value.paymentGateway)
   if (!selectedGateway) return false
-  const hasEmptyRequiredField = selectedGateway.inputConfig.some((input) => input.required && !input.value?.trim())
+  const hasEmptyRequiredField = selectedGateway.inputConfig.some((input) => input.required && !String(input.value ?? '').trim())
   return hasEmptyRequiredField
 })
 
