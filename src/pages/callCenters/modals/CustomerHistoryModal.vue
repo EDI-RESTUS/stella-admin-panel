@@ -766,7 +766,7 @@ const props = defineProps({
   selectedTab: { type: String, default: '' },
 })
 
-const emits = defineEmits(['close', 'repeat-order'])
+const emits = defineEmits(['close', 'repeat-order', 'edit-order'])
 const liveStatus = ref(null)
 const showAddNoteModal = ref(false)
 const showComplaintModal = ref(false)
@@ -1686,9 +1686,11 @@ const restoreFullOrder = async (orderId) => {
 
 const editSelected = async (orderId) => {
   log('ORDER_EDIT_STARTED', { orderId })
+  const order = orders.value.find((o) => o._id === orderId)
   await restoreFullOrder(orderId)
   selectedItems[orderId] = []
   selectedOfferItems[orderId] = []
+  if (order) emits('edit-order', order)
   emits('close')
 }
 

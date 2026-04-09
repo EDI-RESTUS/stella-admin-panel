@@ -355,6 +355,7 @@
       :selected-tab="selectedTab"
       @close="showHistoryModal = false"
       @repeatOrder="handleRepeatOrder"
+      @edit-order="onEditOrderFromHistory"
     />
   </div>
 </template>
@@ -1107,6 +1108,9 @@ function selectDeliveryZone(zone, options = {}) {
 watch(selectedTab, (newTab) => {
   console.log('[watcher:selectedTab] Tab changed to:', newTab)
 
+  // Don't interfere while fromEditOrder is restoring zone context
+  if (isRestoringOrderContext.value) return
+
   if (serviceZoneId.value && deliveryZoneOptions.value.length) {
     const currentZone = deliveryZoneOptions.value.find((z) => z.serviceZoneId == serviceZoneId.value)
 
@@ -1314,6 +1318,19 @@ function fromEditOrder(order) {
   // emit to parent like the rest of your watchers do
   emits('setOrderType', selectedTab.value)
   emits('setCustomerDetailsId', selectedUser.value._id)
+}
+
+function onEditOrderFromHistory(order) {
+  const zoneId = order.deliveryZoneId
+    || (typeof orderStore.deliveryZone === 'string' ? orderStore.deliveryZone : orderStore.deliveryZone?._id)
+    || ''
+  fromEditOrder({
+    ...order,
+    deliveryZoneId: zoneId,
+    customerPhone: order.phoneNo || order.customerPhone || order.phone || '',
+    phone: order.phoneNo || order.phone || '',
+    customerName: order.customerName || order.customer?.Name || '',
+  })
 }
 
 const outlet = computed(() => {
