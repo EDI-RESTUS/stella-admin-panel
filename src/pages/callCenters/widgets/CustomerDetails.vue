@@ -1549,6 +1549,7 @@ watch(
   () => {
     isOpen.value = true
     selectedTab.value = ''
+    orderFor.value = 'current'
     isUserLoading.value = false
     selectedAddress.value = ''
     phoneNumber.value = ''
@@ -1558,6 +1559,7 @@ watch(
     selectedZone.value = ''
     showDeliveryDropdown.value = false
     selectedDate.value = new Date()
+    localDateTime.value = getLocalDateTime()
     showCustomerModal.value = false
     deliveryZoneOptions.value = []
     orderStore.deliveryNotes = ''
