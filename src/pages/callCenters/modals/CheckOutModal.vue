@@ -1466,6 +1466,21 @@ async function createOrder() {
         // Immediate success check (e.g. test gateways or auto-capture)
         if (response.data.data.status === 'Completed') {
           handlePaymentSuccess()
+        } else if (selectedPayment.value.paymentGateway === 'WalleePOS') {
+          // WalleePOS failure/timeout: keep modal open on retry screen (no redirect).
+          // Setting orderId.value causes the template to render the "Retry Payment" UI.
+          const errMsg = response.data.data.errorMessage || 'Payment failed, please retry.'
+          orderId.value =
+            response.data.data.order?._id ||
+            orderResponse.value?.data?.data?._id ||
+            orderId.value
+          log('ORDER_AWAITING_PAYMENT', {
+            orderId: orderId.value,
+            errorMessage: errMsg,
+            paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+            orderType: props.orderType,
+          })
+          showAlert(errMsg)
         } else {
           // orderStore.setPaymentLink(response.data.data.redirectUrl)
           orderId.value = response.data.data.requestId
