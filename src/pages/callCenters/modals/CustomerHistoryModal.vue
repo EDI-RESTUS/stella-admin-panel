@@ -2238,36 +2238,34 @@ const repeatOrder = async (orderId) => {
 
   const items = (order.menuItems || [])
     .map((histItem) => {
-      const freshItem = menuStore.unFilteredMenuItems.find((mi) => mi._id === histItem._id)
+      const targetId = String(
+        (histItem?.menuItem && (histItem.menuItem._id || histItem.menuItem)) ||
+          histItem?.menuItemId ||
+          histItem?._id ||
+          '',
+      ).trim()
+      if (!targetId) return null
+
+      const freshItem = menuStore.unFilteredMenuItems.find((m) => String(m._id || m.id).trim() === targetId)
       if (!freshItem) return null
 
-      const histOptionMap = new Map()
-      if (histItem.articlesOptionsGroup) {
-        histItem.articlesOptionsGroup.forEach((g) => {
-          ;(g.articlesOptions || []).forEach((opt) => {
-            if (opt.selected) histOptionMap.set(opt._id, opt.quantity || 1)
-          })
-        })
-      }
-
-      const freshSelectedOptions = (freshItem.articlesOptionsGroup || [])
+      const selectedOptions = (freshItem.articlesOptionsGroup || [])
         .map((group) => {
-          const limit = group.singleChoice ? 1 : group.maximumChoices || Infinity
-          let groupSelectedQty = 0
-
           const selected = (group.articlesOptions || [])
             .map((opt) => {
-              if (!histOptionMap.has(opt._id)) return null
+              const newFmt = (histItem.options || []).find(
+                (h) => String(h.option?._id || h.option || h._id).trim() === String(opt._id).trim(),
+              )
+              const oldFmt = (histItem.articlesOptionsGroup || [])
+                .flatMap((g) => g.articlesOptions || [])
+                .find(
+                  (o) =>
+                    o.selected && String(o.optionId || o._id).trim() === String(opt._id).trim(),
+                )
 
-              const available = histOptionMap.get(opt._id)
-              if (available <= 0) return null
+              if (!newFmt && !oldFmt) return null
 
-              const remainingLimit = limit - groupSelectedQty
-              const take = Math.min(available, remainingLimit)
-              if (take <= 0) return null
-
-              histOptionMap.set(opt._id, available - take)
-              groupSelectedQty += take
+              const quantity = Number(newFmt?.quantity ?? oldFmt?.quantity ?? 1) || 1
 
               return {
                 ...opt,
@@ -2275,7 +2273,8 @@ const repeatOrder = async (orderId) => {
                 optionName: opt.name,
                 price: parseFloat(opt.price) || 0,
                 type: opt.type,
-                quantity: take,
+                quantity,
+                selected: true,
               }
             })
             .filter(Boolean)
@@ -2299,81 +2298,124 @@ const repeatOrder = async (orderId) => {
         basePrice: parseFloat(freshItem.price) || 0,
         totalPrice: 0,
         imageUrl: freshItem.imageUrl || '',
-        promotionCode: freshItem.promotionCode || '',
+        promotionCode: '',
         isRepeatedOrder: true,
-        quantity: histItem.quantity,
+        quantity: Number(histItem.quantity) || 1,
         isFree: !!freshItem.isFree,
-        selectedOptions: freshSelectedOptions,
+        selectedOptions,
       }
     })
     .filter(Boolean)
 
   const offersItems = (order.offerDetails || [])
     .map((histOffer) => {
-      const freshOfferDef = orderStore.offers.find((o) => o._id === histOffer.offerId)
+      const freshOfferDef = orderStore.offers.find((o) => String(o._id) === String(histOffer.offerId))
       if (!freshOfferDef) return null
 
+      // Rebuild selections from raw offerItems (not structuredOffer, which may drop items
+      // whose menu-item id is no longer listed in the offer's slot definitions).
+      const selections = JSON.parse(JSON.stringify(freshOfferDef.selections || []))
+      selections.forEach((s) => {
+        s.addedItems = []
+      })
+
       let selectionTotal = 0
-      const selections = []
 
-      if (histOffer.structuredOffer && histOffer.structuredOffer.selections) {
-        histOffer.structuredOffer.selections.forEach((sel) => {
-          const freshAddedItems = []
+      ;(histOffer.offerItems || []).forEach((rawItem) => {
+        const rawItemId = String((rawItem.menuItem && (rawItem.menuItem._id || rawItem.menuItem)) || '').trim()
+        if (!rawItemId) return
 
-          sel.addedItems.forEach((addedItem) => {
-            const freshOfferItemDef = freshOfferDef.offerItems.find((oi) => oi.menuItem === addedItem.itemId)
-            if (!freshOfferItemDef) return
+        const freshMenuItem = menuStore.unFilteredMenuItems.find((m) => String(m._id) === rawItemId)
+        if (!freshMenuItem) return
 
-            const freshBasePrice = Number(freshOfferItemDef.price || 0)
-            const freshMenuItem = menuStore.unFilteredMenuItems.find((m) => m._id === addedItem.itemId)
-            if (!freshMenuItem) return
+        // Prefer a slot that lists this menu item; fall back to any slot with capacity;
+        // last resort create an overflow slot so items are never dropped.
+        let slot = selections.find(
+          (s) =>
+            (s.menuItems || []).some((mi) => String(mi.menuItemId) === rawItemId) &&
+            (s.addedItems?.length ?? 0) < (s.max ?? Infinity),
+        )
+        if (!slot) {
+          slot = selections.find((s) => (s.addedItems?.length ?? 0) < (s.max ?? Infinity))
+        }
+        if (!slot) {
+          slot = { _id: 'repeat-overflow', min: 0, max: Infinity, menuItems: [], addedItems: [] }
+          selections.push(slot)
+        }
 
-            const freshSelectedOptions = (addedItem.selectedOptions || [])
-              .map((group) => {
-                const freshGroup = freshMenuItem.articlesOptionsGroup.find((g) => g._id === group.groupId)
-                if (!freshGroup) return null
+        const slotDef = (slot.menuItems || []).find((mi) => String(mi.menuItemId) === rawItemId)
+        const freshOfferItemDef = (freshOfferDef.offerItems || []).find(
+          (oi) => String(oi.menuItem || oi.menuItemId || oi._id) === rawItemId,
+        )
 
-                const validSelections = (group.selected || [])
-                  .map((s) => {
-                    const freshOpt = freshGroup.articlesOptions.find((o) => o._id === s.optionId)
-                    if (!freshOpt) return null
-                    return {
-                      ...s,
-                      price: parseFloat(freshOpt.price) || 0,
-                    }
-                  })
-                  .filter(Boolean)
+        const rawOptions = rawItem.options || []
+        const quantity = Number(rawItem.quantity || 1)
 
-                if (!validSelections.length) return null
-                return { ...group, selected: validSelections }
+        // Reuse the same offer-aware pricing resolvers as the edit flow so e.g. size
+        // options stay at 0 inside offers and explicit customPrice values win.
+        const basePrice = resolveOfferItemBasePriceForEdit(
+          slotDef,
+          { itemId: rawItemId, isFree: !!rawItem.isFree },
+          freshOfferItemDef,
+        )
+
+        const selectedOptions = (freshMenuItem.articlesOptionsGroup || [])
+          .map((group) => {
+            const selected = (group.articlesOptions || [])
+              .filter((opt) =>
+                rawOptions.some((o) => String(o.option?._id || o.option) === String(opt._id)),
+              )
+              .map((opt) => {
+                const rawOpt = rawOptions.find(
+                  (o) => String(o.option?._id || o.option) === String(opt._id),
+                )
+                const correctedOptionPrice = resolveOfferOptionPriceForEdit({
+                  slotDef,
+                  groupId: group._id,
+                  optionId: opt._id,
+                  fallbackOption: opt,
+                  fallbackGroupName: group.name,
+                  fallbackOptionName: opt.name,
+                  historyOption: rawOpt,
+                })
+                return {
+                  optionId: opt._id,
+                  name: opt.name,
+                  quantity: Number(rawOpt?.quantity || 1),
+                  price: correctedOptionPrice,
+                  type: rawOpt?.type || opt.type,
+                }
               })
-              .filter(Boolean)
 
-            let itemOptionsTotal = 0
-            freshSelectedOptions.forEach((g) => {
-              g.selected.forEach((s) => (itemOptionsTotal += s.price * s.quantity))
-            })
-
-            selectionTotal += freshBasePrice * addedItem.quantity + itemOptionsTotal
-
-            freshAddedItems.push({
-              ...addedItem,
-              basePrice: freshBasePrice,
-              selectedOptions: freshSelectedOptions,
-            })
+            if (!selected.length) return null
+            return { groupId: group._id, groupName: group.name, selected }
           })
+          .filter(Boolean)
 
-          if (freshAddedItems.length) {
-            selections.push({ ...sel, addedItems: freshAddedItems })
-          }
+        let itemOptionsTotal = 0
+        selectedOptions.forEach((g) => {
+          g.selected.forEach((s) => {
+            itemOptionsTotal += Number(s.price || 0) * Number(s.quantity || 1)
+          })
         })
-      }
+        selectionTotal += basePrice * quantity + itemOptionsTotal
+
+        slot.addedItems.push({
+          itemId: rawItemId,
+          itemName: rawItem.name || freshMenuItem.name,
+          itemDescription: freshMenuItem.description,
+          imageUrl: freshMenuItem.imageUrl,
+          quantity,
+          basePrice,
+          selectedOptions,
+        })
+      })
 
       return {
         ...freshOfferDef,
         _id: freshOfferDef._id,
         offerId: freshOfferDef._id,
-        basePrice: freshOfferDef.price,
+        basePrice: Number(freshOfferDef.price || 0),
         selectionTotalPrice: selectionTotal,
         totalPrice: Number(freshOfferDef.price || 0) + selectionTotal,
         quantity: 1,
