@@ -125,7 +125,7 @@ const routes: Array<RouteRecordRaw> = [
         name: 'callCenterLogs',
         path: 'callCenterLogs',
         component: () => import('../pages/callCenterLogs/index.vue'),
-        meta: { roles: ['super-admin'] },
+        meta: { roles: ['admin', 'super-admin'] },
       },
       {
         name: 'outlets',
