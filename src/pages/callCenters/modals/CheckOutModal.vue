@@ -44,7 +44,7 @@
                             'bg-amber-100 text-amber-700': option.type.toLowerCase() === 'modifier',
                           }"
                         >
-                          {{ option.name }}
+                          <template v-if="(option.quantity || 1) > 1">{{ option.quantity }}× </template>{{ option.name }}
                           <span v-if="option.price">€{{ (option.price * option.quantity).toFixed(2) }}</span>
                         </span>
                       </div>
@@ -106,7 +106,7 @@
                                 'bg-amber-100 text-amber-700': option.type.toLowerCase() === 'modifier',
                               }"
                             >
-                              {{ option.name }}
+                              <template v-if="(option.quantity || 1) > 1">{{ option.quantity }}× </template>{{ option.name }}
                               <span v-if="option.price">(+€{{ (option.price * option.quantity).toFixed(2) }})</span>
                             </span>
                           </div>

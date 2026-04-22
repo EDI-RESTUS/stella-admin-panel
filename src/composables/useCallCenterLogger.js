@@ -19,12 +19,30 @@ export function useCallCenterLogger() {
         timestamp: new Date().toISOString(),
       }
 
-      // Fire-and-forget — never block the UI
-      axios
-        .post(`${import.meta.env.VITE_API_BASE_URL}/cc/logs`, payload)
-        .catch(() => {
-          // Silently ignore logging errors
-        })
+      const url = `${import.meta.env.VITE_API_BASE_URL}/cc/logs`
+
+      // Use fetch with keepalive so the request survives page unload /
+      // iframe refresh (e.g. SaferPay credit-card return flow). keepalive
+      // preserves the Authorization header that sendBeacon cannot send.
+      if (typeof fetch === 'function') {
+        try {
+          const token = window.sessionStorage.getItem('token')
+          fetch(url, {
+            method: 'POST',
+            keepalive: true,
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(payload),
+          }).catch(() => {})
+          return
+        } catch {
+          // fall through to axios
+        }
+      }
+
+      axios.post(url, payload).catch(() => {})
     } catch {
       // Never let logging crash the app
     }

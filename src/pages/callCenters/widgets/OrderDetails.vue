@@ -853,12 +853,16 @@ const promoUnitsMap = computed(() => {
     const id = line.menuItemId
     const arr = map.get(id) ?? []
     const qty = Math.max(1, Number(line.quantity ?? 1))
+    const perUnitOriginal = Number(line.originalPrice ?? 0) / qty
+    const perUnitOptions = Number(line.optionsPrice ?? 0) / qty
+    const perUnitUpdated = Number(line.updatedPrice ?? 0) / qty
+    const perUnitDiscount = Number(line.discount ?? 0) / qty
     for (let i = 0; i < qty; i++) {
       arr.push({
-        originalPrice: Number(line.originalPrice ?? 0),
-        optionsPrice: Number(line.optionsPrice ?? 0),
-        updatedPrice: Number(line.updatedPrice ?? 0),
-        discount: Number(line.discount ?? 0),
+        originalPrice: perUnitOriginal,
+        optionsPrice: perUnitOptions,
+        updatedPrice: perUnitUpdated,
+        discount: perUnitDiscount,
         isAffected: !!line.isAffected,
       })
     }
