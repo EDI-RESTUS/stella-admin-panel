@@ -15,7 +15,7 @@
 
     <template v-if="items.length || offersItems.length">
       <!-- Promo Code with Button -->
-      <div v-if="!orderStore.editOrder" class="flex flex-wrap items-center gap-1 mt-3 mb-3 w-full">
+      <div class="flex flex-wrap items-center gap-1 mt-3 mb-3 w-full">
         <VaInput
           v-model="promoCode"
           placeholder="Promotion Code"
@@ -364,6 +364,7 @@
       :existing-order-id="existingOrderId"
       @cancel="closeCheckoutModal"
       @success="onCheckoutSuccess"
+      @view-history="$emit('view-history')"
     />
     <PromotionModal
       ref="promotionModal"
@@ -406,7 +407,7 @@ const props = defineProps({
   dateSelected: String,
 })
 
-const emit = defineEmits(['restore-context', 'success'])
+const emit = defineEmits(['restore-context', 'success', 'view-history'])
 
 const route = useRoute()
 const router = useRouter()
