@@ -601,12 +601,16 @@ const promoUnitsMap = computed(() => {
     const id = line.menuItemId as string
     const arr = map.get(id) ?? []
     const qty = Math.max(1, Number((line as any).quantity ?? 1))
+    const perUnitOriginal = Number((line as any).originalPrice ?? 0) / qty
+    const perUnitOptions = Number((line as any).optionsPrice ?? 0) / qty
+    const perUnitUpdated = Number((line as any).updatedPrice ?? 0) / qty
+    const perUnitDiscount = Number((line as any).discount ?? 0) / qty
     for (let i = 0; i < qty; i++) {
       arr.push({
-        originalPrice: Number((line as any).originalPrice ?? 0),
-        optionsPrice: Number((line as any).optionsPrice ?? 0),
-        updatedPrice: Number((line as any).updatedPrice ?? 0),
-        discount: Number((line as any).discount ?? 0),
+        originalPrice: perUnitOriginal,
+        optionsPrice: perUnitOptions,
+        updatedPrice: perUnitUpdated,
+        discount: perUnitDiscount,
         isAffected: Boolean((line as any).isAffected),
       })
     }
@@ -995,10 +999,14 @@ async function updateOrder() {
   apiLoading.value = true
 
   // --- Detect promo codes (from props OR original order) ---
+  // If the user (re)selected codes via PromotionModal, trust that array verbatim —
+  // duplicates matter for TXPY codes with size directives like "(XL+XL)", where each
+  // engine application is capped to a single bundle, so [code,code,code] = 3 bundles.
+  // Only fall back to the order's stored codes when nothing was reselected.
   const codes = normalizeCodes(props.promoCode, props.promoCodes)
   const editPromos =
     orderStore.editOrder.promoCodes || (orderStore.editOrder.promoCode ? [orderStore.editOrder.promoCode] : [])
-  const allCodes = [...new Set([...codes, ...editPromos].filter(Boolean))]
+  const allCodes = (codes.length ? codes : editPromos).filter(Boolean)
   const hasPromo = allCodes.length > 0
 
   if (hasPromo) {
