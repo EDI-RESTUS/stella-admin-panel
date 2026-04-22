@@ -182,18 +182,28 @@ function buildPayload({ promoCodes }) {
   // Back-compat: if exactly one code, keep promoCode too
   const single = promoCodes.length === 1 ? promoCodes[0] : ''
 
+  const zone = orderStore.deliveryZone
+  const deliveryZoneId =
+    typeof zone === 'string' ? zone : zone?._id || zone?.id || ''
+
+  const dateSource = props.dateSelected || orderStore.orderDateTime || new Date()
+  const parsedDate = new Date(dateSource)
+  const orderDateTime = isNaN(parsedDate.getTime())
+    ? new Date().toISOString()
+    : parsedDate.toISOString()
+
   return {
     orderFor: orderFor.value,
     customerDetailId: props.customerDetailsId,
     orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
-    deliveryZoneId: orderStore.deliveryZone?._id,
+    deliveryZoneId,
     address: orderStore.address,
     menuItems,
     offerMenuItems,
     orderNotes: '',
     deliveryFee: props.deliveryFee,
     outletId: serviceStore.selectedRest,
-    orderDateTime: new Date(props.dateSelected).toISOString(),
+    orderDateTime,
     paymentMode: '',
     promoCode: single, // <= keep for older API paths
     promoCodes, // <= NEW multi-code field

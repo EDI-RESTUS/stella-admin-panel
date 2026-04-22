@@ -307,7 +307,7 @@
 </template>
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
-import { useToast } from 'vuestic-ui'
+import { useToast, useModal } from 'vuestic-ui'
 import { useOrderStore } from '@/stores/order-store'
 import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
 import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
@@ -320,8 +320,9 @@ import axios from 'axios'
 const showCheckoutModal = ref(true)
 const selectedPayment: any = ref(null)
 const apiLoading = ref(false)
-const emits = defineEmits(['cancel', 'success'])
+const emits = defineEmits(['cancel', 'success', 'view-history'])
 const { init } = useToast()
+const { confirm } = useModal()
 const { showAlert } = useCallCenterAlert()
 const { log, queueRefreshLog } = useCallCenterLogger()
 const props = defineProps<{
@@ -1379,11 +1380,12 @@ function normalizeCodes(singleStr, codesArr) {
   return codes
 }
 
-async function createOrder() {
+async function createOrder(force = false) {
   log('PAYMENT_INITIATED', {
     paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
     orderType: props.orderType,
     isEdit: !!orderStore.editOrder,
+    force,
   })
   apiLoading.value = true
 
@@ -1447,6 +1449,7 @@ async function createOrder() {
         phoneNo: orderStore.phoneNumber || '',
         ...(codes.length ? { promoCodes: codes } : {}),
         ...(codes.length === 1 ? { promoCode: codes[0] } : {}),
+        ...(force ? { force: true } : {}),
       }
 
       orderResponse.value = await orderStore.createOrder(payload)
@@ -1532,6 +1535,51 @@ async function createOrder() {
       errorData.outOfStockItems.length
     ) {
       errorMessage = `${errorMessage} Items: ${errorData.outOfStockItems.join(', ')}`
+    }
+
+    // Possible duplicate order — backend safety net
+    if (errorData?.code === 'DUPLICATE_ORDER_SUSPECTED') {
+      log('ORDER_DUPLICATE_SUSPECTED', {
+        kind: errorData.kind,
+        match: errorData.match,
+        paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+        orderType: props.orderType,
+      })
+
+      const m = errorData.match || {}
+      const isFuture = String(m.orderFor || '').toLowerCase() === 'future'
+      const when = m.orderDateTime || m.createdAt
+      const whenStr = when ? new Date(when).toLocaleString() : ''
+      const totalStr = Number(m.total || 0).toFixed(2)
+      const tableStr = m.tableNumber ? ` (table ${m.tableNumber})` : ''
+
+      const message =
+        `${errorData.message}\n\n` +
+        `• ${isFuture ? 'Scheduled' : 'Placed'}: ${whenStr}\n` +
+        `• Total: €${totalStr}${tableStr}\n` +
+        `• Status: ${m.status || ''}\n\n` +
+        `View the customer's order history, or proceed and place this order anyway?`
+
+      apiLoading.value = false
+      orderStore.setPaymentLink('')
+
+      const proceed = await confirm({
+        title: 'Possible duplicate order',
+        message,
+        okText: 'Proceed Anyway',
+        cancelText: 'View History',
+        size: 'medium',
+      })
+
+      if (proceed) {
+        log('ORDER_DUPLICATE_PROCEED', { match: errorData.match })
+        await createOrder(true)
+      } else {
+        log('ORDER_DUPLICATE_VIEW_HISTORY', { match: errorData.match })
+        emits('view-history')
+        emits('cancel')
+      }
+      return
     }
 
     log('ORDER_FAILED', {
