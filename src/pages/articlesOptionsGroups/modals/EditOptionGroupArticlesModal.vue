@@ -26,7 +26,7 @@
                 <VaCheckbox
                   v-model="menuItems"
                   :array-value="article._id"
-                  :label="article.code + '-' + article.name"
+                  :label="article.code + '-' + localName(article.name)"
                   @update:modelValue="submit"
                 />
               </td>
@@ -61,6 +61,14 @@ import { ref, computed, watch } from 'vue'
 import axios from 'axios'
 import { useServiceStore } from '@/stores/services'
 import { useToast, useForm } from 'vuestic-ui'
+import { useI18n } from 'vue-i18n'
+const { locale } = useI18n()
+const localName = (val: any) => {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  if (typeof val === 'object') return val[locale.value] || val['en'] || Object.values(val)[0] || ''
+  return String(val)
+}
 const emits = defineEmits(['cancel'])
 const props = defineProps({
   selectedItems: {

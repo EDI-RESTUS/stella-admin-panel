@@ -20,9 +20,13 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
-  selectedDeliveryZoneId: {
-    type: String,
-    default: '',
+  deliveryZones: {
+    type: Array,
+    default: () => [],
+  },
+  initialStockMap: {
+    type: Object,
+    default: () => ({}),
   },
 })
 
@@ -40,56 +44,90 @@ const emits = defineEmits([
   'importArticle',
 ])
 
-const activeOnly = ref(true)
 const { confirm } = useModal()
 const { init } = useToast()
+import { useI18n } from 'vue-i18n'
+const { locale } = useI18n()
+
+const getLocalizedValue = (value: any) => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  return value[locale.value] || value['en'] || Object.values(value)[0] || ''
+}
+
+const getEditableLocaleValue = (value: any): string => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  return value[locale.value] || value['en'] || ''
+}
+
+const setLocaleKey = (obj: any, field: string, newVal: string) => {
+  const lang = locale.value || 'en'
+  if (!obj[field] || typeof obj[field] === 'string') {
+    obj[field] = { [lang]: newVal }
+  } else {
+    obj[field] = { ...obj[field], [lang]: newVal }
+  }
+}
+
+const activeOnly = ref(true)
 const currentPage = ref(1)
 const searchQuery = ref('')
 const stockUpdating = ref(new Set()) // Track which rows are currently updating stock
+const rowSelectedZones = reactive<Record<string, string[]>>({}) // Track selected delivery zones per row
+
+// Initialize rowSelectedZones from the initialStockMap prop (API data)
+watch(
+  () => props.initialStockMap,
+  (newMap) => {
+    // Clear existing and apply new data
+    Object.keys(rowSelectedZones).forEach((key) => delete rowSelectedZones[key])
+    Object.entries(newMap).forEach(([articleId, zoneIds]) => {
+      rowSelectedZones[articleId] = [...(zoneIds as string[])]
+    })
+  },
+  { immediate: true, deep: true },
+)
 const onAddClick = () => {
   emits('addArticle', { adding: true, searchQuery: searchQuery.value, page: currentPage.value })
 }
 
-const toggleStock = async (rowData, event) => {
-  const newValue = event.target.checked
-  console.log('toggleStock called', { selectedDeliveryZoneId: props.selectedDeliveryZoneId, newValue, rowId: rowData._id })
-  
-  // Mark as updating
-  stockUpdating.value.add(rowData._id)
-  
-  if (props.selectedDeliveryZoneId) {
-    // Zone-specific update
-    try {
-      const url = import.meta.env.VITE_API_BASE_URL
-      await axios.patch(`${url}/deliveryZones/${props.selectedDeliveryZoneId}/stock`, {
-        outletId: serviceStore.selectedRest,
-        entityType: 'MenuItem', 
-        entityId: rowData._id,
-        inStock: newValue,
-      })
-      init({ message: `Stock updated for zone: ${newValue ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
-    } catch (err) {
-      rowData.inStock = !newValue // Revert
-      init({ message: 'Failed to update zone stock', color: 'danger' })
-      console.error('Stock update failed', err)
-    } finally {
-      stockUpdating.value.delete(rowData._id)
+const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) => {
+  const key = `${rowData._id}_${zoneId}`
+  stockUpdating.value.add(key)
+  try {
+    const url = import.meta.env.VITE_API_BASE_URL
+    // Build updated inStockByZones array
+    const currentZones = Array.isArray(rowData.inStockByZones) ? [...rowData.inStockByZones] : []
+    const idx = currentZones.findIndex((z: any) => z.deliveryZoneId === zoneId)
+    if (idx >= 0) {
+      currentZones[idx] = { ...currentZones[idx], inStock }
+    } else {
+      currentZones.push({ deliveryZoneId: zoneId, inStock })
     }
-  } else {
-    // Global update via PATCH /menuItems/:id
-    try {
-      const url = import.meta.env.VITE_API_BASE_URL
-      await axios.patch(`${url}/menuItems/${rowData._id}`, {
-        inStock: newValue,
-      })
-      init({ message: `Global stock updated: ${newValue ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
-    } catch (err) {
-      rowData.inStock = !newValue // Revert
-      init({ message: 'Failed to update global stock', color: 'danger' })
-      console.error('Global stock update failed', err)
-    } finally {
-      stockUpdating.value.delete(rowData._id)
+    await axios.patch(`${url}/menuItems/${rowData._id}`, {
+      inStockByZones: currentZones,
+      outletId: serviceStore.selectedRest,
+    })
+    // Update the row data in-place so it stays in sync
+    rowData.inStockByZones = currentZones
+    // Update local tracking
+    if (!rowSelectedZones[rowData._id]) rowSelectedZones[rowData._id] = []
+    if (inStock) {
+      if (!rowSelectedZones[rowData._id].includes(zoneId)) {
+        rowSelectedZones[rowData._id].push(zoneId)
+      }
+    } else {
+      rowSelectedZones[rowData._id] = rowSelectedZones[rowData._id].filter((id) => id !== zoneId)
     }
+    const zone = props.deliveryZones.find((z: any) => z._id === zoneId)
+    const zoneName = zone ? zone.name : zoneId
+    init({ message: `${zoneName}: ${inStock ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
+  } catch (err) {
+    init({ message: 'Failed to update zone stock', color: 'danger' })
+    console.error('[ArticlesTable] Stock update failed:', err)
+  } finally {
+    stockUpdating.value.delete(key)
   }
 }
 const onImportClick = () => {
@@ -118,11 +156,23 @@ function onDocumentClick(e: MouseEvent) {
   showColumnsMenu.value = false
 }
 
+// Close all zone dropdown menus when clicking outside
+function onDocumentClickZone(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (target?.closest('.stock-zone-wrapper')) return
+  // Close all open zone menus by modifying the items
+  props.items.forEach((item: any) => {
+    if (item._showZoneMenu) item._showZoneMenu = false
+  })
+}
+
 onMounted(() => {
   document.addEventListener('click', onDocumentClick)
+  document.addEventListener('click', onDocumentClickZone)
 })
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
+  document.removeEventListener('click', onDocumentClickZone)
 })
 
 const allergenOptions = subCategoryStore.allergenOptions.map((e) => {
@@ -155,19 +205,19 @@ const pages = computed(() => {
 const getCategoryName = (cat: any) => {
   // If it's a string (ID), look it up
   if (typeof cat === 'string') {
-    const found = props.categories.find((c: any) => (c._id === cat || c.id === cat))
-    return found ? found.name : cat
+    const found = props.categories.find((c: any) => c._id === cat || c.id === cat)
+    return found ? getLocalizedValue(found.name) : cat
   }
-  
+
   // If it's an object and has a name, use it
-  if (cat?.name && cat.name !== 'SIZE') return cat.name
+  if (cat?.name && cat.name !== 'SIZE') return getLocalizedValue(cat.name)
 
   // If it's an object but missing name, try looking it up by ID
   // Prioritize 'id' (foreign key) over '_id' (subdocument id)
   const id = cat?.id || cat?._id
   if (id) {
-    const found = props.categories.find((c: any) => (c._id === id || c.id === id))
-    return found ? found.name : ''
+    const found = props.categories.find((c: any) => c._id === id || c.id === id)
+    return found ? getLocalizedValue(found.name) : ''
   }
 
   return ''
@@ -178,7 +228,6 @@ const getCategoryKey = (cat: any, index: number) => {
   return cat?.wCode || cat?._id || cat?.id || index
 }
 
-
 const filteredItems = computed(() => {
   let result = props.items
 
@@ -186,7 +235,7 @@ const filteredItems = computed(() => {
   if (selectedCategoryFilter.value) {
     result = result.filter((item: any) =>
       item.categories.some((cat: any) => {
-        const id = typeof cat === 'string' ? cat : (cat._id || cat.id)
+        const id = typeof cat === 'string' ? cat : cat._id || cat.id
         return id === selectedCategoryFilter.value
       }),
     )
@@ -473,48 +522,6 @@ function openFileModal(data) {
           <Plus class="w-4 h-4" />
           <span class="hidden md:inline">Add Article</span>
         </button>
-
-        <!-- Pagination -->
-        <div class="flex items-center gap-2">
-          <VaPagination v-model="currentPage" :pages="pages" buttons-preset="secondary" gapped="20" :visible-pages="3">
-            <template #firstPageLink="{ onClick, disabled }">
-              <button
-                class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
-                :disabled="disabled"
-                @click="onClick"
-              >
-                ‹‹
-              </button>
-            </template>
-            <template #prevPageLink="{ onClick, disabled }">
-              <button
-                class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
-                :disabled="disabled"
-                @click="onClick"
-              >
-                ‹
-              </button>
-            </template>
-            <template #nextPageLink="{ onClick, disabled }">
-              <button
-                class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
-                :disabled="disabled"
-                @click="onClick"
-              >
-                ›
-              </button>
-            </template>
-            <template #lastPageLink="{ onClick, disabled }">
-              <button
-                class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
-                :disabled="disabled"
-                @click="onClick"
-              >
-                ››
-              </button>
-            </template>
-          </VaPagination>
-        </div>
       </div>
     </div>
 
@@ -589,10 +596,10 @@ function openFileModal(data) {
               :selected-rest="selectedRest"
               @uploadSuccess="
                 (data) => {
-                  rowData.imageUrl = data.url
-                  rowData.assetId = data._id
-                  $emit('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value })
-                  rowData.editing = ''
+                  rowData.imageUrl = data.url;
+                  rowData.assetId = data._id;
+                  $emit('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value });
+                  rowData.editing = '';
                 }
               "
             />
@@ -602,26 +609,20 @@ function openFileModal(data) {
         <!-- NAME COLUMN -->
         <template #cell(name)="{ rowData }">
           <div class="editable-field relative group">
-            <!-- Editable textarea when editing -->
-            <textarea
-              v-if="rowData.editing === 'name'"
-              v-model="rowData.name"
-              class="editable-textarea"
+            <input
+              v-if="rowData.editName"
+              :value="getEditableLocaleValue(rowData.name)"
+              class="editable-input"
               autofocus
-              rows="3"
+              @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage }),
-                  (rowData.editing = '')
+                rowData.editName = false;
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value });
               "
             />
-
-            <!-- Display value when not editing -->
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'name'">
-              <span>{{ rowData.name || '' }}</span>
-
-              <!-- Pencil icon, appears only on hover -->
+            <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
+              <span>{{ getLocalizedValue(rowData.name) }}</span>
               <Pencil
-                v-if="rowData.name"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
               />
             </div>
@@ -631,35 +632,25 @@ function openFileModal(data) {
         <!-- DESCRIPTION COLUMN -->
         <template #cell(description)="{ rowData }">
           <div class="editable-field relative group">
-            <!-- Editable textarea -->
             <textarea
-              v-if="rowData.editing === 'description'"
-              v-model="rowData.description"
-              class="editable-textarea"
+              v-if="rowData.editDescription"
+              :value="getEditableLocaleValue(rowData.description)"
+              class="editable-input"
+              rows="2"
               autofocus
-              rows="3"
+              @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage }),
-                  (rowData.editing = '')
+                rowData.editDescription = false;
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value });
               "
             />
-
-            <!-- Display value when not editing -->
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'description'">
-              <span>{{ rowData.description || '' }}</span>
-
-              <!-- Pencil icon for existing description -->
+            <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
+              <span class="line-clamp-3">{{ getLocalizedValue(rowData.description) || '' }}</span>
               <Pencil
-                v-if="rowData.description"
+                v-if="getLocalizedValue(rowData.description)"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
               />
-
-              <!-- Plus icon for empty field -->
-              <CirclePlus
-                v-else
-                class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors"
-                @click.stop="rowData.editing = 'description'"
-              />
+              <CirclePlus v-else class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors" />
             </div>
           </div>
         </template>
@@ -673,8 +664,8 @@ function openFileModal(data) {
               class="editable-input"
               autofocus
               @blur="
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage }),
-                  (rowData.editing = '')
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage });
+                rowData.editing = '';
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'code'">
@@ -705,8 +696,8 @@ function openFileModal(data) {
               class="editable-input"
               autofocus
               @blur="
-                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage }),
-                  (rowData.editing = '')
+                emits('updateArticle', { ...rowData, searchQuery: searchQuery, page: currentPage });
+                rowData.editing = '';
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'price'">
@@ -741,7 +732,7 @@ function openFileModal(data) {
                     updating: 'category',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ getCategoryName(e) }}
@@ -758,7 +749,7 @@ function openFileModal(data) {
                     updating: 'category',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ getCategoryName(e) }}
@@ -771,7 +762,7 @@ function openFileModal(data) {
                     updating: 'category',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 +{{ rowData.categories.length - 2 }} more
@@ -820,7 +811,7 @@ function openFileModal(data) {
                   }"
                   @click="(selectedCategoryFilter = cat._id || cat.id), (showCategoryFilterMenu = false)"
                 >
-                  {{ cat.name }}
+                  {{ getLocalizedValue(cat.name) }}
                 </button>
               </div>
             </div>
@@ -841,7 +832,7 @@ function openFileModal(data) {
                     updating: 'subCategory',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ sub.name }}
@@ -858,7 +849,7 @@ function openFileModal(data) {
                     updating: 'subCategory',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 {{ sub.name }}
@@ -871,7 +862,7 @@ function openFileModal(data) {
                     updating: 'subCategory',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 +{{ rowData.subCategories.length - 2 }} more
@@ -897,7 +888,7 @@ function openFileModal(data) {
               >
                 <template v-for="opt in getActiveOptions(rowData)" :key="opt.id">
                   <span class="px-2 py-1 rounded text-sm bg-green-50 text-green-700 text-center w-full">
-                    {{ opt.name }}
+                    {{ getLocalizedValue(opt.name) }}
                   </span>
                 </template>
               </div>
@@ -913,7 +904,7 @@ function openFileModal(data) {
                     updating: 'options',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 <CirclePlus class="w-4 h-4" />
@@ -955,7 +946,7 @@ function openFileModal(data) {
                     updating: 'allergens',
                     searchQuery: searchQuery.value,
                     page: currentPage.value,
-                  })
+                  });
                 "
               >
                 <CirclePlus class="w-4 h-4" />
@@ -974,18 +965,12 @@ function openFileModal(data) {
                 class="sr-only"
                 @change="
                   (e) => {
-                    console.log(
-                      '🎯 Toggle clicked! e.target.checked =',
-                      e.target.checked,
-                      'rowData.isActive =',
-                      rowData.isActive,
-                    )
                     emits('updateArticle', {
                       ...rowData,
                       isActive: e.target.checked,
                       searchQuery: searchQuery.value,
                       page: currentPage.value,
-                    })
+                    });
                   }
                 "
               />
@@ -1005,28 +990,74 @@ function openFileModal(data) {
 
         <!-- STOCK COLUMN -->
         <template #cell(stock)="{ rowData }">
-          <div class="flex justify-center items-center">
-            <!-- Loading spinner -->
-            <div v-if="stockUpdating.has(rowData._id)" class="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-            <!-- Stock toggle -->
-            <label v-else class="relative inline-block w-9 h-5 cursor-pointer">
-              <input
-                v-model="rowData.inStock"
-                type="checkbox"
-                class="sr-only"
-                @change="(e) => toggleStock(rowData, e)"
-              />
-              <!-- Track -->
-              <span
-                class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
-                :class="rowData.inStock ? 'bg-blue-500' : 'bg-slate-300'"
-              ></span>
-              <!-- Thumb -->
-              <span
-                class="absolute left-0 top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out"
-                :class="rowData.inStock ? 'translate-x-4' : 'translate-x-1'"
-              ></span>
-            </label>
+          <div class="flex flex-col items-center gap-1" style="min-width: 140px">
+            <template v-if="deliveryZones.length > 0">
+              <div class="relative stock-zone-wrapper w-full">
+                <!-- Trigger button -->
+                <button
+                  class="flex items-center justify-between w-full px-2 py-1.5 text-xs rounded-lg border transition-all duration-200"
+                  :class="
+                    (rowSelectedZones[rowData._id] || []).length > 0
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                  "
+                  @click.stop="rowData._showZoneMenu = !rowData._showZoneMenu"
+                >
+                  <span class="truncate">
+                    <template v-if="(rowSelectedZones[rowData._id] || []).length > 0">
+                      {{ (rowSelectedZones[rowData._id] || []).length }} Zone{{
+                        (rowSelectedZones[rowData._id] || []).length > 1 ? 's' : ''
+                      }}
+                    </template>
+                    <template v-else> Select zone </template>
+                  </span>
+                  <svg
+                    class="w-3 h-3 flex-shrink-0 ml-1 transition-transform"
+                    :class="rowData._showZoneMenu ? 'rotate-180' : ''"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </button>
+
+                <!-- Dropdown menu -->
+                <div
+                  v-if="rowData._showZoneMenu"
+                  class="absolute left-0 top-full mt-1 w-48 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-xl p-2 z-50"
+                >
+                  <div class="flex flex-col gap-0.5 max-h-[200px] overflow-auto">
+                    <label
+                      v-for="zone in deliveryZones"
+                      :key="zone._id"
+                      class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer hover:bg-slate-50 transition-colors"
+                    >
+                      <!-- Loading spinner for this specific zone+row -->
+                      <div
+                        v-if="stockUpdating.has(`${rowData._id}_${zone._id}`)"
+                        class="animate-spin w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full flex-shrink-0"
+                      ></div>
+                      <input
+                        v-else
+                        type="checkbox"
+                        class="accent-emerald-500 h-3.5 w-3.5 rounded flex-shrink-0"
+                        :checked="(rowSelectedZones[rowData._id] || []).includes(zone._id)"
+                        @change="(e) => toggleZoneStock(rowData, zone._id, e.target.checked)"
+                      />
+                      <span class="truncate text-slate-700">{{ zone.name }}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <span class="text-xs text-slate-400 italic">No zones</span>
+            </template>
           </div>
         </template>
 
@@ -1062,6 +1093,48 @@ function openFileModal(data) {
           </div>
         </template>
       </VaDataTable>
+
+      <!-- Bottom Pagination -->
+      <div v-if="pages > 1" class="flex justify-center py-3 border-t border-slate-200">
+        <VaPagination v-model="currentPage" :pages="pages" buttons-preset="secondary" gapped="20" :visible-pages="3">
+          <template #firstPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹‹
+            </button>
+          </template>
+          <template #prevPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹
+            </button>
+          </template>
+          <template #nextPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ›
+            </button>
+          </template>
+          <template #lastPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ››
+            </button>
+          </template>
+        </VaPagination>
+      </div>
     </div>
   </div>
 </template>

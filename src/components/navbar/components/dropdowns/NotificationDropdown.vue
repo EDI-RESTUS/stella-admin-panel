@@ -2,165 +2,162 @@
   <VaDropdown :offset="[13, 0]" class="notification-dropdown" stick-to-edges :close-on-content-click="false">
     <template #anchor>
       <VaButton preset="secondary" color="textPrimary">
-        <VaBadge overlap>
-          <template #text> 2+</template>
+        <VaBadge v-if="store.unreadCount > 0" overlap :text="store.unreadCount > 9 ? '9+' : String(store.unreadCount)" color="danger">
           <VaIconNotification class="notification-dropdown__icon" />
         </VaBadge>
+        <VaIconNotification v-else class="notification-dropdown__icon" />
       </VaButton>
     </template>
-    <VaDropdownContent class="h-full sm:max-w-[420px] sm:h-auto">
-      <section class="sm:max-h-[320px] p-4 overflow-auto">
-        <VaList class="space-y-1 mb-2">
-          <template v-for="(item, index) in notificationsWithRelativeTime" :key="item.id">
-            <VaListItem class="text-base">
-              <VaListItemSection icon class="mx-0 p-0">
-                <VaIcon :name="item.icon" color="secondary" />
-              </VaListItemSection>
-              <VaListItemSection>
-                {{ item.message }}
-              </VaListItemSection>
-              <VaListItemSection icon class="mx-1">
-                {{ item.updateTimestamp }}
-              </VaListItemSection>
-            </VaListItem>
-            <VaListSeparator v-if="item.separator && index !== notificationsWithRelativeTime.length - 1" class="mx-3" />
-          </template>
-        </VaList>
 
-        <VaButton preset="primary" class="w-full" @click="displayAllNotifications = !displayAllNotifications"
-          >{{ displayAllNotifications ? t('notifications.less') : t('notifications.all') }}
-        </VaButton>
+    <VaDropdownContent class="h-full sm:max-w-[480px] sm:h-auto">
+      <section class="p-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="font-semibold text-sm">Notifications</span>
+          <VaButton v-if="store.unreadCount > 0" preset="plain" size="small" @click="store.markAllRead()">
+            Mark all as read
+          </VaButton>
+        </div>
+
+        <div v-if="store.unread.length === 0" class="text-center text-sm text-gray-400 py-4">
+          No unread notifications
+        </div>
+
+        <VaList v-else class="space-y-2 sm:max-h-[500px] overflow-auto">
+          <div
+            v-for="item in store.unread"
+            :key="item._id"
+            class="notification-item rounded-lg overflow-hidden"
+          >
+            <!-- Collapsed header — always visible, click to expand -->
+            <div
+              class="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer select-none"
+              @click="toggleExpand(item._id)"
+            >
+              <div class="flex items-center gap-2 min-w-0">
+                <VaIcon name="warning" color="warning" size="16px" class="flex-shrink-0" />
+                <div class="min-w-0">
+                  <div class="text-xs font-semibold text-warning leading-tight">Winmax Send Failed</div>
+                  <div class="text-xs text-gray-600 truncate">
+                    {{ item.orderNo }} · {{ item.orderType }}
+                    <span v-if="item.failedItems?.length" class="text-red-600 font-medium">
+                      · {{ item.failedItems.map(f => f.name).join(', ') }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                <span class="text-xs text-gray-400">{{ relativeTime(item.createdAt) }}</span>
+                <VaIcon
+                  :name="expandedIds.has(item._id) ? 'expand_less' : 'expand_more'"
+                  size="16px"
+                  class="text-gray-400"
+                />
+                <VaButton preset="plain" size="small" color="secondary" title="Dismiss" @click.stop="store.markRead(item._id)">
+                  <VaIcon name="close" size="14px" />
+                </VaButton>
+              </div>
+            </div>
+
+            <!-- Expanded detail panel -->
+            <div v-if="expandedIds.has(item._id)" class="border-t border-orange-200 px-3 pb-3 pt-2 space-y-2">
+
+              <!-- Order grid -->
+              <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div v-if="item.orderNo" class="flex items-center gap-1 text-gray-700">
+                  <VaIcon name="receipt" size="12px" class="text-gray-400 flex-shrink-0" />
+                  <span class="font-medium">Order:</span>&nbsp;{{ item.orderNo }}
+                </div>
+                <div v-if="item.orderType" class="flex items-center gap-1 text-gray-700">
+                  <VaIcon name="category" size="12px" class="text-gray-400 flex-shrink-0" />
+                  <span class="font-medium">Type:</span>&nbsp;{{ item.orderType }}
+                </div>
+                <div v-if="item.total" class="flex items-center gap-1 text-gray-700">
+                  <VaIcon name="euro" size="12px" class="text-gray-400 flex-shrink-0" />
+                  <span class="font-medium">Total:</span>&nbsp;€{{ item.total.toFixed(2) }}
+                </div>
+                <div v-if="item.customerName" class="flex items-center gap-1 text-gray-700">
+                  <VaIcon name="person" size="12px" class="text-gray-400 flex-shrink-0" />
+                  <span class="font-medium">Customer:</span>&nbsp;{{ item.customerName }}
+                </div>
+                <div v-if="item.tableNumber != null" class="flex items-center gap-1 text-gray-700">
+                  <VaIcon name="table_restaurant" size="12px" class="text-gray-400 flex-shrink-0" />
+                  <span class="font-medium">Table:</span>&nbsp;{{ item.tableNumber }}
+                </div>
+                <div v-if="item.deliveryZoneName" class="flex items-center gap-1 text-gray-700">
+                  <VaIcon name="local_shipping" size="12px" class="text-gray-400 flex-shrink-0" />
+                  <span class="font-medium">Zone:</span>&nbsp;{{ item.deliveryZoneName }}
+                </div>
+                <div v-if="item.phoneNo" class="flex items-center gap-1 text-gray-700 col-span-2">
+                  <VaIcon name="phone" size="12px" class="text-gray-400 flex-shrink-0" />
+                  <span class="font-medium">Phone:</span>&nbsp;{{ item.phoneNo }}
+                </div>
+              </div>
+
+              <!-- All order items, failed ones highlighted -->
+              <div v-if="item.allItems?.length" class="rounded border border-orange-200 overflow-hidden">
+                <div class="text-xs font-semibold text-gray-600 bg-orange-50 px-2 py-1 border-b border-orange-200">
+                  Order items
+                </div>
+                <div
+                  v-for="oi in item.allItems"
+                  :key="oi.name + oi.qty"
+                  class="flex items-center justify-between px-2 py-1 text-xs border-b border-orange-100 last:border-b-0"
+                  :class="isFailed(item, oi) ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-700'"
+                >
+                  <span>{{ oi.name }}</span>
+                  <span class="flex items-center gap-1">
+                    x{{ oi.qty }}
+                    <VaIcon v-if="isFailed(item, oi)" name="error_outline" size="12px" color="danger" title="Missing article code" />
+                  </span>
+                </div>
+              </div>
+
+              <!-- Dismiss button -->
+              <div class="flex justify-end pt-1">
+                <VaButton preset="secondary" size="small" @click="store.markRead(item._id)">
+                  Dismiss
+                </VaButton>
+              </div>
+            </div>
+          </div>
+        </VaList>
       </section>
     </VaDropdownContent>
   </VaDropdown>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { ref, onMounted, onUnmounted } from 'vue'
 import VaIconNotification from '../../../icons/VaIconNotification.vue'
+import { useNotificationsStore, type WinmaxNotification, type OrderItem } from '../../../../stores/notifications'
 
-const { t, locale } = useI18n()
+const store = useNotificationsStore()
+const expandedIds = ref<Set<string>>(new Set())
 
-const baseNumberOfVisibleNotifications = 4
-const rtf = new Intl.RelativeTimeFormat(locale.value, { style: 'short' })
-const displayAllNotifications = ref(false)
-
-interface INotification {
-  message: string
-  icon: string
-  id: number
-  separator?: boolean
-  updateTimestamp: Date
+function toggleExpand(id: string) {
+  if (expandedIds.value.has(id)) {
+    expandedIds.value.delete(id)
+  } else {
+    expandedIds.value.add(id)
+  }
 }
 
-const makeDateFromNow = (timeFromNow: number) => {
-  const date = new Date()
-  date.setTime(date.getTime() + timeFromNow)
-  return date
+function isFailed(notif: WinmaxNotification, item: OrderItem): boolean {
+  return notif.failedItems?.some((f) => f.name === item.name) ?? false
 }
 
-const notifications: INotification[] = [
-  {
-    message: '4 pending requests',
-    icon: 'favorite_outline',
-    id: 1,
-    separator: true,
-    updateTimestamp: makeDateFromNow(-3 * 60 * 1000),
-  },
-  {
-    message: '3 new reports',
-    icon: 'calendar_today',
-    id: 2,
-    separator: true,
-    updateTimestamp: makeDateFromNow(-12 * 60 * 60 * 1000),
-  },
-  {
-    message: 'Whoops! Your trial period has expired.',
-    icon: 'error_outline',
-    id: 3,
-    separator: true,
-    updateTimestamp: makeDateFromNow(-2 * 24 * 60 * 60 * 1000),
-  },
-  {
-    message: 'It looks like your timezone is set incorrectly, please change it to avoid issues with Memory.',
-    icon: 'schedule',
-    id: 4,
-    updateTimestamp: makeDateFromNow(-2 * 7 * 24 * 60 * 60 * 1000),
-  },
-  {
-    message: '2 new team members added',
-    icon: 'group_add',
-    id: 5,
-    separator: false,
-    updateTimestamp: makeDateFromNow(-3 * 60 * 1000),
-  },
-  {
-    message: 'Monthly budget exceeded by 10%',
-    icon: 'trending_up',
-    id: 6,
-    separator: true,
-    updateTimestamp: makeDateFromNow(-3 * 24 * 60 * 60 * 1000),
-  },
-  {
-    message: '7 tasks are approaching their deadlines',
-    icon: 'alarm',
-    id: 7,
-    separator: false,
-    updateTimestamp: makeDateFromNow(-5 * 60 * 60 * 1000),
-  },
-  {
-    message: 'New software update available',
-    icon: 'system_update',
-    id: 8,
-    separator: true,
-    updateTimestamp: makeDateFromNow(-1 * 24 * 60 * 60 * 1000),
-  },
-].sort((a, b) => new Date(b.updateTimestamp).getTime() - new Date(a.updateTimestamp).getTime())
+onMounted(() => store.startPolling(30_000))
+onUnmounted(() => store.stopPolling())
 
-const TIME_NAMES = {
-  second: 1000,
-  minute: 1000 * 60,
-  hour: 1000 * 60 * 60,
-  day: 1000 * 60 * 60 * 24,
-  week: 1000 * 60 * 60 * 24 * 7,
-  month: 1000 * 60 * 60 * 24 * 30,
-  year: 1000 * 60 * 60 * 24 * 365,
+function relativeTime(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime()
+  const minutes = Math.floor(diff / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
 }
-
-const getTimeName = (differenceTime: number) => {
-  return Object.keys(TIME_NAMES).reduce(
-    (acc, key) => (TIME_NAMES[key as keyof typeof TIME_NAMES] < differenceTime ? key : acc),
-    'month',
-  ) as keyof typeof TIME_NAMES
-}
-
-const notificationsWithRelativeTime = computed(() => {
-  const list = displayAllNotifications.value ? notifications : notifications.slice(0, baseNumberOfVisibleNotifications)
-
-  return list.map((item, index) => {
-    const timeDifference = Math.round(new Date().getTime() - new Date(item.updateTimestamp).getTime())
-    const timeName = getTimeName(timeDifference)
-
-    let separator = false
-
-    const nextItem = list[index + 1]
-    if (nextItem) {
-      const nextItemDifference = Math.round(new Date().getTime() - new Date(nextItem.updateTimestamp).getTime())
-      const nextItemTimeName = getTimeName(nextItemDifference)
-
-      if (timeName !== nextItemTimeName) {
-        separator = true
-      }
-    }
-
-    return {
-      ...item,
-      updateTimestamp: rtf.format(-1 * Math.round(timeDifference / TIME_NAMES[timeName]), timeName),
-      separator,
-    }
-  })
-})
 </script>
 
 <style lang="scss" scoped>
@@ -175,6 +172,16 @@ const notificationsWithRelativeTime = computed(() => {
 
   .va-dropdown__anchor {
     display: inline-block;
+  }
+
+  .notification-item {
+    background: #fff8f0;
+    border: 1px solid #ffe0b2;
+    transition: box-shadow 0.15s ease;
+
+    &:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
   }
 }
 </style>

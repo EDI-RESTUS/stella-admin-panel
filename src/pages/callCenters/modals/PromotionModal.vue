@@ -17,7 +17,7 @@
             <div
               class="flex items-center justify-between px-3 py-2 rounded-full shadow-sm cursor-pointer transition"
               :class="isSelected(code) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'"
-              @click="toggleCode(code)"
+              @click="toggleCode(code, promo)"
             >
               <span class="text-sm truncate">
                 <strong>{{ promo.name }}</strong> - {{ code }}
@@ -70,11 +70,15 @@
 <script setup>
 import { useToast } from 'vuestic-ui'
 import { computed, ref, watch } from 'vue'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 import { useOrderStore } from '@/stores/order-store'
 import { useServiceStore } from '@/stores/services'
 
 const emits = defineEmits(['cancel', 'select-code', 'select-codes'])
 const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
+const { log } = useCallCenterLogger()
 
 const props = defineProps({
   promotion: { type: Array, default: () => [] },
@@ -99,10 +103,39 @@ function isSelected(code) {
   return selectedCodes.value.includes(code)
 }
 
-function toggleCode(code) {
-  const idx = selectedCodes.value.indexOf(code)
-  if (idx >= 0) selectedCodes.value.splice(idx, 1)
-  else selectedCodes.value.push(code)
+function countEligibleItems(promo) {
+  const menuIdSet = new Set((promo.menuItem || []).map(String))
+  const optionIdSet = new Set((promo.option || []).map(String))
+  let total = 0
+  for (const item of orderStore.cartItems) {
+    const itemEligible = menuIdSet.has(String(item.itemId))
+    const optionEligible = (item.selectedOptions || []).some((group) =>
+      (group.selected || []).some((opt) => optionIdSet.has(String(opt.optionId))),
+    )
+    if (itemEligible || optionEligible) {
+      total += item.quantity || 1
+    }
+  }
+  return total
+}
+
+function toggleCode(code, promo) {
+  if (promo.promotionType === 'TAKE_X_PAY_Y') {
+    const takeQty = Number(promo.takeQuantity) || 2
+    const eligible = countEligibleItems(promo)
+    const maxTimes = Math.floor(eligible / takeQty)
+    const count = selectedCodes.value.filter((c) => c === code).length
+    if (count < maxTimes) {
+      selectedCodes.value.push(code)
+    } else {
+      // at max → clear all instances on next click
+      selectedCodes.value = selectedCodes.value.filter((c) => c !== code)
+    }
+  } else {
+    const idx = selectedCodes.value.indexOf(code)
+    if (idx >= 0) selectedCodes.value.splice(idx, 1)
+    else selectedCodes.value.push(code)
+  }
 }
 
 function clearSelection() {
@@ -113,7 +146,7 @@ function copyToClipboard(text) {
   navigator.clipboard
     .writeText(text)
     .then(() => init({ message: 'Copied', color: 'success' }))
-    .catch(() => init({ message: 'Copy failed.', color: 'danger' }))
+    .catch(() => showAlert('Copy failed.'))
 }
 
 // Build payload shared by single/multi
@@ -180,6 +213,7 @@ async function applySelectedCodes(hideToast = false) {
       if (!hideToast)
         init({ message: `Promotion${selectedCodes.value.length > 1 ? 's' : ''} applied`, color: 'success' })
       orderStore.setOrderTotal(response.data.data)
+      log('PROMO_SELECTED', { codes: selectedCodes.value, success: true })
 
       // Emit both for compatibility; parent can listen to either
       if (selectedCodes.value.length === 1) {
@@ -191,10 +225,12 @@ async function applySelectedCodes(hideToast = false) {
       emits('cancel')
     } else {
       orderStore.setOrderTotal(null)
-      init({ message: response.data?.message || 'Invalid promotion(s)', color: 'danger' })
+      log('PROMO_SELECTED', { codes: selectedCodes.value, success: false, errorMessage: response.data?.message || 'Invalid promotion(s)' })
+      showAlert(response.data?.message || 'Invalid promotion(s)')
     }
   } catch (err) {
-    init({ message: err?.response?.data?.message || 'Promotion validation failed', color: 'danger' })
+    log('ERROR_PROMO_VALIDATION', { codes: selectedCodes.value, errorMessage: err?.response?.data?.message || 'Promotion validation failed' })
+    showAlert(err?.response?.data?.message || 'Promotion validation failed')
     console.error(err)
   } finally {
     apiLoading.value = false
@@ -233,4 +269,6 @@ watch(
     }
   },
 )
+
+defineExpose({ clearSelection })
 </script>

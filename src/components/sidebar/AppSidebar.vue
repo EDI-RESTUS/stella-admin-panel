@@ -265,6 +265,19 @@
               Payments
             </RouterLink>
 
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'callCenterLogs'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/callCenterLogs"
+            >
+              <VaIcon name="assignment" class="mr-2" />
+              CC Logs
+            </RouterLink>
+
             <span
               class="flex items-center py-1 rounded-lg mr-2 pl-2 -ml-2 text-slate-400 cursor-not-allowed"
               title="Coming Soon"

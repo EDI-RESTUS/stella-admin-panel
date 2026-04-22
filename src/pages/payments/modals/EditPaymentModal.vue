@@ -25,8 +25,11 @@
           :options="paymentGateway"
         />
 
-        <!-- Payment Gateway Config Inputs -->
-        <div v-if="formData.paymentGateway" class="grid md:grid-cols-1 gap-3">
+        <!-- Payment Gateway Config Inputs — hidden for WalleePOS (terminals managed via Configure Wallee) -->
+        <div
+          v-if="formData.paymentGateway && formData.paymentGateway !== 'WalleePOS'"
+          class="grid md:grid-cols-1 gap-3"
+        >
           <div
             v-for="e in paymentOptions.find((a) => a.paymentMethodName === formData.paymentGateway)?.inputConfig || []"
             :key="e.label"
@@ -42,8 +45,17 @@
           </div>
         </div>
 
-        <!-- Payment Type ID -->
-        <VaInput v-model="formData.paymentTypeId" label="Payment Type ID" placeholder="Payment Type ID" type="text" />
+        <!-- Payment Type ID + Auto Receipt + Receipt Format -->
+        <div class="grid md:grid-cols-3 gap-3 items-end">
+          <VaInput v-model="formData.paymentTypeId" label="Payment Type ID" placeholder="Payment Type ID" type="text" />
+          <VaCheckbox v-model="formData.autoReceipt" label="Auto Receipt" />
+          <VaSelect
+            v-model="formData.receiptFormat"
+            label="Receipt Format"
+            :options="receiptFormatOptions"
+            value-by="value"
+          />
+        </div>
 
         <!-- Options -->
         <div class="grid md:grid-cols-4 gap-3">
@@ -63,6 +75,13 @@
         >
           Configure Wallee
         </VaButton>
+        <VaButton
+          v-if="isUpdating && formData.paymentGateway === 'VivaWalletPOS'"
+          color="secondary"
+          @click="showVivaWalletPOSConfig = true"
+        >
+          Configure VivaWalletPOS
+        </VaButton>
         <VaButton type="submit" :disabled="isSubmitDisabled">{{ isUpdating ? 'Update' : 'Add' }}</VaButton>
       </div>
     </VaForm>
@@ -72,6 +91,13 @@
       :outlet-id="servicesStore.selectedRest"
       :payment-type-id="formData.paymentTypeId"
       @cancel="showWalleeConfig = false"
+    />
+
+    <VivaWalletPOSConfigModal
+      v-if="showVivaWalletPOSConfig"
+      :outlet-id="servicesStore.selectedRest"
+      :payment-type-id="formData.paymentTypeId"
+      @cancel="showVivaWalletPOSConfig = false"
     />
   </VaModal>
 </template>
@@ -83,6 +109,7 @@ import { validators } from '@/services/utils'
 import { useForm, useToast } from 'vuestic-ui'
 import { useServiceStore } from '@/stores/services'
 import WalleeConfigModal from './WalleeConfigModal.vue'
+import VivaWalletPOSConfigModal from './VivaWalletPOSConfigModal.vue'
 
 const emits = defineEmits(['cancel'])
 const props = defineProps({
@@ -96,6 +123,7 @@ const { validate } = useForm('form')
 const { init } = useToast()
 const servicesStore = useServiceStore()
 const showWalleeConfig = ref(false)
+const showVivaWalletPOSConfig = ref(false)
 
 // Form data
 const formData = ref({
@@ -107,7 +135,15 @@ const formData = ref({
   delivery: false,
   takeaway: false,
   callCenter: false,
+  autoReceipt: false,
+  receiptFormat: 'NONE',
 })
+
+const receiptFormatOptions = [
+  { text: 'None', value: 'NONE' },
+  { text: 'Print', value: 'PRINT' },
+  { text: 'PDF', value: 'PDF' },
+]
 
 const isUpdating = computed(() => !!Object.keys(props.selectedPayment).length)
 
@@ -168,9 +204,11 @@ getPaymentconfig()
 const isSubmitDisabled = computed(() => {
   if (!formData.value.name?.trim()) return true
   if (!formData.value.paymentGateway) return false
+  // WalleePOS config fields are hidden — skip their required-field validation
+  if (formData.value.paymentGateway === 'WalleePOS') return false
   const selectedGateway = paymentOptions.value.find((a) => a.paymentMethodName === formData.value.paymentGateway)
   if (!selectedGateway) return false
-  const hasEmptyRequiredField = selectedGateway.inputConfig.some((input) => input.required && !input.value?.trim())
+  const hasEmptyRequiredField = selectedGateway.inputConfig.some((input) => input.required && !String(input.value ?? '').trim())
   return hasEmptyRequiredField
 })
 
@@ -195,10 +233,13 @@ const submit = async () => {
       )
     }
 
+    const isNewWallee = !data._id && formData.value.paymentGateway === 'WalleePOS'
+
     data = {
       ...data,
       outletId: servicesStore.selectedRest,
-      paymentGatewayConfig: getConfig(selectedGateway),
+      // Don't send paymentGatewayConfig on new WalleePOS — backend would auto-create a terminal with deliveryZoneId:null
+      ...(!isNewWallee && { paymentGatewayConfig: getConfig(selectedGateway) }),
     }
 
     // Remove unnecessary fields
@@ -226,7 +267,6 @@ const submit = async () => {
   }
 }
 
-getPaymentconfig()
 </script>
 
 <style scoped>

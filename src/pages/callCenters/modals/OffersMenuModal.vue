@@ -92,8 +92,13 @@
                 :class="{
                   'border-gray-700 bg-[#f8f9fa] border-2': isChecked(group, option.optionId),
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option.optionId),
+                  'out-of-stock': option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
-                @click="updateSingleChoice(group, option)"
+                @click="
+                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                    ? null
+                    : updateSingleChoice(group, option)
+                "
               >
                 <div v-if="option.imageUrl" class="item-image">
                   <img
@@ -135,8 +140,13 @@
                 :class="{
                   'border-gray-700 bg-[#f8f9fa] border-2': isChecked(group, option.optionId),
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option.optionId),
+                  'out-of-stock': option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
-                @click.prevent="toggleMultipleChoiceNoQty(group, option)"
+                @click.prevent="
+                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                    ? null
+                    : toggleMultipleChoiceNoQty(group, option)
+                "
               >
                 <div v-if="option.imageUrl" class="item-image">
                   <img
@@ -171,11 +181,12 @@
                 v-if="group.multipleChoice"
                 :key="option.optionId"
                 class="w-[200px] h-[80px] relative flex flex-col justify-between border rounded-xl transition hover:shadow-sm cursor-pointer"
-                :class="
+                :class="[
                   getQty(group.optionGroupId, option.optionId) > 0
                     ? 'border-gray-700 bg-[#f8f9fa] border-2'
-                    : 'border-gray-200 hover:border-gray-700 hover:border-2'
-                "
+                    : 'border-gray-200 hover:border-gray-700 hover:border-2',
+                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK') ? 'out-of-stock' : '',
+                ]"
               >
                 <!-- Top content -->
                 <div class="flex items-start gap-1">
@@ -213,7 +224,11 @@
                   <p v-if="option.isFree" class="text-xs text-gray-600 font-medium mr-1">Free</p>
                   <button
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
-                    :disabled="getQty(group.optionGroupId, option.optionId) === 0"
+                    :disabled="
+                      getQty(group.optionGroupId, option.optionId) === 0 ||
+                      option.inStock === false ||
+                      option.name?.toUpperCase().includes('OUT OF STOCK')
+                    "
                     @click="() => updateMultipleChoice(group, option, getQty(group.optionGroupId, option.optionId) - 1)"
                   >
                     -
@@ -224,12 +239,16 @@
                       getQty(group.optionGroupId, option.optionId) >=
                       (option.maximumChoices || group.maximumChoices || 99)
                         ? 'Max quantity reached'
-                        : ''
+                        : option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                          ? 'Out of stock'
+                          : ''
                     "
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                     :disabled="
                       getQty(group.optionGroupId, option.optionId) >=
-                      (option.maximumChoices || group.maximumChoices || 99)
+                        (option.maximumChoices || group.maximumChoices || 99) ||
+                      option.inStock === false ||
+                      option.name?.toUpperCase().includes('OUT OF STOCK')
                     "
                     @click="() => updateMultipleChoice(group, option, getQty(group.optionGroupId, option.optionId) + 1)"
                   >
@@ -277,6 +296,10 @@ const props = defineProps({
     required: true,
   },
   menuItemId: String,
+  addedItemIndex: {
+    type: Number,
+    default: -1,
+  },
 })
 const selectedOptions = ref([])
 const menuStore = useMenuStore()
@@ -336,16 +359,16 @@ watch(
     if (props.isEdit) {
       groupItemIndex = offer.value.selections.findIndex((a) => a._id === props.offerGroup._id)
       if (groupItemIndex !== -1) {
-        const addedItems = offer.value.selections[groupItemIndex].addedItems.find(
-          (offerItem) => offerItem.itemId === props.item.id && props.selectedMenuItem.itemId === offerItem.itemId,
-        )
-          ? offer.value.selections[groupItemIndex].addedItems.find((offerItem) => offerItem.itemId === props.item.id)
-          : null
-        addedItemIndex = offer.value.selections[groupItemIndex].addedItems.findIndex(
-          (offerItem) => offerItem.itemId === props.item.id,
-        )
-        if (addedItems && addedItems.selectedOptions.length) {
-          selectedOptions.value = addedItems.selectedOptions
+        addedItemIndex =
+          props.addedItemIndex >= 0
+            ? props.addedItemIndex
+            : offer.value.selections[groupItemIndex].addedItems.findIndex(
+                (offerItem) => offerItem.itemId === props.item.id,
+              )
+        const addedItem =
+          addedItemIndex >= 0 ? offer.value.selections[groupItemIndex].addedItems[addedItemIndex] : null
+        if (addedItem && addedItem.selectedOptions.length) {
+          selectedOptions.value = JSON.parse(JSON.stringify(addedItem.selectedOptions))
           selectedOptions.value.forEach((group) => {
             if (group.selected.find((a) => a.type.toLowerCase() === 'article')) {
               getArticlesConfiguration(
@@ -648,6 +671,16 @@ function decrement(item) {
     margin-right: 30px;
     margin-top: 10px;
   }
+}
+.out-of-stock {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+.out-of-stock:hover {
+  border-color: #e9ecef !important;
+  background: white !important;
 }
 .item-image {
   width: 60px;

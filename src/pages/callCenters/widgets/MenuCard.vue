@@ -17,8 +17,6 @@
       :fetch-configurations="[]"
       @cancel="closeMenuModal"
     />
-
-
   </div>
 </template>
 
@@ -26,9 +24,10 @@
 import { ref, computed } from 'vue'
 import MenuModal from '../modals/MenuModal.vue'
 import axios from 'axios'
-import { useToast } from 'vuestic-ui'
 import { useOrderStore } from '@/stores/order-store'
 import { useMenuStore } from '@/stores/getMenu'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 
 const props = defineProps({
   item: Object,
@@ -41,13 +40,15 @@ const itemWithArticlesOptionsGroups = ref({})
 const orderStore = useOrderStore()
 const menuStore = useMenuStore()
 
-const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
+const { log } = useCallCenterLogger()
 
 const isOutOfStock = computed(() => {
   return props.item?.inStock === false || props.item?.name?.toUpperCase().includes('OUT OF STOCK')
 })
 
 function addToBasket(item) {
+  log('ITEM_ADDED_TO_CART', { itemId: item._id, itemName: item.name, price: item.price })
   const productEntry = {
     itemId: item._id,
     itemName: item.name,
@@ -65,6 +66,7 @@ function addToBasket(item) {
 }
 
 const getMenuOptions = async () => {
+  log('MENU_ITEM_CLICKED', { itemId: props.item._id, itemName: props.item.name, price: props.item.price })
   const url = import.meta.env.VITE_API_BASE_URL
   isLoading.value = true
   try {
@@ -87,7 +89,7 @@ const getMenuOptions = async () => {
       addToBasket(itemWithArticlesOptionsGroups.value)
     }
   } catch (error) {
-    init({ message: 'Something went wrong', color: 'danger' })
+    showAlert('Something went wrong. Please try again.')
   } finally {
     isLoading.value = false
   }
@@ -177,5 +179,4 @@ function closeMenuModal() {
   box-shadow: none;
   border-color: #e2e8f0;
 }
-
 </style>

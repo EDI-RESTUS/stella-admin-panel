@@ -102,7 +102,11 @@
                   'border-gray-200 hover:border-gray-700 hover:border-2': !isChecked(group, option._id),
                   'out-of-stock': option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
-                @click="option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK') ? null : updateSingleChoice(group, option)"
+                @click="
+                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                    ? null
+                    : updateSingleChoice(group, option)
+                "
               >
                 <div v-if="option.imageUrl" class="item-image">
                   <img
@@ -127,8 +131,6 @@
                   :value="option._id"
                   class="absolute bottom-2 right-2 accent-gray-700 pointer-events-none"
                 />
-
-
               </label>
 
               <!-- Multiple Choice (No Qty)-->
@@ -143,7 +145,9 @@
                   'out-of-stock': option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK'),
                 }"
                 @click.prevent="
-                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK') ? null : toggleMultipleChoiceNoQty(group, option)
+                  option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                    ? null
+                    : toggleMultipleChoiceNoQty(group, option)
                 "
               >
                 <div v-if="option.imageUrl" class="item-image">
@@ -207,7 +211,9 @@
                   <button
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                     :disabled="
-                      getQty(group._id, option._id) === 0 || option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                      getQty(group._id, option._id) === 0 ||
+                      option.inStock === false ||
+                      option.name?.toUpperCase().includes('OUT OF STOCK')
                     "
                     @click="() => updateMultipleChoice(group, option, getQty(group._id, option._id) - 1)"
                   >
@@ -225,7 +231,8 @@
                     class="w-5 h-5 text-xs font-bold border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                     :disabled="
                       getQty(group._id, option._id) >= (option.maximumChoices || group.maximumChoices || 99) ||
-                      option.inStock === false || option.name?.toUpperCase().includes('OUT OF STOCK')
+                      option.inStock === false ||
+                      option.name?.toUpperCase().includes('OUT OF STOCK')
                     "
                     @click="() => updateMultipleChoice(group, option, getQty(group._id, option._id) + 1)"
                   >
@@ -247,8 +254,10 @@ import { useOrderStore } from '@/stores/order-store'
 import { useMenuStore } from '@/stores/getMenu'
 import { useToast } from 'vuestic-ui'
 import axios from 'axios'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 const orderStore = useOrderStore()
 const menuStore = useMenuStore()
+const { log } = useCallCenterLogger()
 
 const showMenuModal = ref(true)
 const emits = defineEmits(['cancel', 'cancel-edit'])
@@ -483,6 +492,11 @@ function addToBasket(item: any) {
   showMenuModal.value = false
   formSubmitted.value = false
 
+  log(props.isEdit ? 'CART_ITEM_UPDATED' : 'CART_ITEM_ADDED_WITH_OPTIONS', {
+    itemId: props.isEdit ? item.itemId : item._id,
+    itemName: props.isEdit ? item.itemName : item.name,
+  })
+
   if (props.isEdit) {
     emits('cancel-edit')
   }
@@ -634,30 +648,30 @@ watch(showMenuModal, (val) => {
 })
 
 const allergenIcons = {
-  1: '/allergens/vegan.png',
-  2: '/allergens/plant_based.png',
-  3: '/allergens/vegetarian.png',
-  4: '/allergens/pescatarian.png',
-  5: '/allergens/spicy.png',
-  6: '/allergens/halal.png',
-  7: '/allergens/kosher.png',
-  8: '/allergens/gluten_free.png',
-  9: '/allergens/dairy_free.png',
-  10: '/allergens/nut_free.png',
-  11: '/allergens/gluten.png',
-  12: '/allergens/crustaceans.png',
-  13: '/allergens/eggs.png',
-  14: '/allergens/fish.png',
-  15: '/allergens/peanuts.png',
-  16: '/allergens/soybeans.png',
-  17: '/allergens/milk.png',
-  18: '/allergens/nuts.png',
-  19: '/allergens/celery.png',
-  20: '/allergens/mustard.png',
-  21: '/allergens/sesame_seeds.png',
+  1: '/allergens/celery.png',
+  2: '/allergens/crustaceans.png',
+  3: '/allergens/dairy_free.png',
+  4: '/allergens/eggs.png',
+  5: '/allergens/fish.png',
+  6: '/allergens/gluten.png',
+  7: '/allergens/gluten_free.png',
+  8: '/allergens/halal.png',
+  9: '/allergens/kosher.png',
+  10: '/allergens/lupin.png',
+  11: '/allergens/milk.png',
+  12: '/allergens/molluscs.png',
+  13: '/allergens/mustard.png',
+  14: '/allergens/nut_free.png',
+  15: '/allergens/nuts.png',
+  16: '/allergens/peanuts.png',
+  17: '/allergens/pescatarian.png',
+  18: '/allergens/plant_based.png',
+  19: '/allergens/sesame_seeds.png',
+  20: '/allergens/soybeans.png',
+  21: '/allergens/spicy.png',
   22: '/allergens/sulphur_dioxide.png',
-  23: '/allergens/lupin.png',
-  24: '/allergens/molluscs.png',
+  23: '/allergens/vegan.png',
+  24: '/allergens/vegetarian.png',
 }
 
 function increment(item) {
@@ -669,7 +683,6 @@ function decrement(item) {
 }
 
 onMounted(() => {
-
   if (props.isEdit && props.item?.selectedOptions) {
     selectedOptions.value = JSON.parse(JSON.stringify(props.item.selectedOptions))
     const selectedGroupAndOption = props.item.selectedOptions.find((group) =>
@@ -682,8 +695,6 @@ onMounted(() => {
 })
 
 const { init } = useToast()
-
-
 </script>
 
 <style>
@@ -737,6 +748,4 @@ const { init } = useToast()
   border-color: #e9ecef !important;
   background: white !important;
 }
-
-
 </style>

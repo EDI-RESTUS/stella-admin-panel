@@ -3,10 +3,43 @@ import { defineVaDataTableColumns, useModal, useToast } from 'vuestic-ui'
 import { useRouter } from 'vue-router'
 import { ref, toRef, watch, computed, reactive, onMounted, onUnmounted } from 'vue'
 import { useServiceStore } from '@/stores/services'
+import { useUsersStore } from '@/stores/users'
 import FileUpload from '@/components/file-uploader/FileUpload.vue'
 import AddSelectionModal from '../modals/AddSelectionModal.vue'
 import axios from 'axios'
-import { Plus, Search, CirclePlus, Pencil, Columns3 } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
+import { Plus, Search, CirclePlus, Pencil, Columns3, Copy, ArrowUpDown } from 'lucide-vue-next'
+
+const { locale } = useI18n()
+
+// Resolve a localized name/description field (may be string or Record<lang, string>)
+function getLocalizedValue(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  if (typeof val === 'object') {
+    return val[locale.value] || val['en'] || Object.values(val)[0] || ''
+  }
+  return ''
+}
+
+// Get the inline-edit string for a locale field (edits the primary/en key)
+function getEditableValue(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  return val[locale.value] || val['en'] || ''
+}
+
+// Write back inline edits to the correct key on a locale object
+function setLocaleValue(obj: any, field: string, value: string) {
+  if (typeof obj[field] === 'string') {
+    obj[field] = value
+  } else if (obj[field] && typeof obj[field] === 'object') {
+    const lang = locale.value || 'en'
+    obj[field] = { ...obj[field], [lang]: value }
+  } else {
+    obj[field] = value
+  }
+}
 
 const emits = defineEmits(['getOffers', 'editOffers', 'openOfferModal'])
 const props = defineProps({
@@ -15,6 +48,14 @@ const props = defineProps({
     required: true,
   },
   loading: { type: Boolean, default: false },
+  deliveryZones: {
+    type: Array,
+    default: () => [],
+  },
+  initialStockMap: {
+    type: Object,
+    default: () => ({}),
+  },
 })
 
 const isAddSelectionModalOpen = ref(false)
@@ -29,6 +70,9 @@ const isEditSelection = ref(false)
 const router = useRouter()
 const filterMode = ref(2)
 const servicesStore = useServiceStore()
+const userStore = useUsersStore()
+const stockUpdating = ref(new Set()) // Track which rows are currently updating stock
+const rowSelectedZones = reactive<Record<string, string[]>>({}) // Track selected delivery zones per row
 const columns = defineVaDataTableColumns([
   { label: 'Image', key: 'imageUrl' },
   { label: 'Name', key: 'name' },
@@ -40,8 +84,9 @@ const columns = defineVaDataTableColumns([
   { label: 'Week Days', key: 'weeklyOffer', thAlign: 'center', width: '190px' },
   { label: 'Order Type', key: 'orderType' },
   { label: 'Selections', key: 'selections', thAlign: 'center' },
+  { label: 'In Stock', key: 'inStock', thAlign: 'center' },
   { label: 'Active', key: 'isActive', thAlign: 'center' },
-  { label: 'Actions', key: 'actions' },
+  { label: 'Actions', key: 'actions', width: '100px' },
 ])
 const columnsVisibility = reactive<Record<string, boolean>>({})
 
@@ -103,6 +148,56 @@ watch(
 
 onMounted(() => loadColumnVisibility())
 
+// Initialize rowSelectedZones from the initialStockMap prop (API data)
+watch(
+  () => props.initialStockMap,
+  (newMap) => {
+    Object.keys(rowSelectedZones).forEach((key) => delete rowSelectedZones[key])
+    Object.entries(newMap).forEach(([offerId, zoneIds]) => {
+      rowSelectedZones[offerId] = [...(zoneIds as string[])]
+    })
+  },
+  { immediate: true, deep: true },
+)
+
+const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) => {
+  const key = `${rowData._id}_${zoneId}`
+  stockUpdating.value.add(key)
+  try {
+    const url = import.meta.env.VITE_API_BASE_URL
+    await axios.put(`${url}/offers/${rowData._id}`, {
+      deliveryZoneId: zoneId,
+      inStock,
+    })
+    // Update the row data in-place so it stays in sync
+    const currentZones = Array.isArray(rowData.inStockByZones) ? [...rowData.inStockByZones] : []
+    const idx = currentZones.findIndex((z: any) => z.deliveryZoneId === zoneId)
+    if (idx >= 0) {
+      currentZones[idx] = { ...currentZones[idx], inStock }
+    } else {
+      currentZones.push({ deliveryZoneId: zoneId, inStock })
+    }
+    rowData.inStockByZones = currentZones
+    // Update local tracking
+    if (!rowSelectedZones[rowData._id]) rowSelectedZones[rowData._id] = []
+    if (inStock) {
+      if (!rowSelectedZones[rowData._id].includes(zoneId)) {
+        rowSelectedZones[rowData._id].push(zoneId)
+      }
+    } else {
+      rowSelectedZones[rowData._id] = rowSelectedZones[rowData._id].filter((id) => id !== zoneId)
+    }
+    const zone = props.deliveryZones.find((z: any) => z._id === zoneId)
+    const zoneName = zone ? (zone as any).name : zoneId
+    init({ message: `${zoneName}: ${inStock ? 'In Stock' : 'Out of Stock'}`, color: 'success' })
+  } catch (err) {
+    init({ message: 'Failed to update zone stock', color: 'danger' })
+    console.error('[OfferTable] Stock update failed:', err)
+  } finally {
+    stockUpdating.value.delete(key)
+  }
+}
+
 // Dropdown state
 const showColumnsMenu = ref(false)
 const columnsMenuWrapper = ref<HTMLElement | null>(null)
@@ -115,8 +210,23 @@ function onDocumentClick(e: MouseEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('click', onDocumentClick))
-onUnmounted(() => document.removeEventListener('click', onDocumentClick))
+// Close zone dropdown menus on outside click
+function onDocumentClickZone(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (target?.closest('.stock-zone-wrapper')) return
+  props.items.forEach((item: any) => {
+    if (item._showZoneMenu) item._showZoneMenu = false
+  })
+}
+
+onMounted(() => {
+  document.addEventListener('click', onDocumentClick)
+  document.addEventListener('click', onDocumentClickZone)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onDocumentClick)
+  document.removeEventListener('click', onDocumentClickZone)
+})
 const selectionColumns = defineVaDataTableColumns([
   { label: 'Name', key: 'name' },
   { label: 'Options', key: 'menuItems' },
@@ -127,26 +237,52 @@ const selectionColumns = defineVaDataTableColumns([
 const totalVisibleCount = computed(() => filteredItems.value.length)
 const searchQuery = ref('')
 const filteredItems = ref([])
+const sortKey = ref<'name' | 'startDate' | 'isActive' | null>(null)
+const sortOrder = ref<'asc' | 'desc'>('asc')
+
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+}
+
 watch(
-  [() => props.items, searchQuery, filterMode],
+  [() => props.items, searchQuery, filterMode, sortKey, sortOrder],
   ([newItems, query, mode]) => {
     const lowerQuery = query.toLowerCase().trim()
     let mappedItems = newItems.map((item) => ({ ...item }))
 
     // Filter by active mode
     if (mode === 0) {
-      // Only inactive
       mappedItems = mappedItems.filter((item) => !item.isActive)
     } else if (mode === 2) {
-      // Only active
       mappedItems = mappedItems.filter((item) => item.isActive)
     }
 
     // Search filter
     if (lowerQuery) {
       mappedItems = mappedItems.filter((item) =>
-        [item.name, item.code].filter(Boolean).some((field) => field.toLowerCase().includes(lowerQuery)),
+        [getLocalizedValue(item.name), item.code]
+          .filter(Boolean)
+          .some((field) => field.toLowerCase().includes(lowerQuery)),
       )
+    }
+
+    // Sort
+    if (sortKey.value) {
+      const dir = sortOrder.value === 'asc' ? 1 : -1
+      mappedItems = [...mappedItems].sort((a, b) => {
+        if (sortKey.value === 'name') {
+          return getLocalizedValue(a.name).localeCompare(getLocalizedValue(b.name)) * dir
+        }
+        if (sortKey.value === 'startDate') {
+          const da = new Date(a.dateOffer?.startDate || 0).getTime()
+          const db = new Date(b.dateOffer?.startDate || 0).getTime()
+          return (da - db) * dir
+        }
+        if (sortKey.value === 'isActive') {
+          return (Number(b.isActive) - Number(a.isActive)) * dir
+        }
+        return 0
+      })
     }
 
     filteredItems.value = mappedItems
@@ -249,6 +385,16 @@ async function deleteOffer(payload) {
     .catch((err) => {
       init({ message: err.response?.data?.error || 'Delete failed', color: 'danger' })
     })
+}
+
+function duplicateOffer(payload) {
+  const { _id, __v, createdAt, updatedAt, ...rest } = payload
+  const duplicate = {
+    ...rest,
+    code: rest.code || '',
+    isActive: true,
+  }
+  emits('editOffers', duplicate)
 }
 
 async function deleteSelection(payload) {
@@ -384,6 +530,25 @@ function formatReadableDate(dateStr: string): string {
 
       <!-- Right: Buttons -->
       <div class="flex flex-wrap gap-2 justify-end items-center flex-shrink-0">
+        <!-- Sort controls -->
+        <div class="flex items-center gap-1">
+          <select
+            v-model="sortKey"
+            class="text-sm px-2 py-1.5 rounded-xl border border-slate-200 bg-white/60 backdrop-blur-md shadow-sm focus:outline-none text-slate-700"
+          >
+            <option :value="null">Sort by...</option>
+            <option value="name">Name</option>
+            <option value="startDate">Date Range</option>
+          </select>
+          <button
+            v-if="sortKey"
+            class="flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200 bg-white/60 backdrop-blur-md shadow-sm hover:bg-white/80 transition-all"
+            :title="sortOrder === 'asc' ? 'Ascending' : 'Descending'"
+            @click="toggleSortOrder"
+          >
+            <ArrowUpDown class="w-4 h-4 text-slate-600" :class="sortOrder === 'desc' ? 'rotate-180' : ''" />
+          </button>
+        </div>
         <!-- Active Only -->
         <div class="flex items-center gap-2">
           <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Active Only</span>
@@ -524,10 +689,10 @@ function formatReadableDate(dateStr: string): string {
               :selected-rest="selectedRest"
               @uploadSuccess="
                 (data) => {
-                  rowData.imageUrl = data.url
-                  rowData.assetId = data._id
-                  updateData(rowData)
-                  rowData.editing = ''
+                  rowData.imageUrl = data.url;
+                  rowData.assetId = data._id;
+                  updateData(rowData);
+                  rowData.editing = '';
                 }
               "
             />
@@ -539,16 +704,17 @@ function formatReadableDate(dateStr: string): string {
           <div class="editable-field relative group">
             <input
               v-if="rowData.editName"
-              v-model="rowData.name"
+              :value="getEditableValue(rowData.name)"
               class="editable-input"
               autofocus
+              @input="(e) => setLocaleValue(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
                 rowData.editName = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
-              <span>{{ rowData.name || '' }}</span>
+              <span>{{ getLocalizedValue(rowData.name) || '' }}</span>
               <Pencil
                 v-if="rowData.name"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -567,17 +733,18 @@ function formatReadableDate(dateStr: string): string {
           <div class="editable-field relative group">
             <textarea
               v-if="rowData.editDescription"
-              v-model="rowData.description"
+              :value="getEditableValue(rowData.description)"
               class="editable-input"
               rows="3"
               autofocus
+              @input="(e) => setLocaleValue(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
                 rowData.editDescription = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
-              <span>{{ rowData.description || '' }}</span>
+              <span>{{ getLocalizedValue(rowData.description) || '' }}</span>
               <Pencil
                 v-if="rowData.description"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -602,7 +769,7 @@ function formatReadableDate(dateStr: string): string {
               autofocus
               @blur="
                 rowData.editCode = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editCode = true">
@@ -631,7 +798,7 @@ function formatReadableDate(dateStr: string): string {
               autofocus
               @blur="
                 rowData.editPrice = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editPrice = true">
@@ -777,8 +944,8 @@ function formatReadableDate(dateStr: string): string {
                       type="text"
                       @change="
                         () => {
-                          updateData({ ...rowData, fromInlineEdit: true })
-                          selection.editName = false
+                          updateData({ ...rowData, fromInlineEdit: true });
+                          selection.editName = false;
                         }
                       "
                     />
@@ -797,8 +964,8 @@ function formatReadableDate(dateStr: string): string {
                       type="number"
                       @change="
                         () => {
-                          updateData({ ...rowData, fromInlineEdit: true })
-                          selection.editMinChoice = false
+                          updateData({ ...rowData, fromInlineEdit: true });
+                          selection.editMinChoice = false;
                         }
                       "
                     />
@@ -815,8 +982,8 @@ function formatReadableDate(dateStr: string): string {
                       type="number"
                       @change="
                         () => {
-                          updateData({ ...rowData, fromInlineEdit: true })
-                          selection.editMaxChoice = false
+                          updateData({ ...rowData, fromInlineEdit: true });
+                          selection.editMaxChoice = false;
                         }
                       "
                     />
@@ -856,6 +1023,79 @@ function formatReadableDate(dateStr: string): string {
           </div>
         </template>
 
+        <!-- IN STOCK (per-zone dropdown) -->
+        <template #cell(inStock)="{ rowData }">
+          <div class="flex flex-col items-center gap-1" style="min-width: 140px">
+            <template v-if="deliveryZones.length > 0">
+              <div class="relative stock-zone-wrapper w-full">
+                <!-- Trigger button -->
+                <button
+                  class="flex items-center justify-between w-full px-2 py-1.5 text-xs rounded-lg border transition-all duration-200"
+                  :class="
+                    (rowSelectedZones[rowData._id] || []).length > 0
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                  "
+                  @click.stop="rowData._showZoneMenu = !rowData._showZoneMenu"
+                >
+                  <span class="truncate">
+                    <template v-if="(rowSelectedZones[rowData._id] || []).length > 0">
+                      {{ (rowSelectedZones[rowData._id] || []).length }} Zone{{
+                        (rowSelectedZones[rowData._id] || []).length > 1 ? 's' : ''
+                      }}
+                    </template>
+                    <template v-else> Select zone </template>
+                  </span>
+                  <svg
+                    class="w-3 h-3 flex-shrink-0 ml-1 transition-transform"
+                    :class="rowData._showZoneMenu ? 'rotate-180' : ''"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </button>
+
+                <!-- Dropdown menu -->
+                <div
+                  v-if="rowData._showZoneMenu"
+                  class="absolute left-0 top-full mt-1 w-48 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-xl p-2 z-50"
+                >
+                  <div class="flex flex-col gap-0.5 max-h-[200px] overflow-auto">
+                    <label
+                      v-for="zone in deliveryZones"
+                      :key="zone._id"
+                      class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer hover:bg-slate-50 transition-colors"
+                    >
+                      <!-- Loading spinner for this specific zone+row -->
+                      <div
+                        v-if="stockUpdating.has(`${rowData._id}_${zone._id}`)"
+                        class="animate-spin w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full flex-shrink-0"
+                      ></div>
+                      <input
+                        v-else
+                        type="checkbox"
+                        class="accent-emerald-500 h-3.5 w-3.5 rounded flex-shrink-0"
+                        :checked="(rowSelectedZones[rowData._id] || []).includes(zone._id)"
+                        @change="(e) => toggleZoneStock(rowData, zone._id, (e.target as HTMLInputElement).checked)"
+                      />
+                      <span class="truncate text-slate-700">{{ zone.name }}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <span class="text-xs text-slate-400 italic">No zones</span>
+            </template>
+          </div>
+        </template>
+
         <!-- ACTIVE -->
         <template #cell(isActive)="{ rowData }">
           <div class="flex justify-center items-center">
@@ -888,6 +1128,15 @@ function formatReadableDate(dateStr: string): string {
               @click="emits('editOffers', rowData)"
             >
               <Pencil class="w-3.5 h-3.5" />
+            </button>
+
+            <!-- Duplicate -->
+            <button
+              class="flex items-center justify-center w-7 h-7 rounded-lg text-blue-600 hover:bg-blue-100 transition-colors duration-150 active:scale-95"
+              title="Duplicate Offer"
+              @click="duplicateOffer(rowData)"
+            >
+              <Copy class="w-3.5 h-3.5" />
             </button>
 
             <!-- Delete -->

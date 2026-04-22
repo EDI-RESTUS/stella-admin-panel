@@ -85,6 +85,19 @@ export async function validatePromotion(data) {
 }
 
 /**
+ * 7. Generate additional codes for a MULTI promotion
+ */
+export async function generatePromotionCodes(promotionId, { startFrom, endAt, codePrefix }) {
+  return safeRequest(
+    axios.post(`${API_BASE_URL}/promotions/${promotionId}/codes`, {
+      startFrom,
+      endAt,
+      codePrefix,
+    }),
+  )
+}
+
+/**
  * 7. Get Menu Items by Outlet
  */
 export async function getMenuItemsByOutlet(outletId) {
@@ -112,8 +125,10 @@ export const getArticlesByOutlet = async (outletId) => {
       },
     })
 
-    // The API wraps data in `result`, so extract it safely
-    return Array.isArray(response.data.result) ? response.data.result : []
+    // Handle response structures: array directly, { items: [...] }, or { result: [...] }
+    const rawData = response.data
+    const data = Array.isArray(rawData) ? rawData : rawData.items || rawData.result || []
+    return data
   } catch (error) {
     console.error('[getArticlesOptionsByOutlet] Error:', error)
     throw error

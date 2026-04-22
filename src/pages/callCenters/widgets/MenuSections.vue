@@ -8,7 +8,11 @@
     >
       {{ title }}
     </div>
-    <div v-if="id === 'offers'">
+    <div v-if="category.loading" class="flex items-center justify-center py-10 gap-3 text-slate-400">
+      <div class="animate-spin w-5 h-5 border-2 border-slate-200 border-t-slate-500 rounded-full"></div>
+      <span class="text-sm">Loading items...</span>
+    </div>
+    <div v-else-if="id === 'offers'">
       <MenuSubSections :id="id" :title="title" :items="items" :outlet="outlet" />
     </div>
     <div v-else>
@@ -38,8 +42,6 @@
 
 <script setup>
 import MenuSubSections from '@/pages/callCenters/widgets/MenuSubSections.vue'
-import { storeToRefs } from 'pinia'
-import { useGlobalStore } from '@/stores/global-store'
 
 defineProps({
   id: String,
@@ -48,8 +50,6 @@ defineProps({
   category: Object,
   outlet: Object,
 })
-
-const { isSidebarMinimized } = storeToRefs(useGlobalStore())
 </script>
 <style lang="scss" scoped>
 .category-title {

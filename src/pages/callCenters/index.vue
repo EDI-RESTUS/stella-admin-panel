@@ -1,4 +1,5 @@
 <template>
+  <CallCenterAlertModal />
   <div class="grid grid-cols-1 md:grid-cols-7 gap-4">
     <!-- LEFT SECTION -->
     <div
@@ -14,7 +15,7 @@
               <!-- CATEGORY LINKS -->
               <div class="flex flex-wrap gap-2">
                 <a
-                  v-if="offers.length"
+                  v-if="filteredOffers.length"
                   class="text-white px-4 py-2 rounded-2xl category-link"
                   href="#offers"
                   :style="{
@@ -65,12 +66,17 @@
           </div>
 
           <div class="menu-scroll">
+            <!-- Offers loading spinner -->
+            <div v-if="loadingOffers" class="flex justify-center items-center py-8">
+              <div class="animate-spin w-6 h-6 border-3 border-slate-300 border-t-slate-600 rounded-full"></div>
+              <span class="ml-2 text-sm text-slate-500">Loading offers...</span>
+            </div>
             <MenuSection
-              v-if="offers.length"
+              v-else-if="filteredOffers.length"
               id="offers"
-              :category="category"
+              :category="{ _id: 'offers', name: 'OFFERS' }"
               title="OFFERS"
-              :items="offers"
+              :items="filteredOffers"
               :outlet="outlet"
             />
 
@@ -129,6 +135,8 @@
               :customer-details-id="customerDetailsId"
               :order-type="orderType"
               :is-customer-open="accordian[0]"
+              @restore-context="updateContext"
+              @success="resetContext"
             />
           </VaCardContent>
         </VaCard>
@@ -138,7 +146,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted, useTemplateRef, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, useTemplateRef, onBeforeUnmount, nextTick } from 'vue'
 import { useMenuStore } from '@/stores/getMenu.js'
 import { useServiceStore } from '@/stores/services.ts'
 import { useOrderStore } from '@/stores/order-store'
@@ -154,6 +162,12 @@ const customerRef = useTemplateRef('customerRef')
 import MenuSection from '@/pages/callCenters/widgets/MenuSections.vue'
 import CustomerDetails from '@/pages/callCenters/widgets/CustomerDetails.vue'
 import OrderDetails from '@/pages/callCenters/widgets/OrderDetails.vue'
+import CallCenterAlertModal from '@/pages/callCenters/modals/CallCenterAlertModal.vue'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
+
+const { showAlert } = useCallCenterAlert()
+const { log, queueRefreshLog, flushPendingRefreshLogs } = useCallCenterLogger()
 import { storeToRefs } from 'pinia'
 
 const props = defineProps({
@@ -175,6 +189,7 @@ const accordian = ref([true, true])
 const deliveryFee = ref(0)
 const orderStore = useOrderStore()
 const userStore = useUsersStore()
+const pendingRestoreContext = ref(null)
 const toTitleCase = (text) => {
   if (!text) return ''
   return text
@@ -190,15 +205,18 @@ const activeSubCategories = ref([])
 const currentTime = ref('')
 const forceRemount = ref(0)
 const offers = ref([])
+const loadingOffers = ref(false)
 
 const selectCategory = (category) => {
   if (category === 'offers') {
     selectedItem.value = 'offers'
     activeSubCategories.value = []
+    log('CATEGORY_CLICKED', { categoryId: 'offers', categoryName: 'Offers' })
     return
   }
 
   selectedItem.value = category._id
+  log('CATEGORY_CLICKED', { categoryId: category._id, categoryName: category.name })
 
   if (category.subCategories && category.subCategories.length) {
     activeSubCategories.value = category.subCategories.filter((sub) => sub.menuItems && sub.menuItems.length > 0)
@@ -209,6 +227,7 @@ const selectCategory = (category) => {
 
 const selectSubCategory = (subId) => {
   selectedSubCategory.value = subId
+  log('SUBCATEGORY_CLICKED', { subCategoryId: subId })
 
   const el = document.getElementById(subId)
   if (el) {
@@ -217,11 +236,100 @@ const selectSubCategory = (subId) => {
 }
 
 const getOffers = async () => {
-  const url = import.meta.env.VITE_API_BASE_URL
+  loadingOffers.value = true
+  try {
+    const data = await menuStore.getOffers()
+    offers.value = data
+    // keep legacy orderStore sync if components depend on it
+    orderStore.offers = data
+  } finally {
+    loadingOffers.value = false
+  }
+}
 
-  const response = await axios.get(url + '/offers?outletId=' + serviceStore.selectedRest)
-  orderStore.offers = response.data.data
-  offers.value = response.data.data
+// All offers shown; OfferCard handles disabling out-of-stock ones visually
+const filteredOffers = computed(() => offers.value)
+
+function buildRestoreCustomerPayload(order) {
+  const addr = order.address
+  const fullAddress = addr
+    ? typeof addr === 'string'
+      ? addr
+      : [addr.line1, addr.line2, addr.city, addr.postcode].filter(Boolean).join(', ')
+    : ''
+
+  return {
+    orderType: order.orderType,
+    phone: order.phoneNo || order.customer?.MobilePhone || '',
+    name: order.customerName || order.customer?.Name || '',
+    deliveryAddress: fullAddress,
+    postCode: order.postCode || order.postalCode || addr?.postcode || '',
+    customerDetailsId: order.customerDetailId,
+    deliveryZoneId: order.deliveryZoneId,
+    deliveryNotes: order.deliveryNotes || '',
+    addressDesignation: order.addressDesignation || '',
+  }
+}
+
+async function restoreCustomerContext(order) {
+  if (!order) return
+
+  pendingRestoreContext.value = buildRestoreCustomerPayload(order)
+  await nextTick()
+
+  if (customerRef.value?.fromEditOrder) {
+    customerRef.value.fromEditOrder(pendingRestoreContext.value)
+    pendingRestoreContext.value = null
+  }
+}
+
+const updateContext = (ctx) => {
+  customerDetailsId.value = ctx.customerDetailsId
+  orderType.value = ctx.orderType
+  deliveryFee.value = ctx.deliveryFee
+  isDeliveryZoneSelected.value = ctx.isDeliveryZoneSelected
+  dateSelected.value = ctx.dateSelected
+  if (ctx.customerDetailsId) isCustomerTabActivated.value = true
+
+  // Restore customer details panel when returning from a failed payment redirect
+  if (ctx.order) {
+    void restoreCustomerContext(ctx.order)
+  }
+}
+
+watch(
+  () => customerRef.value,
+  (refVal) => {
+    if (refVal?.fromEditOrder && pendingRestoreContext.value) {
+      refVal.fromEditOrder(pendingRestoreContext.value)
+      pendingRestoreContext.value = null
+    }
+  },
+  { immediate: true },
+)
+
+const resetContext = () => {
+  pendingRestoreContext.value = null
+  orderStore.cartItems = []
+  orderStore.offerItems = []
+  orderStore.editOrder = null
+  orderStore.phoneNumber = ''
+  orderStore.address = {
+    line1: '',
+    line2: '',
+    city: '',
+    postcode: '',
+  }
+  orderStore.deliveryNotes = ''
+  orderStore.orderNotes = ''
+  orderStore.deliveryZone = null
+  customerDetailsId.value = ''
+  orderType.value = ''
+  dateSelected.value = ''
+  deliveryFee.value = 0
+  isDeliveryZoneSelected.value = ''
+  accordian.value = [true, true]
+  forceRemount.value++
 }
 
 // Auto-set delivery zone from user's allowed zones before fetching menu
@@ -232,16 +340,14 @@ async function autoSetUserDeliveryZone() {
       // User has no zone restrictions, don't auto-set
       return
     }
-    
+
     // Fetch delivery zones for the outlet
     const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/deliveryZones/${serviceStore.selectedRest}`)
     const zones = response.data.data.filter((zone) => zone.isActive !== false)
-    
+
     // Filter to user's allowed zones
-    const userZones = zones.filter((zone) => 
-      allowed.includes(zone._id) || allowed.includes(zone.id)
-    )
-    
+    const userZones = zones.filter((zone) => allowed.includes(zone._id) || allowed.includes(zone.id))
+
     // If user has exactly one allowed zone, auto-set it
     if (userZones.length === 1) {
       const zone = userZones[0]
@@ -254,7 +360,7 @@ async function autoSetUserDeliveryZone() {
       orderStore.setDeliveryZone(zone)
     }
   } catch (err) {
-    console.error('Failed to auto-set user delivery zone:', err)
+    showAlert('Failed to set delivery zone. Please try again.')
   }
 }
 
@@ -272,6 +378,10 @@ const menuItems = computed(() => {
   }))
 })
 
+function onBeforeUnload() {
+  queueRefreshLog({})
+}
+
 onMounted(() => {
   currentTime.value = new Date().toLocaleTimeString('en-GB', {
     hour: '2-digit',
@@ -285,9 +395,13 @@ onMounted(() => {
       hour12: false,
     })
   }, 3000)
+
+  window.addEventListener('beforeunload', onBeforeUnload)
+  flushPendingRefreshLogs()
 })
 
 onUnmounted(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
   orderStore.cartItems = []
   orderStore.offerItems = []
   orderStore.paymentId = ''
@@ -299,13 +413,14 @@ onBeforeUnmount(() => {
   resetState()
 })
 watch(
-  () => route.fullPath,
+  () => route.path,
   () => {
     resetState()
   },
 )
 
 function resetState() {
+  pendingRestoreContext.value = null
   selectedItem.value = null
   offers.value = []
   orderStore.cartItems = []
@@ -329,16 +444,30 @@ watch(
         history.replaceState(null, '', window.location.pathname + window.location.search)
       }
       isLoading.value = true
-      
-      // Auto-set delivery zone from user's allowed zones before fetching menu
+
+      // Capture before any awaits — OrderDetails cleans the query params during menu load,
+      // so checking route.query after the awaits would always be false
+      const paymentState = String(route.query.payment || route.query.status || '').toLowerCase()
+      const isPaymentRetry = ['failed', 'cancel', 'cancelled', 'canceled'].includes(paymentState)
+
+      // 1. Setup Zone (awaited)
       await autoSetUserDeliveryZone()
-      
-      getMenu()
-      getOffers()
-      orderStore.cartItems = []
-      orderStore.paymentId = ''
-      orderStore.redirectUrl = ''
-      forceRemount.value++
+
+      // 2. Fetch Restaurant Basics (needed by both Menu and Offers)
+      const payload = serviceStore.items.find((item) => item._id === serviceStore.selectedRest).slug
+      await menuStore.getOutletDetails(payload)
+
+      // 3. Start Offers and Menu in parallel
+      // getOffers is first in Promise.all to ensure it hits the browser queue first
+      await Promise.all([getOffers(), getMenu()])
+
+      // Don't wipe the cart or reset CustomerDetails when returning from a failed payment redirect
+      if (!isPaymentRetry) {
+        orderStore.cartItems = []
+        orderStore.paymentId = ''
+        orderStore.redirectUrl = ''
+        forceRemount.value++
+      }
       isLoading.value = false
     }
   },
@@ -348,6 +477,7 @@ watch(
 const filteredCategories = computed(() => {
   const validCategories = categories.value.filter(
     (category) =>
+      category.loading || // Show loading categories immediately for headers/spinners
       category.menuItems.length > 0 ||
       (category.subCategories.length && category.subCategories.some((a) => a.menuItems.length)),
   )
@@ -359,7 +489,9 @@ watch(
   () => orderStore.cartItems,
   () => {
     if (orderStore.cartItems.length) {
-      customerRef.value.isOpen = false
+      if (customerRef.value) {
+        customerRef.value.isOpen = false
+      }
       accordian.value[0] = false
     }
   },
@@ -380,7 +512,9 @@ watch(
   () => orderStore.offerItems,
   () => {
     if (orderStore.offerItems.length) {
-      customerRef.value.isOpen = false
+      if (customerRef.value) {
+        customerRef.value.isOpen = false
+      }
       accordian.value[0] = false
     }
   },
@@ -410,17 +544,15 @@ watch(
     // Only refetch if we have a restaurant selected, otherwise let the initial load handle it
     if (serviceStore.selectedRest) {
       getMenu()
+      getOffers()
     }
   },
 )
 
 async function getMenu() {
-  isLoading.value = true
-  menuStore.resetUnFilteredMenuItems()
   const payload = serviceStore.items.find((item) => item._id === serviceStore.selectedRest).slug
   await menuStore.getOutletDetails(payload)
   await menuStore.getCategories()
-  isLoading.value = false
 }
 </script>
 

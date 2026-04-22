@@ -8,19 +8,19 @@
     hide-default-actions
     :close-button="!redirectUrl"
   >
-    <div class="grid grid-cols-1 md:grid-cols-3 h-full bg-gray-50">
-      <!-- Order Summary -->
-      <div class="md:col-span-1 flex flex-col">
-        <div class="p-4 h-full flex flex-col">
-          <h3 class="va-h3">Order Summary</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 h-full min-h-0 bg-gray-50">
+      <!-- Order Details -->
+      <div class="md:col-span-1 flex flex-col h-full min-h-0">
+        <div class="p-4 flex flex-col h-full min-h-0">
+          <h3 class="va-h3">Order Details</h3>
 
-          <div class="order-items order-items-wrapper overflow-y-auto flex-grow">
+          <div class="order-items order-items-wrapper overflow-y-auto flex-1 min-h-0 basis-0 h-0">
             <div v-for="(item, index) in orderStore.cartItems" :key="item.itemId" class="order-item">
               <div class="item-main">
                 <div class="item-details">
                   <div class="flex-1 px-2">
                     <div class="flex justify-between items-center">
-                      <span class="item-qty-name">{{ item.quantity }}x {{ item.itemName }}</span>
+                      <span class="item-qty-name">{{ item.quantity }} x {{ item.itemName }}</span>
                     </div>
 
                     <!-- Options -->
@@ -45,33 +45,25 @@
                           }"
                         >
                           {{ option.name }}
-                          <span v-if="option.price">(+€{{ (option.price * option.quantity).toFixed(2) }})</span>
+                          <span v-if="option.price">€{{ (option.price * option.quantity).toFixed(2) }}</span>
                         </span>
                       </div>
                     </div>
-
-                    <!-- Base Info -->
-                    <p class="text-[11px] text-gray-500 mt-1 italic">
-                      Base: €{{ item.basePrice.toFixed(2) }} + €{{ item.selectionTotalPrice.toFixed(2) }} * = €{{
-                        item.totalPrice.toFixed(2) / item.quantity
-                      }}
-                      each
-                    </p>
                   </div>
                 </div>
 
                 <div class="item-total-price">
                   <template v-if="promoTotal">
                     <template v-if="cartItemPromoDisplay(item, index).affected">
-                      <span class="original-price">€{{ cartItemPromoDisplay(item, index).original.toFixed(2) }}</span>
-                      <span class="updated-price">€{{ cartItemPromoDisplay(item, index).updated.toFixed(2) }}</span>
+                      <span class="original-price">{{ cartItemPromoDisplay(item, index).original.toFixed(2) }} € </span>
+                      <span class="updated-price">{{ cartItemPromoDisplay(item, index).updated.toFixed(2) }} €</span>
                     </template>
                     <template v-else>
-                      <span class="font-semibold text-green-800">€{{ item.totalPrice.toFixed(2) }}</span>
+                      <span class="font-semibold text-green-800">{{ item.totalPrice.toFixed(2) }} €</span>
                     </template>
                   </template>
                   <template v-else>
-                    <span class="font-semibold text-green-800">€{{ item.totalPrice.toFixed(2) }}</span>
+                    <span class="font-semibold text-green-800">{{ item.totalPrice.toFixed(2) }} €</span>
                   </template>
                 </div>
               </div>
@@ -122,149 +114,190 @@
                       </div>
                     </div>
                   </div>
-
-                  <div class="item-base-price">
-                    Base price: €{{ item.price.toFixed(2) }} + €{{ item.selectionTotalPrice.toFixed(2) }} for addons
-                  </div>
                 </div>
 
                 <div class="item-total-price">
                   <template v-if="offerPromoDisplay(item, index).affected">
-                    <span class="original-price">€{{ offerPromoDisplay(item, index).original.toFixed(2) }}</span>
-                    <span class="updated-price">€{{ offerPromoDisplay(item, index).updated.toFixed(2) }}</span>
+                    <span class="original-price">{{ offerPromoDisplay(item, index).original.toFixed(2) }} €</span>
+                    <span class="updated-price">{{ offerPromoDisplay(item, index).updated.toFixed(2) }} €</span>
                   </template>
                   <template v-else>
-                    <span class="font-semibold text-green-800">€{{ item.totalPrice.toFixed(2) }}</span>
+                    <span class="font-semibold text-green-800">{{ item.totalPrice.toFixed(2) }} €</span>
                   </template>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="summary-totals flex-shrink-0">
+          <div class="summary-totals flex-none pt-3">
             <div class="total-row">
               <span>Subtotal:</span>
-              <span>€{{ subtotal.toFixed(2) }}</span>
+              <span>{{ subtotal.toFixed(2) }} €</span>
             </div>
+
             <div v-if="orderType === 'delivery'" class="total-row">
               <span>Delivery Fee:</span>
-              <span>€{{ deliveryFee.toFixed(2) }}</span>
+              <span>{{ deliveryFee.toFixed(2) }} €</span>
             </div>
+
             <div v-if="promoTotal" class="total-row">
-              <span>Total Discount:</span>
-              <span>- €{{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }}</span>
+              <span class="text-red-600">Discount:</span>
+              <span class="text-red-600"
+                >- {{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }} €</span
+              >
             </div>
-            <div class="total-row total-final">
-              <span v-if="orderStore.editOrder"
-                >Total:
-                <span class="text-green-600">PAID AMOUNT: €{{ orderStore.editOrder.editOrderTotal.toFixed(2) }}</span>
+
+            <div v-if="orderStore.editOrder" class="total-row">
+              <span class="text-gray-600">Paid Amount:</span>
+              <span class="text-green-600 font-semibold">{{ paidAmount.toFixed(2) }} €</span>
+            </div>
+
+            <div class="total-row total-final !text-2xl">
+              <span>Total:</span>
+              <span>{{ currentEditedTotal.toFixed(2) }} €</span>
+            </div>
+
+            <div v-if="orderStore.editOrder" class="total-row text-sm">
+              <span class="text-gray-600">Difference:</span>
+              <span
+                class="font-semibold"
+                :class="editDifference > 0 ? 'text-red-600' : editDifference < 0 ? 'text-green-600' : 'text-gray-700'"
+              >
+                {{ editDifference.toFixed(2) }} €
               </span>
-              <span v-else>Total:</span>
-              <span v-if="orderStore.editOrder">Balance €{{ getTotalPrice }}</span>
-              <span v-else-if="!promoTotal">€{{ (totalAmount + deliveryFee).toFixed(2) }}</span>
-              <span v-else>€{{ promoTotal.updatedTotal.toFixed(2) }}</span>
             </div>
           </div>
         </div>
       </div>
-      <!-- Payment Section -->
-      <div v-if="!redirectUrl" class="md:col-span-2 flex flex-col bg-white relative">
+      <!-- Outlet & Type & Time -->
+      <div v-if="!redirectUrl" class="relative flex flex-col md:col-span-2">
         <div v-if="apiLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-white/50">
           <div class="loading-spinner !w-16 !h-16 border-4 !border-gray-300 !border-t-gray-600"></div>
         </div>
-        <div class="header-container">
+        <div class="pt-4">
           <h3 class="va-h3">{{ etaTime }}</h3>
         </div>
 
-        <div class="payment-content flex-grow">
-          <div class="payment-options grid sm:grid-cols-2 gap-4">
+        <!-- Payment Types & Keypad -->
+        <div class="flex-grow min-h-0 overflow-hidden pt-0 pr-4 pb-4">
+          <div class="grid h-full min-h-0 grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Left pane: payment types -->
+            <div class="flex flex-col h-full min-h-0">
+              <!-- Card container like Order Items -->
+              <div class="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col flex-1 min-h-0">
+                <div class="p-4 flex-1 min-h-0 overflow-y-auto">
+                  <div class="payment-options grid gap-2 sm:grid-cols-2">
+                    <div
+                      v-for="payment in paymentTypes.filter((a) => userDetails.paymentType.includes(a.paymentTypeId))"
+                      :key="payment.paymentTypeId"
+                      class="payment-option transition-all p-4 flex items-center justify-center text-center"
+                      :class="selectedPayment == payment ? 'selected' : ''"
+                      @click="selectedPayment = payment; log('PAYMENT_METHOD_SELECTED', { paymentMethod: payment?.name || payment?.paymentTypeId })"
+                    >
+                      <div class="payment-label font-bold text-lg">{{ payment.name }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Payment button -->
+              <div class="pt-4">
+                <button
+                  id="confirmBtn"
+                  :disabled="apiLoading || !selectedPayment"
+                  class="btn btn-primary !w-full !min-w-0 py-2 !text-2xl"
+                  @click="orderStore.editOrder ? updateOrder() : createOrder()"
+                >
+                  <span v-if="!apiLoading" id="btnText">Payment</span>
+                  <div v-if="apiLoading" id="loadingSpinner" class="loading-spinner animate-spin"></div>
+                </button>
+              </div>
+            </div>
+
+            <!-- Right pane -->
             <div
-              v-for="payment in paymentTypes.filter((a) => userDetails.paymentType.includes(a.paymentTypeId))"
-              :key="payment.paymentTypeId"
-              class="payment-option"
-              :class="selectedPayment == payment ? 'selected' : ''"
-              @click="selectedPayment = payment"
+              class="p-4 gap-3 bg-white rounded-xl border border-gray-200 shadow-sm h-full min-h-0 overflow-hidden flex flex-col"
             >
-              <div class="payment-icon">{{ payment.name === 'Cash' ? '💵' : '💳' }}</div>
-              <div class="payment-label">{{ payment.name }}</div>
-              <div class="payment-desc">
-                {{ payment.name === 'Cash' ? 'Pay with cash on delivery or pickup' : 'Secure payment with Visa/Card' }}
+              <div class="bg-white p-3 rounded-lg border border-gray-300 text-right shadow-inner">
+                <div class="text-3xl font-bold text-gray-800">€ {{ (selectedCashAmount || 0).toFixed(2) }}</div>
+                <div class="text-3xl mt-1" :class="changeAmount >= 0 ? 'text-green-600' : 'text-red-600'">
+                  Change: € {{ changeAmount.toFixed(2) }}
+                </div>
+              </div>
+
+              <div class="flex-1 min-h-0 flex flex-col gap-3">
+                <!-- Denominations -->
+                <div class="grid grid-cols-3 gap-2 flex-1 min-h-0 auto-rows-fr">
+                  <button
+                    v-for="amount in cashDenominations"
+                    :key="amount"
+                    class="py-2 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 font-bold text-gray-700 shadow-sm active:translate-y-0.5 transition-all text-2xl h-full"
+                    @click="handleDenominationClick(amount)"
+                  >
+                    {{ amount.toFixed(2) }}
+                  </button>
+                </div>
+
+                <!-- Keypad -->
+                <div class="grid grid-cols-3 gap-2 flex-[2] min-h-0 auto-rows-fr">
+                  <button
+                    v-for="n in ['7', '8', '9']"
+                    :key="n"
+                    class="key-btn bg-gray-200 hover:bg-gray-300 h-full"
+                    @click="handleKeypadInput(n)"
+                  >
+                    {{ n }}
+                  </button>
+                  <button
+                    v-for="n in ['4', '5', '6']"
+                    :key="n"
+                    class="key-btn bg-gray-200 hover:bg-gray-300 h-full"
+                    @click="handleKeypadInput(n)"
+                  >
+                    {{ n }}
+                  </button>
+                  <button
+                    v-for="n in ['1', '2', '3']"
+                    :key="n"
+                    class="key-btn bg-gray-200 hover:bg-gray-300 h-full"
+                    @click="handleKeypadInput(n)"
+                  >
+                    {{ n }}
+                  </button>
+
+                  <button class="key-btn bg-gray-200 hover:bg-gray-300 h-full" @click="handleKeypadInput('0')">
+                    0
+                  </button>
+                  <button class="key-btn bg-gray-200 hover:bg-gray-300 h-full" @click="handleKeypadInput('.')">
+                    .
+                  </button>
+                  <button
+                    class="key-btn bg-gray-400 hover:bg-gray-500 text-white h-full"
+                    @click="handleKeypadInput('backspace')"
+                  >
+                    <span class="text-2xl">⌫</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-
-          <!-- Cash Denomination Selector -->
-          <div v-if="selectedPayment?.name?.toLowerCase() === 'cash'" class="cash-denominations-section">
-            <h4 class="text-lg font-semibold mb-3 text-gray-700">Cash Amount Received:</h4>
-            <div class="denominations-grid">
-              <button
-                v-for="amount in cashDenominations"
-                :key="amount"
-                class="denomination-btn"
-                :class="{ selected: selectedCashAmount === amount }"
-                @click="selectedCashAmount = amount"
-              >
-                {{ amount.toFixed(2) }}
-              </button>
-            </div>
-
-            <div v-if="selectedCashAmount" class="change-info">
-              <div class="change-row">
-                <span>Order Total:</span>
-                <span class="font-bold">€{{ finalTotal.toFixed(2) }}</span>
-              </div>
-              <div class="change-row">
-                <span>Cash Received:</span>
-                <span class="font-bold">€{{ selectedCashAmount.toFixed(2) }}</span>
-              </div>
-              <div class="change-row total-change">
-                <span>Change to Give:</span>
-                <span class="font-bold" :class="changeAmount >= 0 ? 'text-blue-600' : 'text-red-600'">
-                  €{{ changeAmount.toFixed(2) }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="action-container">
-          <div class="flex gap-2 w-full justify-center">
-            <button v-if="orderId" class="btn btn-flat-danger mr-2" :disabled="apiLoading" @click="cancelOrder()">
-              Cancel Order
-            </button>
-            <button
-              id="confirmBtn"
-              :disabled="apiLoading || !selectedPayment"
-              class="btn btn-primary"
-              @click="orderStore.editOrder ? updateOrder() : createOrder()"
-            >
-              <span v-if="!apiLoading" id="btnText">
-                {{ orderId && selectedPayment?.name.includes('Card') ? 'Retry Payment' : 'Payment' }}
-              </span>
-              <div v-if="apiLoading" id="loadingSpinner" class="loading-spinner animate-spin"></div>
-            </button>
           </div>
         </div>
       </div>
-      <div v-else class="col-span-2 flex flex-col bg-white h-full">
-        <div class="flex-grow relative">
+
+      <!-- SaferPay Iframe Section -->
+      <div v-if="redirectUrl" class="col-span-2 flex flex-col bg-white h-full">
+        <div class="flex-grow relative py-16">
           <iframe :src="redirectUrl" width="100%" height="100%" class="border-none" />
-          <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
-            <div class="loading-spinner !w-16 !h-16 border-4 !border-gray-300 !border-t-gray-600"></div>
-          </div>
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-50"></div>
         </div>
         <div class="p-4 border-t border-gray-200 flex justify-between items-center bg-gray-50">
-          <span class="text-sm text-gray-500 flex items-center gap-2">
-            <div class="loading-spinner !border-gray-300 !border-t-gray-600"></div>
-            Payment in progress...
-          </span>
+          <span class="text-sm text-gray-500 flex items-center gap-2"> </span>
           <div class="flex gap-2">
-            <button class="btn btn-flat-danger text-sm px-4 py-2" @click="cancelOrder()">Cancel Order</button>
             <button
               class="btn btn-secondary text-sm px-4 py-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
               @click="manualRetry()"
             >
-              Try Another Payment
+              Change Payment Type
             </button>
           </div>
         </div>
@@ -276,6 +309,8 @@
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useToast } from 'vuestic-ui'
 import { useOrderStore } from '@/stores/order-store'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 import { useUsersStore } from '@/stores/users'
 import { useServiceStore } from '@/stores/services'
 import { storeToRefs } from 'pinia'
@@ -285,8 +320,10 @@ import axios from 'axios'
 const showCheckoutModal = ref(true)
 const selectedPayment: any = ref(null)
 const apiLoading = ref(false)
-const emits = defineEmits(['cancel'])
+const emits = defineEmits(['cancel', 'success'])
 const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
+const { log, queueRefreshLog } = useCallCenterLogger()
 const props = defineProps<{
   deliveryFee: number
   customerDetailsId: string
@@ -294,29 +331,61 @@ const props = defineProps<{
   dateSelected: string
   promoCode: string
   promoCodes?: string[]
+  existingOrderId?: string
 }>()
 
 const orderStore = useOrderStore()
 const serviceStore = useServiceStore()
 const userStore = useUsersStore()
-const orderId: any = ref('')
+const orderId: any = ref(props.existingOrderId || '')
 const orderResponse: any = ref('')
 const redirectUrl = computed(() => orderStore.redirectUrl)
 const userDetails = computed(() => userStore.userDetails)
 const checkInterval: any = ref('')
 const paymentTypes: any = ref([])
 const orderFor = computed(() => orderStore.orderFor)
+const programmaticClose = ref(false)
+const completedOrderData = ref<any>(null)
 
 // Cash payment state
 const selectedCashAmount = ref<number | null>(null)
 const cashDenominations = [5.0, 10.0, 20.0, 50.0, 100.0, 200.0]
+const manualCashString = ref('')
 
-const finalTotal = computed(() => {
-  if (promoTotal.value) {
-    return promoTotal.value.updatedTotal
+const handleKeypadInput = (input: string) => {
+  if (input === 'backspace') {
+    manualCashString.value = manualCashString.value.slice(0, -1)
+  } else if (input === '.') {
+    if (!manualCashString.value.includes('.')) {
+      manualCashString.value += '.'
+    }
+  } else {
+    // Prevent multiple leading zeros
+    if (manualCashString.value === '0' && input === '0') return
+    if (manualCashString.value === '0' && input !== '.') {
+      manualCashString.value = input
+    } else {
+      manualCashString.value += input
+    }
   }
-  return totalAmount.value + props.deliveryFee
-})
+
+  const val = parseFloat(manualCashString.value)
+  selectedCashAmount.value = isNaN(val) ? 0 : val
+}
+
+const handleDenominationClick = (amount: number) => {
+  selectedCashAmount.value = amount
+  manualCashString.value = amount.toString()
+}
+
+const finalTotal = computed(() => currentEditedTotal.value)
+
+function getSelectedDeliveryZoneId() {
+  const zone = orderStore.deliveryZone
+  if (!zone) return ''
+  if (typeof zone === 'string') return zone
+  return zone._id || zone.id || ''
+}
 
 const changeAmount = computed(() => {
   if (!selectedCashAmount.value) return 0
@@ -326,7 +395,8 @@ const changeAmount = computed(() => {
 const etaTime = computed(() => {
   const now = new Date()
 
-  const selectedDate = new Date(props.dateSelected)
+  const parsedDate = props.dateSelected ? new Date(props.dateSelected) : new Date()
+  const selectedDate = !isNaN(parsedDate.getTime()) ? parsedDate : new Date()
 
   const promiseTime =
     props.orderType === 'delivery'
@@ -337,11 +407,16 @@ const etaTime = computed(() => {
   etaDate.setMinutes(etaDate.getMinutes() + (promiseTime || 0))
 
   const timeString = etaDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+
+  const isScheduled = orderFor.value !== 'current'
+
   const isFutureOrder = selectedDate.getTime() > now.getTime() + 30 * 60 * 1000
+
+  const showScheduledText = isScheduled || isFutureOrder
 
   const zoneName = orderStore.deliveryZone?.name ? `${orderStore.deliveryZone.name} - ` : ''
 
-  if (isFutureOrder) {
+  if (showScheduledText) {
     const dateString = selectedDate.toLocaleDateString([], {
       day: 'numeric',
 
@@ -378,10 +453,74 @@ const getTotalPrice = computed(() => {
   return total.toFixed(2)
 })
 
-onMounted(() => {
+function onBeforeUnload() {
+  queueRefreshLog({ orderId: orderId.value || null, orderType: props.orderType })
+}
+
+onMounted(async () => {
+  console.log('[CheckOutModal] Mounted. Cart items LEN:', orderStore.cartItems.length)
+  console.log('[CheckOutModal] Mounted. Offer items LEN:', orderStore.offerItems.length)
+  console.log('[CheckOutModal] Store ID ref:', orderStore.$id)
+
   if (serviceStore.selectedRest) {
     getPaymentOptions()
   }
+
+  // Re-validate promo on open if codes are present but cartTotal was cleared (e.g. after failed payment redirect)
+  const codes = (props.promoCodes?.length ? props.promoCodes : props.promoCode ? [props.promoCode] : [])
+    .map((c) => c.trim()).filter(Boolean)
+
+  if (codes.length && !orderStore.cartTotal) {
+    try {
+      const menuItems = orderStore.cartItems.map((e: any) => ({
+        menuItem: e.itemId,
+        quantity: e.quantity,
+        options: e.selectedOptions.flatMap((g: any) =>
+          g.selected.map((o: any) => ({ option: o.optionId, quantity: o.quantity })),
+        ),
+      }))
+      const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
+        offerId: offer.offerId,
+        menuItems: offer.selections.flatMap((s: any) =>
+          s.addedItems.map((item: any) => ({
+            menuItem: item.itemId,
+            quantity: item.quantity || 1,
+            options: (item.selectedOptions || []).flatMap((g: any) =>
+              g.selected.map((o: any) => ({ option: o.optionId, quantity: o.quantity })),
+            ),
+          })),
+        ),
+      }))
+      const dateVal = props.dateSelected ? new Date(props.dateSelected) : new Date()
+      const orderDateTime = !isNaN(dateVal.getTime()) ? dateVal.toISOString() : new Date().toISOString()
+      const single = codes.length === 1 ? codes[0] : null
+      const payload: any = {
+        orderFor: orderFor.value,
+        customerDetailId: props.customerDetailsId,
+        orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
+        deliveryZoneId: getSelectedDeliveryZoneId(),
+        address: orderStore.address,
+        menuItems,
+        offerMenuItems,
+        orderNotes: orderStore.orderNotes || '',
+        deliveryFee: props.deliveryFee,
+        outletId: serviceStore.selectedRest,
+        orderDateTime,
+        paymentMode: '',
+        promoCodes: codes,
+        hasOtherOffers: offerMenuItems.length,
+        ...(single ? { promoCode: single } : {}),
+      }
+      const res = await orderStore.validatePromoCode(payload)
+      if (res.data?.success) {
+        orderStore.setOrderTotal(res.data.data)
+      }
+    } catch {
+      // promo may have expired — leave cartTotal null, user sees normal prices
+    }
+  }
+
+  window.addEventListener('beforeunload', onBeforeUnload)
 })
 
 const getPaymentOptions = () => {
@@ -401,7 +540,13 @@ const getPaymentOptions = () => {
 watch(
   () => showCheckoutModal.value,
   (val) => {
-    if (!val) emits('cancel')
+    if (!val) {
+      if (!programmaticClose.value) {
+        log('CHECKOUT_DISMISSED', { orderId: orderId.value || null, orderType: props.orderType })
+      }
+      programmaticClose.value = false
+      emits('cancel')
+    }
   },
   { immediate: true },
 )
@@ -412,6 +557,14 @@ watch(
     if (val) {
       getPaymentOptions()
     }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.existingOrderId,
+  (val) => {
+    if (val) orderId.value = val
   },
   { immediate: true },
 )
@@ -535,11 +688,13 @@ async function checkPaymentStatus(requestId: string, paymentId: string, isPollin
 
       if ((isWallee || isDeviceSuccess) && responseData.status === 'Completed') {
         console.log('WalleePOS/Device Success Detected - Triggering Success Handler')
+        completedOrderData.value = responseData.order || responseData
         handlePaymentSuccess()
         return
       }
 
       if (responseData.status === 'Completed') {
+        completedOrderData.value = responseData.order || responseData
         handlePaymentSuccess()
         return
       }
@@ -563,34 +718,43 @@ async function checkPaymentStatus(requestId: string, paymentId: string, isPollin
 
     if ((isWallee || isDeviceSuccess) && status === 'Completed') {
       console.log('WalleePOS/Device Success Detected (GET) - Triggering Success Handler')
+      completedOrderData.value = responseData
       handlePaymentSuccess()
       return
     }
 
     if (status === 'Completed') {
+      completedOrderData.value = responseData
       handlePaymentSuccess()
     } else if (status === 'In Progress') {
       if (isPolling) return
       // Payment flow finished (iframe returned) but status is still In Progress => Failed/Unpaid
-      init({
-        color: 'danger',
-        message: 'Payment not completed. Please retry or cancel.',
-      })
+      showAlert('Payment not completed. Please retry or cancel.')
       orderStore.setPaymentLink('') // Hide iframe
       // UI will show "Retry Payment" because orderId exists
     } else if (status === 'Cancelled') {
-      init({ color: 'warning', message: 'Order was cancelled.' })
+      showAlert('Order was cancelled.')
       orderStore.setPaymentLink('')
       emits('cancel')
     }
   } catch (err: any) {
     console.error('Status check failed', err)
-    init({ color: 'danger', message: 'Could not verify payment status.' })
+    log('ERROR_PAYMENT_STATUS_CHECK', { orderId: orderId.value, errorMessage: err?.message || 'Could not verify payment status.' })
+    showAlert('Could not verify payment status.')
     orderStore.setPaymentLink('')
   }
 }
 
 function handlePaymentSuccess() {
+  log('ORDER_PLACED', {
+    orderId: orderResponse.value?.data?.data?._id || orderId.value,
+    tableNumber: completedOrderData.value?.tableNumber || orderStore.editOrder?.tableNumber || null,
+    phoneNo: orderStore.phoneNumber || null,
+    paymentRequestId: orderId.value,
+    paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+    orderType: props.orderType,
+    success: true,
+  })
   init({
     color: 'success',
     message: 'Payment Success',
@@ -609,7 +773,9 @@ function handlePaymentSuccess() {
     } catch (e) {
       console.error('Error clearing cart', e)
     }
-    window.location.reload()
+    programmaticClose.value = true
+    emits('success')
+    showCheckoutModal.value = false
   }, 800)
 }
 
@@ -695,7 +861,75 @@ function setInter() {
     }
   }, 2000)
 }
+const editUntouchedTotals = computed(() => {
+  if (!orderStore.editOrder) return { items: 0, offers: 0 }
 
+  // Menu items: sum prices of original items that are NOT currently in the cart
+  const originalMenuItems: any[] = orderStore.editOrder.menuItems || []
+  const cartCountMap = new Map<string, number>()
+  for (const c of orderStore.cartItems as any[]) {
+    const id = String(c.itemId)
+    cartCountMap.set(id, (cartCountMap.get(id) || 0) + 1)
+  }
+  const removedCountMap = new Map<string, number>()
+  let itemsTotal = 0
+  for (const item of originalMenuItems) {
+    const menuItemId = String(item._id || (item.menuItem?._id ?? item.menuItem) || '')
+    const allowed = cartCountMap.get(menuItemId) || 0
+    const removed = removedCountMap.get(menuItemId) || 0
+    if (allowed > 0 && removed < allowed) {
+      removedCountMap.set(menuItemId, removed + 1)
+    } else {
+      itemsTotal += Number(item.totalPrice) || Number(item.unitPrice || item.price || 0) * Number(item.quantity || 1)
+    }
+  }
+
+  // Offers: sum prices of original offers not currently in the cart
+  const originalOffers: any[] = orderStore.editOrder.offerDetails || []
+  const cartOfferCountMap = new Map<string, number>()
+  for (const o of orderStore.offerItems as any[]) {
+    cartOfferCountMap.set(String(o.offerId), (cartOfferCountMap.get(String(o.offerId)) || 0) + 1)
+  }
+  const removedOfferCountMap = new Map<string, number>()
+  let offersTotal = 0
+  for (const offer of originalOffers) {
+    const offerId = String(offer.offerId || offer._id)
+    const allowed = cartOfferCountMap.get(offerId) || 0
+    const removed = removedOfferCountMap.get(offerId) || 0
+    if (allowed > 0 && removed < allowed) {
+      removedOfferCountMap.set(offerId, removed + 1)
+    } else {
+      offersTotal += Number(offer.totalPrice || offer.price || 0)
+    }
+  }
+
+  return { items: itemsTotal, offers: offersTotal }
+})
+
+const currentEditedTotal = computed(() => {
+  const { items: untouchedItemsTotal, offers: untouchedOffersTotal } = editUntouchedTotals.value
+
+  if (promoTotal.value) {
+    // promoTotal.updatedTotal already includes delivery fee for the cart items.
+    // Add untouched original items at their stored (already-discounted) prices.
+    return Number((Number(promoTotal.value.updatedTotal || 0) + untouchedItemsTotal + untouchedOffersTotal).toFixed(2))
+  }
+
+  if (!orderStore.editOrder) {
+    return Number(totalAmount.value + props.deliveryFee)
+  }
+
+  const effectiveDeliveryFee = Number(props.deliveryFee || orderStore.editOrder.deliveryFee || 0)
+  return Number((totalAmount.value + untouchedItemsTotal + untouchedOffersTotal + effectiveDeliveryFee).toFixed(2))
+})
+
+const paidAmount = computed(() => {
+  return Number(orderStore.editOrder?.editOrderTotal || 0)
+})
+
+const editDifference = computed(() => {
+  return Number((currentEditedTotal.value - paidAmount.value).toFixed(2))
+})
 function resetInter() {
   clearInterval(checkInterval.value)
 }
@@ -703,6 +937,7 @@ function resetInter() {
 async function cancelOrder() {
   if (!orderId.value) return
   resetInter() // Stop polling
+  log('ORDER_CANCELLED', { orderId: orderId.value, orderType: props.orderType })
   try {
     apiLoading.value = true
     // Use new cancel endpoint
@@ -710,14 +945,17 @@ async function cancelOrder() {
 
     init({ color: 'info', message: 'Order cancelled' })
 
-    // Reset everything by reloading, similar to success flow
+    // Reset everything by emitting event, similar to success flow
     setTimeout(() => {
       orderStore.cartItems = []
-      window.location.reload()
+      programmaticClose.value = true
+      emits('cancel')
+      showCheckoutModal.value = false
     }, 800)
   } catch (e) {
     console.error(e)
-    init({ color: 'danger', message: 'Failed to cancel order' })
+    log('ERROR_CANCEL_ORDER', { orderId: orderId.value, errorMessage: e?.message || 'Failed to cancel order.' })
+    showAlert('Failed to cancel order.')
   } finally {
     apiLoading.value = false
   }
@@ -736,7 +974,7 @@ async function manualRetry() {
       return
     } else {
       // If In Progress or Cancelled, just reset the view so they can try again
-      init({ color: 'warning', message: 'Payment not confirmed. You can try again.' })
+      showAlert('Payment not confirmed. You can try again.')
       orderStore.setPaymentLink('')
     }
   } catch (e) {
@@ -749,58 +987,56 @@ async function manualRetry() {
 
 onUnmounted(() => {
   resetInter()
+  window.removeEventListener('beforeunload', onBeforeUnload)
 })
 
 async function updateOrder() {
   apiLoading.value = true
+
+  // --- Detect promo codes (from props OR original order) ---
+  const codes = normalizeCodes(props.promoCode, props.promoCodes)
+  const editPromos =
+    orderStore.editOrder.promoCodes || (orderStore.editOrder.promoCode ? [orderStore.editOrder.promoCode] : [])
+  const allCodes = [...new Set([...codes, ...editPromos].filter(Boolean))]
+  const hasPromo = allCodes.length > 0
+
+  if (hasPromo) {
+    return await updateOrderWithPromo(allCodes)
+  }
+
+  // --- Existing non-promo edit flow (unchanged) ---
   const url = import.meta.env.VITE_API_BASE_URL
   const userStore = useUsersStore()
-  const existingMenuItems: any[] = []
-  const existingOffers: any[] = []
+  const itemsToDelete: any = {
+    menuItems: [],
+    offerMenuItems: [],
+  }
+
   orderStore.editOrder.menuItems.forEach((item: any) => {
     if (orderStore.cartItems.find((a: any) => a.itemId === item._id)) {
-      existingMenuItems.push(item._id)
+      itemsToDelete.menuItems.push({
+        menuItem: item._id,
+        quantity: 1,
+        options: (item.options || []).map((op: any) => ({
+          option: typeof op.option === 'string' ? op.option : String(op.option?._id),
+          quantity: Number(op.quantity ?? 1),
+        })),
+      })
     }
   })
 
-  orderStore.editOrder.offerDetails.forEach((item: any) => {
-    if (orderStore.offerItems.find((a: any) => a._id === item.offerId)) {
-      existingOffers.push(item)
-    }
-  })
+  const existingOffers = orderStore.editOrder.offerDetails.filter((item: any) =>
+    orderStore.offerItems.find((a: any) => a._id === item.offerId),
+  )
+  if (existingOffers.length) {
+    const uniq = Array.from(new Map(existingOffers.map((o: any) => [o.offerId, o])).values())
+    itemsToDelete.offerMenuItems = uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 }))
+  }
 
   try {
-    if (existingMenuItems.length) {
-      await Promise.all(
-        existingMenuItems.map((item) => {
-          const data = {
-            menuItems: [
-              {
-                menuItem: item,
-                quantity: 1,
-                options: (orderStore.editOrder.menuItems.find((m: any) => m._id === item)?.options || []).map(
-                  (op: any) => ({
-                    option: typeof op.option === 'string' ? op.option : String(op.option?._id),
-                    quantity: Number(op.quantity ?? 1),
-                  }),
-                ),
-              },
-            ],
-          }
-          return applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, data)
-        }),
-      )
+    if (itemsToDelete.menuItems.length || itemsToDelete.offerMenuItems.length) {
+      await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, itemsToDelete)
     }
-
-    // --- CHANGED: batch & dedupe offer deletes into ONE call ---
-    if (existingOffers.length) {
-      const uniq = Array.from(new Map(existingOffers.map((o: any) => [o.offerId, o])).values())
-      const payload = {
-        offerMenuItems: uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 })),
-      }
-      await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, payload)
-    }
-    // --- END CHANGE ---
 
     const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
       offerId: offer.offerId,
@@ -848,21 +1084,194 @@ async function updateOrder() {
         },
       },
     )
-    init({
-      message: res.data.message,
-      color: res.data.status !== 'Failed' ? 'success' : 'danger',
-    })
+    if (res.data.status === 'Failed') {
+      showAlert(res.data.message)
+    } else {
+      init({ message: res.data.message, color: 'success' })
+    }
     orderStore.editOrder = null as any
     try {
       orderStore.cartItems = [] as any
     } catch (e) {
       console.error(e)
     }
-    window.location.reload()
+    emits('success')
+    showCheckoutModal.value = false
     return res.data
   } catch (err: any) {
     console.error('Order edit failed:', err)
-    init({ message: err.response.data.message, color: 'danger' })
+    showAlert(err.response.data.message)
+    apiLoading.value = false
+    throw err
+  }
+}
+
+/**
+ * Promo-aware edit: delete ALL original items/offers, then resend the
+ * entire order via PATCH so the promo engine re-calculates on the full order.
+ */
+async function updateOrderWithPromo(promoCodes: string[]) {
+  const userStore = useUsersStore()
+  try {
+    // 1. Cache original menu items before deleting
+    const originalMenuItems = orderStore.editOrder.menuItems || []
+    const cachedMenuItems = originalMenuItems.map((item: any) => ({
+      menuItem: item._id,
+      quantity: Number(item.quantity ?? 1),
+      options: (item.options || []).map((op: any) => ({
+        option: typeof op.option === 'string' ? op.option : String(op.option?._id),
+        quantity: Number(op.quantity ?? 1),
+      })),
+    }))
+
+    // Cache original offers before deleting
+    const originalOffers = orderStore.editOrder.offerDetails || []
+    const cachedOfferItems = originalOffers.map((od: any) => ({
+      offerId: od.offerId,
+      menuItems: (od.offerItems || []).map((oi: any) => ({
+        menuItem: typeof oi.menuItem === 'string' ? oi.menuItem : String(oi.menuItem?._id || oi._id),
+        quantity: Number(oi.quantity ?? 1),
+        options: (oi.options || []).map((op: any) => ({
+          option: typeof op.option === 'string' ? op.option : String(op.option?._id),
+          quantity: Number(op.quantity ?? 1),
+        })),
+      })),
+    }))
+
+    // 2. Delete ALL original items and offers in ONE call
+    const itemsToDelete: any = {
+      menuItems: originalMenuItems.map((item: any) => ({
+        menuItem: item._id,
+        quantity: 1,
+        options: (item.options || []).map((op: any) => ({
+          option: typeof op.option === 'string' ? op.option : String(op.option?._id),
+          quantity: Number(op.quantity ?? 1),
+        })),
+      })),
+      offerMenuItems: [],
+    }
+
+    if (originalOffers.length) {
+      const uniq = Array.from(new Map(originalOffers.map((o: any) => [o.offerId, o])).values())
+      itemsToDelete.offerMenuItems = uniq.map((o: any) => ({ offerId: o.offerId, quantity: 1 }))
+    }
+
+    if (itemsToDelete.menuItems.length || itemsToDelete.offerMenuItems.length) {
+      await applyOrderEdit(orderStore.editOrder._id, 'delete', orderStore.editOrder.tableNumber, itemsToDelete)
+    }
+
+    // 4. Build full order payload: cached original items + new cart items
+    const newMenuItems = orderStore.cartItems.map((e: any) => ({
+      menuItem: e.itemId,
+      quantity: e.quantity,
+      options: e.selectedOptions.flatMap((group: any) =>
+        group.selected.map((option: any) => ({
+          option: option.optionId,
+          quantity: option.quantity,
+        })),
+      ),
+    }))
+
+    // Merge: remove from cache only as many as exist in cart (edited items), keep the rest
+    const cartCountMap = new Map<string, number>()
+    for (const c of orderStore.cartItems as any[]) {
+      cartCountMap.set(c.itemId, (cartCountMap.get(c.itemId) || 0) + 1)
+    }
+    const removedCountMap = new Map<string, number>()
+    const untouchedCachedItems = cachedMenuItems.filter((ci: any) => {
+      const allowed = cartCountMap.get(ci.menuItem) || 0
+      const removed = removedCountMap.get(ci.menuItem) || 0
+      if (allowed > 0 && removed < allowed) {
+        removedCountMap.set(ci.menuItem, removed + 1)
+        return false // this one was edited, skip it
+      }
+      return true // keep untouched original
+    })
+    const menuItems = [...untouchedCachedItems, ...newMenuItems]
+
+    const newOfferItems = orderStore.offerItems.map((offer: any) => ({
+      offerId: offer.offerId,
+      menuItems: offer.selections.flatMap((selection: any) =>
+        selection.addedItems.map((item: any) => ({
+          menuItem: item.itemId,
+          quantity: item.quantity || 1,
+          options:
+            item.selectedOptions?.flatMap((group: any) =>
+              group.selected.map((option: any) => ({
+                option: option.optionId,
+                quantity: option.quantity,
+              })),
+            ) || [],
+        })),
+      ),
+    }))
+
+    // Merge: count-based removal for offers too
+    const cartOfferCountMap = new Map<string, number>()
+    for (const o of orderStore.offerItems as any[]) {
+      cartOfferCountMap.set(o.offerId, (cartOfferCountMap.get(o.offerId) || 0) + 1)
+    }
+    const removedOfferCountMap = new Map<string, number>()
+    const untouchedCachedOffers = cachedOfferItems.filter((co: any) => {
+      const allowed = cartOfferCountMap.get(co.offerId) || 0
+      const removed = removedOfferCountMap.get(co.offerId) || 0
+      if (allowed > 0 && removed < allowed) {
+        removedOfferCountMap.set(co.offerId, removed + 1)
+        return false
+      }
+      return true
+    })
+    const offerMenuItems = [...untouchedCachedOffers, ...newOfferItems]
+
+    const dateVal = props.dateSelected ? new Date(props.dateSelected) : new Date()
+    const orderDateTime = !isNaN(dateVal.getTime()) ? dateVal.toISOString() : new Date().toISOString()
+
+    const pm = selectedPayment.value || ({} as any)
+    const patchPayload: any = {
+      orderFor: orderFor.value,
+      customerDetailId: props.customerDetailsId,
+      orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
+      deliveryZoneId: getSelectedDeliveryZoneId(),
+      outletId: serviceStore.selectedRest,
+      orderDateTime,
+      phoneNo: orderStore.phoneNumber || '',
+      address: sanitizeAddress(orderStore.address),
+      deliveryNotes: orderStore.deliveryNotes || '',
+      orderNotes: orderStore.orderNotes,
+      deliveryFee: props.deliveryFee,
+      paymentMode: {
+        _id: pm._id,
+        name: pm.name,
+        paymentTypeId: pm.paymentTypeId,
+        autoReceipt: pm.autoReceipt ?? false,
+        receiptFormat: pm.receiptFormat ?? 'NONE',
+      },
+      menuItems,
+      offerDetails: offerMenuItems,
+      promoCodes,
+    }
+    if (promoCodes.length === 1) patchPayload.promoCode = promoCodes[0]
+
+    // 4. PATCH the entire order
+    const res = await orderStore.patchOrder(orderStore.editOrder._id, patchPayload)
+
+    if (res.data?.status === 'Failed') {
+      showAlert(res.data?.message || 'Order edit failed')
+    } else {
+      init({ message: res.data?.message || 'Order updated with promo', color: 'success' })
+    }
+    orderStore.editOrder = null as any
+    try {
+      orderStore.cartItems = [] as any
+    } catch (e) {
+      console.error(e)
+    }
+    emits('success')
+    showCheckoutModal.value = false
+    return res.data
+  } catch (err: any) {
+    console.error('Order edit with promo failed:', err)
+    showAlert(err.response?.data?.message || 'Order edit failed')
     apiLoading.value = false
     throw err
   }
@@ -894,14 +1303,15 @@ const applyOrderEdit = async (orderId: string, action: string, tableNumber: stri
         },
       },
     )
-    init({
-      message: res.data.message,
-      color: res.data.status !== 'Failed' ? 'success' : 'danger',
-    })
+    if (res.data.status === 'Failed') {
+      showAlert(res.data.message)
+    } else {
+      init({ message: res.data.message, color: 'success' })
+    }
     return res.data
   } catch (err: any) {
     console.error('Order edit failed:', err)
-    init({ message: err.response.data.message, color: 'danger' })
+    showAlert(err.response.data.message)
     throw err
   }
 }
@@ -966,77 +1376,79 @@ function normalizeCodes(singleStr, codesArr) {
       .filter(Boolean)
   }
 
-  // De-dupe case-insensitively
-  const seen = new Set()
-  const out = []
-  for (const c of codes) {
-    const k = c.toLowerCase()
-    if (!seen.has(k)) {
-      seen.add(k)
-      out.push(c)
-    }
-  }
-  return out
+  return codes
 }
 
 async function createOrder() {
-  apiLoading.value = true
-  let menuItems: any[] = []
-  menuItems = orderStore.cartItems.map((e: any) => {
-    return {
-      menuItem: e.itemId,
-      quantity: e.quantity,
-      options: e.selectedOptions.flatMap((group: any) =>
-        group.selected.map((option: any) => ({
-          option: option.optionId,
-          quantity: option.quantity,
-        })),
-      ),
-    }
+  log('PAYMENT_INITIATED', {
+    paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+    orderType: props.orderType,
+    isEdit: !!orderStore.editOrder,
   })
-
-  const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
-    offerId: offer.offerId,
-    menuItems: offer.selections.flatMap((selection: any) =>
-      selection.addedItems.map((item: any) => ({
-        menuItem: item.itemId,
-        quantity: item.quantity || 1,
-        options:
-          item.selectedOptions?.flatMap((group: any) =>
-            group.selected.map((option: any) => ({
-              option: option.optionId,
-              quantity: option.quantity,
-            })),
-          ) || [],
-      })),
-    ),
-  }))
-  const codes = normalizeCodes(props.promoCode, props.promoCodes)
+  apiLoading.value = true
 
   try {
-    const payload = {
-      orderFor: orderFor.value,
-      customerDetailId: props.customerDetailsId,
-      orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
-      deliveryZoneId: orderStore.deliveryZone?._id,
-      menuItems,
-      deliveryNotes: orderStore.deliveryNotes || '',
-      offerMenuItems,
-      orderNotes: orderStore.orderNotes,
-      deliveryFee: props.deliveryFee,
-      outletId: serviceStore.selectedRest,
-      orderDateTime: new Date(props.dateSelected).toISOString(),
-      paymentMode: selectedPayment.value,
-      address: sanitizeAddress(orderStore.address),
-      phoneNo: orderStore.phoneNumber || '',
-      ...(codes.length ? { promoCodes: codes } : {}),
-      ...(codes.length === 1 ? { promoCode: codes[0] } : {}),
-    }
-
     let response: any = ''
+
+    // ── Payment Retry path ──
+    // When we already have an orderId (from a failed payment redirect),
+    // skip building the full payload and just retry the payment.
     if (orderId.value) {
+      console.log('[CheckOutModal] RETRY path — orderId:', orderId.value, 'paymentTypeId:', selectedPayment.value?.paymentTypeId)
       response = await orderStore.retryPayment(orderId.value, selectedPayment.value?.paymentTypeId)
     } else {
+      // ── New Order path ──
+      const menuItems = orderStore.cartItems.map((e: any) => ({
+        menuItem: e.itemId,
+        quantity: e.quantity,
+        options: e.selectedOptions.flatMap((group: any) =>
+          group.selected.map((option: any) => ({
+            option: option.optionId,
+            quantity: option.quantity,
+          })),
+        ),
+      }))
+
+      const offerMenuItems = orderStore.offerItems.map((offer: any) => ({
+        offerId: offer.offerId,
+        menuItems: offer.selections.flatMap((selection: any) =>
+          selection.addedItems.map((item: any) => ({
+            menuItem: item.itemId,
+            quantity: item.quantity || 1,
+            options:
+              item.selectedOptions?.flatMap((group: any) =>
+                group.selected.map((option: any) => ({
+                  option: option.optionId,
+                  quantity: option.quantity,
+                })),
+              ) || [],
+          })),
+        ),
+      }))
+      const codes = normalizeCodes(props.promoCode, props.promoCodes)
+
+      const dateVal = props.dateSelected ? new Date(props.dateSelected) : new Date()
+      const orderDateTime = !isNaN(dateVal.getTime()) ? dateVal.toISOString() : new Date().toISOString()
+
+      const payload = {
+        orderFor: orderFor.value,
+        customerDetailId: props.customerDetailsId,
+        orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
+        deliveryZoneId: getSelectedDeliveryZoneId(),
+        menuItems,
+        deliveryNotes: orderStore.deliveryNotes || '',
+        offerMenuItems,
+        orderNotes: orderStore.orderNotes,
+        deliveryFee: props.deliveryFee,
+        outletId: serviceStore.selectedRest,
+        orderDateTime,
+        paymentMode: selectedPayment.value,
+        address: sanitizeAddress(orderStore.address),
+        phoneNo: orderStore.phoneNumber || '',
+        ...(codes.length ? { promoCodes: codes } : {}),
+        ...(codes.length === 1 ? { promoCode: codes[0] } : {}),
+      }
+
       orderResponse.value = await orderStore.createOrder(payload)
       response = await orderStore.createPayment({
         orderId: orderResponse.value.data.data._id,
@@ -1054,10 +1466,43 @@ async function createOrder() {
         // Immediate success check (e.g. test gateways or auto-capture)
         if (response.data.data.status === 'Completed') {
           handlePaymentSuccess()
+        } else if (selectedPayment.value.paymentGateway === 'WalleePOS') {
+          // WalleePOS failure/timeout: keep modal open on retry screen (no redirect).
+          // Setting orderId.value causes the template to render the "Retry Payment" UI.
+          const errMsg = response.data.data.errorMessage || 'Payment failed, please retry.'
+          orderId.value =
+            response.data.data.order?._id ||
+            orderResponse.value?.data?.data?._id ||
+            orderId.value
+          log('ORDER_AWAITING_PAYMENT', {
+            orderId: orderId.value,
+            errorMessage: errMsg,
+            paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+            orderType: props.orderType,
+          })
+          showAlert(errMsg)
         } else {
-          orderStore.setPaymentLink(response.data.data.redirectUrl)
+          // orderStore.setPaymentLink(response.data.data.redirectUrl)
           orderId.value = response.data.data.requestId
-          setInter()
+          log('ORDER_AWAITING_PAYMENT', {
+            orderId: orderResponse.value?.data?.data?._id,
+            paymentRequestId: response.data.data.requestId,
+            paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+            orderType: props.orderType,
+          })
+          const deliveryZoneId = getSelectedDeliveryZoneId()
+          // Save customer context so it can be restored on failed-payment return
+          sessionStorage.setItem('cc_pending_customer', JSON.stringify({
+            phone: orderStore.phoneNumber || '',
+            customerName: orderStore.customerName || '',
+            customerDetailId: props.customerDetailsId || '',
+            deliveryZoneId,
+            orderType: props.orderType || '',
+            address: orderStore.address || '',
+            deliveryNotes: orderStore.deliveryNotes || '',
+          }))
+          // setInter()
+          window.top.location.href = response.data.data.redirectUrl
         }
       }
       // CASE 2: No Gateway (Cash, External Terminal) - Immediate Success
@@ -1066,25 +1511,37 @@ async function createOrder() {
           init({ color: 'success', message: 'Order sent to Winmax' })
         }
 
+        completedOrderData.value = response?.data?.data || orderResponse.value?.data?.data || null
         handlePaymentSuccess()
       }
     } else {
       throw new Error(response.data?.message || 'Something went wrong')
     }
   } catch (err: any) {
+    console.error('[CheckOutModal] Payment failed. Error details:', err)
+    console.error('[CheckOutModal] Response data:', err.response?.data)
+
     // Build error message, including out of stock items if applicable
     let errorMessage = err.response?.data?.message || 'Order failed, please try again.'
     const errorData = err.response?.data
-    
+
     // Check for OUT_OF_STOCK error and append item names
-    if (errorData?.code === 'OUT_OF_STOCK' && Array.isArray(errorData?.outOfStockItems) && errorData.outOfStockItems.length) {
+    if (
+      errorData?.code === 'OUT_OF_STOCK' &&
+      Array.isArray(errorData?.outOfStockItems) &&
+      errorData.outOfStockItems.length
+    ) {
       errorMessage = `${errorMessage} Items: ${errorData.outOfStockItems.join(', ')}`
     }
-    
-    init({
-      color: 'danger',
-      message: errorMessage,
+
+    log('ORDER_FAILED', {
+      errorMessage,
+      errorCode: err?.response?.data?.code || null,
+      paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+      orderType: props.orderType,
+      success: false,
     })
+    showAlert(errorMessage)
 
     if (err?.response?.data?.data?.requestId) {
       orderId.value = err.response.data.data.requestId
@@ -1141,12 +1598,13 @@ const promoOfferItemPrice = (item: any, index: number) => {
 }
 
 .order-item {
-  padding: 12px 0;
+  padding: 6px 0;
   border-bottom: 1px solid #f3f4f6;
 }
 
 .order-items-wrapper {
-  max-height: calc(100vh - 350px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1231,7 +1689,7 @@ const promoOfferItemPrice = (item: any, index: number) => {
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
-  font-size: 15px;
+  font-size: 18px;
 }
 
 .total-row:not(:last-child) {
@@ -1256,20 +1714,10 @@ const promoOfferItemPrice = (item: any, index: number) => {
   text-align: left !important;
 }
 
-.header-container {
-  background: #ffffff;
-  border-bottom: 2px solid #e5e7eb;
-  padding: 16px 32px;
-  display: flex;
-  justify-content: left;
-  align-items: center;
-  flex-shrink: 0;
-}
-
 .payment-content {
   flex: 1;
-  padding: 28px 32px;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -1309,7 +1757,6 @@ const promoOfferItemPrice = (item: any, index: number) => {
   font-size: 18px;
   font-weight: 600;
   color: #111827;
-  margin-bottom: 6px;
 }
 
 .payment-desc {
@@ -1415,23 +1862,6 @@ const promoOfferItemPrice = (item: any, index: number) => {
   box-shadow: 0 4px 16px rgba(45, 93, 42, 0.2);
 }
 
-.payment-option.selected::after {
-  content: '✓';
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: #2d5d2a;
-  color: white;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: bold;
-}
-
 .payment-option:hover {
   border-color: #2d5d2a;
   box-shadow: 0 4px 12px rgba(45, 93, 42, 0.1);
@@ -1440,6 +1870,8 @@ const promoOfferItemPrice = (item: any, index: number) => {
 
 .btn {
   padding: 16px 32px;
+  background: #2d5d2a;
+  color: white;
   border: none;
   border-radius: 8px;
   font-size: 16px;
@@ -1453,7 +1885,10 @@ const promoOfferItemPrice = (item: any, index: number) => {
   width: auto;
   min-width: 200px;
 }
-
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(45, 93, 42, 0.4);
+}
 .btn-primary {
   background: linear-gradient(135deg, #2d5d2a 0%, #1f4a1d 100%);
   color: white;
@@ -1483,8 +1918,7 @@ const promoOfferItemPrice = (item: any, index: number) => {
 
 .action-container {
   background: #f9fafb;
-  padding: 24px 32px;
-  border-top: 2px solid #e5e7eb;
+  padding: 16px 32px;
   display: flex;
   justify-content: center;
   flex-shrink: 0;
@@ -1533,7 +1967,7 @@ const promoOfferItemPrice = (item: any, index: number) => {
   margin-bottom: 20px;
 }
 
-.denomination-btn {
+.denominations-btn {
   padding: 16px 12px;
   border: 2px solid #d1d5db;
   border-radius: 8px;
@@ -1546,14 +1980,14 @@ const promoOfferItemPrice = (item: any, index: number) => {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.denomination-btn:hover {
+.denominations-btn:hover {
   border-color: #2d5d2a;
   background: #f0f7f0;
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(45, 93, 42, 0.15);
 }
 
-.denomination-btn.selected {
+.denominations-btn.selected {
   border-color: #2d5d2a;
   background: linear-gradient(135deg, #2d5d2a 0%, #1f4a1d 100%);
   color: white;
@@ -1581,5 +2015,120 @@ const promoOfferItemPrice = (item: any, index: number) => {
   margin-top: 8px;
   padding-top: 12px;
   font-size: 16px;
+}
+
+/* Keypad Styles */
+.keypad-container {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+}
+
+.keypad-display {
+  background: #f3f4f6;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  text-align: right;
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  border: 2px solid transparent;
+}
+
+.keypad-display:focus-within {
+  border-color: #2d5d2a;
+}
+
+.currency-symbol {
+  color: #6b7280;
+  margin-right: 4px;
+  font-size: 20px;
+}
+
+.keypad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.key-btn {
+  padding: 12px 4px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #1f4a1d;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.key-btn:hover {
+  background: #396137;
+}
+
+.key-btn:active {
+  background: #e5e7eb;
+  transform: translateY(1px);
+}
+
+.delete-btn {
+  color: #dc2626;
+  font-weight: bold;
+}
+
+.clear-btn {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+  font-size: 16px;
+  margin-top: 8px;
+  height: 40px;
+}
+
+.clear-btn:hover {
+  background: #fecaca;
+}
+
+/* Make VaModal default close button bigger + more visible */
+.big-xl-xl-modal :deep(.va-modal__close-button),
+.big-xl-xl-modal :deep(.va-modal__close),
+.big-xl-xl-modal :deep(.va-modal__close-btn) {
+  /* Bigger tap target */
+  width: 48px;
+  height: 48px;
+  background: #bd3523;
+  border-radius: 9999px;
+  opacity: 1;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.big-xl-xl-modal :deep(.va-modal__close-button svg),
+.big-xl-xl-modal :deep(.va-modal__close svg),
+.big-xl-xl-modal :deep(.va-modal__close-btn svg),
+.big-xl-xl-modal :deep(.va-icon) {
+  width: 32px;
+  height: 32px;
+  color: #ffffff;
+}
+
+.big-xl-xl-modal :deep(.va-modal__close-button:hover),
+.big-xl-xl-modal :deep(.va-modal__close:hover),
+.big-xl-xl-modal :deep(.va-modal__close-btn:hover) {
+  background: #e06752;
 }
 </style>

@@ -1,8 +1,14 @@
 <template>
-  <div v-if="isOfferAvailable(item)" class="menu-item" @click="getOffers">
+  <div
+    v-if="isOfferAvailable(item)"
+    class="menu-item"
+    :class="{ 'out-of-stock': item.inStock === false }"
+    @click="getOffers"
+  >
     <div class="item-content">
       <div class="item-name">{{ item.name }}</div>
       <div class="item-price">€{{ parseFloat(item.price).toFixed(2) }}</div>
+      <div v-if="item.inStock === false" class="oos-label">Out of Stock</div>
     </div>
     <div v-if="item.imageUrl" class="item-image">
       <img :src="item.imageUrl" alt="icon" class="w-full h-full" />
@@ -18,9 +24,10 @@
 <script setup>
 import { ref } from 'vue'
 import axios from 'axios'
-import { useToast } from 'vuestic-ui'
 import OfferModal from '../modals/OfferModal.vue'
 import { useOrderStore } from '@/stores/order-store'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 
 const props = defineProps({
   item: Object,
@@ -31,7 +38,8 @@ const isLoading = ref(false)
 const itemWithOffers = ref({})
 const orderStore = useOrderStore()
 
-const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
+const { log } = useCallCenterLogger()
 
 // Check if offer is available based on weekly days, time, and date
 function isOfferAvailable(item) {
@@ -69,12 +77,15 @@ function isOfferAvailable(item) {
 }
 
 function getOffers() {
-  // If offer is not available, show toast & stop
+  log('OFFER_CLICKED', { offerId: props.item._id, offerName: props.item.name, price: props.item.price })
+  // If offer is out of stock, show toast & stop
+  if (props.item.inStock === false) {
+    showAlert('This offer is out of stock!')
+    return
+  }
+  // If offer is not available, show popup & stop
   if (!isOfferAvailable(props.item)) {
-    init({
-      message: 'This offer is not available right now!',
-      color: 'danger',
-    })
+    showAlert('This offer is not available right now!')
     return
   }
   openMenuModal()
@@ -147,5 +158,23 @@ function closeOfferModal() {
   font-size: 16px;
   font-weight: 700;
   color: #2d5d2a;
+}
+
+.out-of-stock {
+  opacity: 0.5;
+  pointer-events: auto;
+  cursor: not-allowed;
+}
+
+.out-of-stock:hover {
+  box-shadow: none;
+  border-color: #e2e8f0;
+}
+
+.oos-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #dc2626;
+  margin-top: 4px;
 }
 </style>

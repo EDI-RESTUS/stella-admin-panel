@@ -21,7 +21,18 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label class="text-sm font-medium text-gray-500">Mobile Number *</label>
-                <VaInput v-model="phoneNumber" placeholder="Enter mobile number" class="mt-1" />
+                <div class="flex mt-1 items-center">
+                  <VaSelect
+                    v-model="phonePrefix"
+                    :options="countryPrefixes"
+                    class="min-w-0"
+                    :clearable="false"
+                    value-by="value"
+                    text-by="text"
+                    track-by="value"
+                  />
+                  <VaInput v-model="phoneLocal" placeholder="Mobile" class="w-[65px]" @input="onPhoneInput" />
+                </div>
               </div>
               <div>
                 <label class="text-sm font-medium text-gray-500">Customer Name *</label>
@@ -256,12 +267,14 @@
 <script setup lang="ts">
 import { useOrderStore } from '@/stores/order-store'
 import { ref, watch, reactive, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import { useToast } from 'vuestic-ui'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 import axios from 'axios'
 import { useServiceStore } from '@/stores/services.ts'
 import { Circle, CircleDot } from 'lucide-vue-next'
 
-const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
+const { log } = useCallCenterLogger()
 const addressNote = ref('')
 const emits = defineEmits(['cancel', 'setUser', 'close', 'selectAddress'])
 const orderStore = useOrderStore()
@@ -405,7 +418,51 @@ const searchAdd = reactive({
   postalCode: '',
 })
 const name = ref('')
-const phoneNumber = ref('')
+const phonePrefix = ref('357')
+const phoneLocal = ref('')
+
+// Computed phoneNumber to maintain compatibility with existing logic if references exist,
+// though we will update main usages.
+const phoneNumber = computed({
+  get: () => phonePrefix.value + phoneLocal.value,
+  set: (val) => {
+    // If setting full number externally, we try to parse it
+    const raw = String(val || '').replace(/\D/g, '')
+    const found = countryPrefixes.find((p) => raw.startsWith(p.value))
+    if (found) {
+      phonePrefix.value = found.value
+      phoneLocal.value = raw.slice(found.value.length)
+    } else {
+      // Default to 357 if no match or just local
+      if (raw.length > 0 && !raw.startsWith('357')) {
+        // If it doesn't match any prefix, assume it's a local number for the default prefix?
+        // Or if it's empty, clear local.
+        phonePrefix.value = '357'
+        phoneLocal.value = raw
+      } else if (raw.startsWith('357')) {
+        phonePrefix.value = '357'
+        phoneLocal.value = raw.slice(3)
+      } else {
+        phonePrefix.value = '357'
+        phoneLocal.value = ''
+      }
+    }
+  },
+})
+
+const countryPrefixes = [
+  { text: '+357', value: '357' },
+  { text: '+30', value: '30' },
+  { text: '+44', value: '44' },
+  { text: '+1', value: '1' },
+  { text: '+7', value: '7' },
+  { text: '+971', value: '971' },
+  { text: '+961', value: '961' },
+]
+
+function onPhoneInput(val: string) {
+  phoneLocal.value = val.replace(/\D/g, '')
+}
 const notifications: any = ref(false)
 const postCode = ref('')
 const streetAddress = ref('')
@@ -447,7 +504,20 @@ const isAddressValid = computed(() => {
 
 if (props.selectedUser) {
   name.value = props.selectedUser['Name'] || ''
-  phoneNumber.value = props.selectedUser['MobilePhone'] || props.selectedUser['Phone'] || ''
+  // Initialize phone split
+  const raw = String(props.selectedUser['MobilePhone'] || props.selectedUser['Phone'] || '')
+    .trim()
+    .replace(/\D/g, '')
+  const found = countryPrefixes.find((p) => raw.startsWith(p.value))
+  if (found) {
+    phonePrefix.value = found.value
+    phoneLocal.value = raw.slice(found.value.length)
+  } else {
+    // Fallback or assume local
+    phonePrefix.value = '357'
+    phoneLocal.value = raw.startsWith('357') ? raw.slice(3) : raw
+  }
+
   notifications.value = !!props.selectedUser['notifications']
 
   if (typeof props.selectedUser['isTick'] !== 'undefined') {
@@ -475,7 +545,18 @@ if (props.selectedUser) {
   }
 } else {
   name.value = props.userName || ''
-  phoneNumber.value = String(props.userNumber ?? '').trim()
+  // Initialize phone split from prop
+  const raw = String(props.userNumber ?? '')
+    .trim()
+    .replace(/\D/g, '')
+  const found = countryPrefixes.find((p) => raw.startsWith(p.value))
+  if (found) {
+    phonePrefix.value = found.value
+    phoneLocal.value = raw.slice(found.value.length)
+  } else {
+    phonePrefix.value = '357'
+    phoneLocal.value = raw.startsWith('357') ? raw.slice(3) : raw
+  }
   isTick.value = null
 }
 
@@ -522,7 +603,7 @@ function setAddress(addr: any) {
 
 async function addAddress() {
   if (!isAddressValid.value) {
-    init({ color: 'danger', message: 'Please fill all required address fields.' })
+    showAlert('Please fill all required address fields.')
     addressSet.value = null
     return
   }
@@ -539,11 +620,11 @@ async function addAddress() {
       })
 
       if (!response.data.data || response.data.data.length === 0) {
-        init({ color: 'danger', message: 'Address not available for Delivery' })
+        showAlert('Address not available for Delivery.')
         return
       }
     } catch (error) {
-      init({ color: 'danger', message: 'Failed to verify delivery availability' })
+      showAlert('Failed to verify delivery availability.')
       return
     }
   }
@@ -654,11 +735,11 @@ async function fetchStreetName() {
       })
     } else {
       streetList.value = []
-      init({ color: 'danger', message: 'Address not available for Delivery' })
+      showAlert('Address not available for Delivery.')
     }
   } catch (error) {
     streetList.value = []
-    init({ color: 'danger', message: 'Failed to fetch address data' })
+    showAlert('Failed to fetch address data.')
   }
 }
 async function stellaUpsertFromForm(
@@ -771,11 +852,12 @@ async function addOrUpdateCustomerDetails() {
   const outletId = servicesStore.selectedRest
 
   // normalize phone to digits only
-  phoneNumber.value = String(phoneNumber.value || '').replace(/\D+/g, '')
+  // phoneNumber is now computed, so we use prefix + local
+  const fullPhone = (phonePrefix.value + phoneLocal.value).replace(/\D+/g, '')
 
   const base = {
     name: String(name.value || '').trim(),
-    phone: String(phoneNumber.value || '').trim(),
+    phone: fullPhone,
     address: Array.isArray(address.value) ? address.value : [],
     isTick: isTick.value, // UI toggle (Save / Don’t Save). We still do Winmax-first per rule.
     notifications: !!notifications.value,
@@ -787,6 +869,7 @@ async function addOrUpdateCustomerDetails() {
     // 1) Forced anonymous update of an existing Stella doc (never Winmax)
     if ((props as any).forceUpdateId) {
       await stellaUpsertFromForm(base, outletId, (props as any).forceUpdateId /* maybeId */, /* wmMeta */ null)
+      log('CUSTOMER_UPDATED', { phone: base.phone, name: base.name, isForceUpdate: true })
       emits('setUser', { phoneNumber: base.phone, name: base.name })
       return
     }
@@ -807,6 +890,7 @@ async function addOrUpdateCustomerDetails() {
         await stellaUpsertFromForm(base, outletId, selected._id || selected.id, null)
       }
 
+      log('CUSTOMER_UPDATED', { phone: base.phone, name: base.name })
       emits('setUser', { phoneNumber: base.phone, name: base.name })
       return
     }
@@ -815,6 +899,7 @@ async function addOrUpdateCustomerDetails() {
     const wmCreated = await winmaxCreateOrUpdate(base, outletId, null)
     await stellaUpsertFromForm(base, outletId, /* maybeId */ undefined, wmCreated)
 
+    log('CUSTOMER_CREATED', { phone: base.phone, name: base.name })
     emits('setUser', { phoneNumber: base.phone, name: base.name })
   } catch (error: any) {
     const msg =
@@ -823,7 +908,8 @@ async function addOrUpdateCustomerDetails() {
       (Array.isArray(error?.response?.data?.errors) ? error.response.data.errors.join(', ') : null) ||
       error?.message ||
       'Something went wrong.'
-    init({ color: 'danger', message: msg })
+    log('ERROR_CUSTOMER_SAVE', { errorMessage: msg })
+    showAlert(msg)
   }
 }
 
@@ -832,16 +918,16 @@ async function handleSubmit() {
 
   // basic guards for brand-new customers
   if (!String(name.value || '').trim()) {
-    init({ color: 'danger', message: 'Please enter a customer name.' })
+    showAlert('Please enter a customer name.')
     return
   }
   const digits = String(phoneNumber.value || '').replace(/\D+/g, '')
   if (!digits) {
-    init({ color: 'danger', message: 'Please enter a valid mobile number.' })
+    showAlert('Please enter a valid mobile number.')
     return
   }
   if (isTick.value === null) {
-    init({ color: 'danger', message: 'Choose “Save Data” or “Don’t Save”.' })
+    showAlert(`Choose “Save Data” or “Don’t Save”.`)
     return
   }
 
@@ -858,7 +944,7 @@ async function handleSubmit() {
       if (selectedAddressObj.value) {
         emits('selectAddress', selectedAddressObj.value)
       } else {
-        init({ color: 'warning', message: 'Please select an address.' })
+        showAlert('Please select an address.')
         isSubmitting.value = false
         return
       }
@@ -868,7 +954,7 @@ async function handleSubmit() {
     showCustomerModal.value = false
   } catch (e: any) {
     const msg = e?.response?.data?.error || e?.response?.data?.message || e?.message || 'Something went wrong.'
-    init({ color: 'danger', message: msg })
+    showAlert(msg)
   } finally {
     isSubmitting.value = false
   }

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { defineVaDataTableColumns, useModal, useToast } from 'vuestic-ui'
-import { useRouter } from 'vue-router'
 import { ref, computed, toRef, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { useServiceStore } from '@/stores/services'
 import EditArticleOptionGroupsModal from '../modals/EditArticleOptionGroupsModal.vue'
@@ -9,6 +8,33 @@ import EditArticleOptionGroupsItemsModal from '../modals/EditArticleOptionGroups
 import EditOptionGroupArticlesModal from '../modals/EditOptionGroupArticlesModal.vue'
 import axios from 'axios'
 import { Pencil, CirclePlus, Search, Plus, Columns3, Copy } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
+
+const { locale } = useI18n()
+
+function getLocalizedValue(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  if (typeof val === 'object') {
+    return val[locale.value] || val['en'] || Object.values(val)[0] || ''
+  }
+  return ''
+}
+
+function getEditableLocaleValue(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  return val[locale.value] || val['en'] || ''
+}
+
+function setLocaleKey(obj: any, field: string, value: string) {
+  const lang = locale.value || 'en'
+  if (!obj[field] || typeof obj[field] === 'string') {
+    obj[field] = { [lang]: value }
+  } else {
+    obj[field] = { ...obj[field], [lang]: value }
+  }
+}
 
 const isEditArticleOptionGroupsModal = ref(false)
 const selectedOptionGroups = ref('')
@@ -18,12 +44,6 @@ const isEditOptionGroupArticlesModal = ref(false)
 const selectedOptions = ref('')
 const selectedItems = ref('')
 const activeOnly = ref(true)
-const totalOptionGroupsCount = computed(() => {
-  if (activeOnly.value) {
-    return props.items.filter((i) => i.isActive).length
-  }
-  return props.items.length
-})
 const typeOptions = [
   { key: 'singleChoice', label: 'Single Choice' },
   { key: 'multipleChoice', label: 'Multiple Choice' },
@@ -34,19 +54,6 @@ function getTypeLabel(row) {
   if (row.multipleChoice) return 'Multiple Choice'
   if (row.multipleChoiceNoQty) return 'Multiple (No Qty)'
   return ''
-}
-function changeType(row, selectedKey) {
-  // Reset all types
-  row.singleChoice = false
-  row.multipleChoice = false
-  row.multipleChoiceNoQty = false
-  row[selectedKey] = true
-
-  // Close dropdown
-  row.showTypeDropdown = false
-
-  // Persist change
-  updateData(row)
 }
 onMounted(() => {
   const handleClickOutside = (e: MouseEvent) => {
@@ -117,18 +124,34 @@ function resetColumnVisibility() {
   columns.forEach((c) => (columnVisibility[c.key] = true))
 }
 
-const emits = defineEmits(['getOptionGroups', 'editOptionGroup', 'sortBy', 'sortingOrder', 'updateOptionGroupModal'])
+const emits = defineEmits([
+  'getOptionGroups',
+  'editOptionGroup',
+  'sortBy',
+  'sortingOrder',
+  'updateOptionGroupModal',
+  'getOptionGroupsForPagination',
+  'update:currentPage',
+  'activeOnlyChanged',
+])
 const props = defineProps({
   items: { type: Array, required: true },
   count: { type: Number, default: 0 },
   loading: { type: Boolean, default: false },
+  currentPage: { type: Number, default: 1 },
 })
 const { confirm } = useModal()
 const { init } = useToast()
-const router = useRouter()
 const servicesStore = useServiceStore()
 const searchQuery = ref('')
 const searchTimeout = ref<number | null>(null)
+
+const pages = computed(() => Math.ceil(props.count / 50) || 1)
+
+function changePage(page: number) {
+  emits('update:currentPage', page)
+  emits('getOptionGroupsForPagination', { page, searchQuery: searchQuery.value })
+}
 
 watch(searchQuery, () => {
   // clear previous timer
@@ -139,6 +162,15 @@ watch(searchQuery, () => {
     emits('getOptionGroups', searchQuery.value)
   }, 500) // 500ms delay
 })
+
+// Emit activeOnly changes so parent can re-fetch with server-side filter
+watch(
+  activeOnly,
+  (val) => {
+    emits('activeOnlyChanged', val)
+  },
+  { immediate: true },
+)
 
 async function updateData(rowData) {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -179,25 +211,20 @@ const cloneArticle = (article) => {
 }
 const items = toRef(props, 'items') // original prop
 
-const filteredItems = computed(() => {
-  if (activeOnly.value) {
-    return items.value.filter((item) => item.isActive)
-  }
-  return items.value
-})
-const activeTab = ref<'groups' | 'options'>('groups')
+const filteredItems = computed(() => items.value)
 // Modal open functions
 function onButtonEditOptionGroup(rowData) {
   isEditArticleOptionsModal.value = true
   selectedOptions.value = rowData
 }
-function onButtonEditOptionGroupItems(rowData) {
-  isEditArticleOptionGroupsItemsModal.value = true
-  selectedItems.value = rowData
-}
 function onButtonEditOptionGroupArticles(rowData) {
   isEditOptionGroupArticlesModal.value = true
   selectedItems.value = rowData
+}
+
+const openEditGroupModal = (group) => {
+  selectedOptionGroups.value = group
+  isEditArticleOptionGroupsModal.value = true
 }
 </script>
 
@@ -230,7 +257,7 @@ function onButtonEditOptionGroupArticles(rowData) {
 
         <!-- FE Counter Badge -->
         <div class="h-9 flex items-center px-3 text-sm font-medium rounded-xl bg-blue-100 text-blue-700">
-          {{ totalOptionGroupsCount }}
+          {{ props.count }}
         </div>
 
         <!-- Search Input -->
@@ -343,16 +370,17 @@ function onButtonEditOptionGroupArticles(rowData) {
           <div class="editable-field relative group">
             <input
               v-if="rowData.editName"
-              v-model="rowData.name"
+              :value="getEditableLocaleValue(rowData.name)"
               class="editable-input"
               autofocus
+              @input="(e) => setLocaleKey(rowData, 'name', (e.target as HTMLInputElement).value)"
               @blur="
                 rowData.editName = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
-              <span>{{ rowData.name || '' }}</span>
+              <span v-if="getLocalizedValue(rowData.name)">{{ getLocalizedValue(rowData.name) }}</span>
               <Pencil
                 v-if="rowData.name"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -376,7 +404,7 @@ function onButtonEditOptionGroupArticles(rowData) {
               autofocus
               @blur="
                 rowData.editInternalName = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editInternalName = true">
@@ -396,19 +424,24 @@ function onButtonEditOptionGroupArticles(rowData) {
 
         <!-- DESCRIPTION -->
         <template #cell(description)="{ rowData }">
-          <div class="editable-field relative group max-w-[200px] truncate" :title="rowData.description">
-            <input
+          <div
+            class="editable-field relative group max-w-[200px] truncate"
+            :title="getLocalizedValue(rowData.description)"
+          >
+            <textarea
               v-if="rowData.editDescription"
-              v-model="rowData.description"
+              :value="getEditableLocaleValue(rowData.description)"
               class="editable-input"
+              rows="2"
               autofocus
+              @input="(e) => setLocaleKey(rowData, 'description', (e.target as HTMLTextAreaElement).value)"
               @blur="
                 rowData.editDescription = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
-              <span>{{ rowData.description || '' }}</span>
+              <span v-if="rowData.description">{{ getLocalizedValue(rowData.description) }}</span>
               <Pencil
                 v-if="rowData.description"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -455,7 +488,7 @@ function onButtonEditOptionGroupArticles(rowData) {
                 @click="
                   rowData.type = option.key || option;
                   updateData(rowData);
-                  rowData.showTypeDropdown = false
+                  rowData.showTypeDropdown = false;
                 "
               >
                 {{ option.label }}
@@ -493,7 +526,7 @@ function onButtonEditOptionGroupArticles(rowData) {
               type="number"
               @blur="
                 rowData.editMinimumChoices = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div
@@ -520,7 +553,7 @@ function onButtonEditOptionGroupArticles(rowData) {
               type="number"
               @blur="
                 rowData.editMaximumChoices = false;
-                updateData(rowData)
+                updateData(rowData);
               "
             />
             <div
@@ -614,6 +647,55 @@ function onButtonEditOptionGroupArticles(rowData) {
           </div>
         </template>
       </VaDataTable>
+
+      <!-- Bottom Pagination -->
+      <div v-if="pages > 1" class="flex justify-center py-3 border-t border-slate-200">
+        <VaPagination
+          :model-value="props.currentPage"
+          :pages="pages"
+          buttons-preset="secondary"
+          gapped="20"
+          :visible-pages="3"
+          @update:modelValue="changePage"
+        >
+          <template #firstPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹‹
+            </button>
+          </template>
+          <template #prevPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ‹
+            </button>
+          </template>
+          <template #nextPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ›
+            </button>
+          </template>
+          <template #lastPageLink="{ onClick, disabled }">
+            <button
+              class="px-3 py-1.5 font-bold border-slate-300 bg-white hover:bg-slate-100 transition disabled:opacity-50"
+              :disabled="disabled"
+              @click="onClick"
+            >
+              ››
+            </button>
+          </template>
+        </VaPagination>
+      </div>
     </div>
 
     <!-- MODALS -->
@@ -623,7 +705,7 @@ function onButtonEditOptionGroupArticles(rowData) {
       @cancel="
         isEditArticleOptionGroupsModal = false;
         selectedOptionGroups = '';
-        emits('getOptionGroups', searchQuery)
+        emits('getOptionGroups', searchQuery);
       "
     />
     <EditArticleOptionGroupsOptionsModal
@@ -632,7 +714,7 @@ function onButtonEditOptionGroupArticles(rowData) {
       @cancel="
         isEditArticleOptionsModal = false;
         selectedOptions = '';
-        emits('getOptionGroups', searchQuery)
+        emits('getOptionGroups', searchQuery);
       "
     />
     <EditArticleOptionGroupsItemsModal
@@ -641,7 +723,7 @@ function onButtonEditOptionGroupArticles(rowData) {
       @cancel="
         isEditArticleOptionGroupsItemsModal = false;
         selectedItems = '';
-        emits('getOptionGroups', searchQuery)
+        emits('getOptionGroups', searchQuery);
       "
     />
     <EditOptionGroupArticlesModal
@@ -650,7 +732,7 @@ function onButtonEditOptionGroupArticles(rowData) {
       @cancel="
         isEditOptionGroupArticlesModal = false;
         selectedItems = '';
-        emits('getOptionGroups', searchQuery)
+        emits('getOptionGroups', searchQuery);
       "
     />
   </div>

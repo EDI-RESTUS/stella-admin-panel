@@ -180,11 +180,16 @@ if (props.rowData) {
 }
 
 const submit = async () => {
-  axios.patch(`${url}/deliveryZones/${props.rowData._id}`, {
-    district: formData.value.district,
-    municipalities: formData.value.municipalities,
-    postalCodes: postalCodes.value.filter((postcode) => postcode.isChecked).map((postcode) => postcode.text),
-  })
-  showPostcodeModal.value = false
+  try {
+    await axios.patch(`${url}/deliveryZones/${props.rowData._id}`, {
+      district: formData.value.district,
+      municipalities: formData.value.municipalities,
+      postalCodes: postalCodes.value.filter((postcode) => postcode.isChecked).map((postcode) => postcode.text),
+    })
+    showPostcodeModal.value = false
+  } catch (error: any) {
+    const message = error?.response?.data?.message || 'Failed to update delivery zone'
+    init({ message, color: 'danger' })
+  }
 }
 </script>

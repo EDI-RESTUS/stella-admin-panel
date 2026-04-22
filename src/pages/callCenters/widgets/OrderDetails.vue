@@ -22,7 +22,7 @@
           size="small"
           class="flex-1 min-w-[200px]"
           input-class="text-xs pr-6"
-          @keypress.enter="applyPromoCode"
+          @keyup.enter="applyPromoCode"
         >
           <template #appendInner>
             <VaIcon v-if="isPromoValid" name="close" color="danger" class="cursor-pointer" @click="clearPromoCode" />
@@ -141,10 +141,17 @@
         </div>
 
         <!-- Offers -->
-        <div v-for="(item, index) in offersItems" :key="item.id" class="mb-2 border-b pb-2 last:border-none">
+        <div v-for="(item, index) in offersItems" :key="item.__storeIndex" class="mb-2 border-b pb-2 last:border-none">
           <div class="flex items-start justify-between">
             <div class="flex items-center gap-2">
               <VaButton icon="mso-close" color="danger" size="small" class="rounded" @click="deleteOffer(item)" />
+              <VaButton
+                icon="mso-content_copy"
+                :style="{ '--va-background-color': outlet.primaryColor }"
+                size="small"
+                class="rounded"
+                @click="duplicateOffer(item)"
+              />
             </div>
 
             <div class="flex-1 px-2">
@@ -170,9 +177,6 @@
                 <div v-for="selectedArticle in item.items" :key="selectedArticle.itemName" class="mt-2 text-xs">
                   <p class="font-semibold text-gray-800 mt-1 flex items-center gap-2">
                     <span class="mb-1">{{ selectedArticle.itemName }}</span>
-                    <span v-if="Number(selectedArticle.basePrice) > 0" class="text-xs font-normal text-gray-500">
-                      (€{{ Number(selectedArticle.basePrice).toFixed(2) }})
-                    </span>
                   </p>
 
                   <div class="flex flex-wrap gap-1 text-xs">
@@ -236,18 +240,27 @@
               <span class="text-gray-600">Subtotal</span>
               <span>€{{ subtotal.toFixed(2) }}</span>
             </div>
+
             <div v-if="orderType === 'delivery'" class="flex justify-between">
               <span class="text-gray-600">Delivery Fee</span>
               <span>€{{ deliveryFee.toFixed(2) }}</span>
             </div>
+
+            <div v-if="orderStore.editOrder" class="flex justify-between">
+              <span class="text-gray-600">Paid</span>
+              <span class="text-green-600">€{{ paidAmount.toFixed(2) }}</span>
+            </div>
+
             <div class="flex justify-between font-bold text-xs pt-1 border-t">
-              <span v-if="orderStore.editOrder">
-                Total
-                <span class="text-green-600"> · PAID €{{ (orderStore.editOrder.editOrderTotal || 0).toFixed(2) }}</span>
+              <span>Total</span>
+              <span>€{{ currentOrderTotal.toFixed(2) }}</span>
+            </div>
+
+            <div v-if="orderStore.editOrder" class="flex justify-between text-xs pt-0.5">
+              <span class="text-gray-600">Difference</span>
+              <span class="font-semibold" :class="editDifference > 0 ? 'text-red-600' : 'text-green-600'">
+                €{{ editDifference.toFixed(2) }}
               </span>
-              <span v-else>Total</span>
-              <span v-if="orderStore.editOrder">€{{ getTotalPrice }}</span>
-              <span v-else>€{{ total.toFixed(2) }}</span>
             </div>
           </template>
 
@@ -257,26 +270,37 @@
               <span class="text-gray-600">Subtotal</span>
               <span>€{{ (promoOriginalItems + promoOriginalOffers).toFixed(2) }}</span>
             </div>
+
             <div class="flex justify-between text-[10px] text-gray-500">
               <span>Items + Offers</span>
               <span>€{{ promoOriginalItems.toFixed(2) }} + €{{ promoOriginalOffers.toFixed(2) }}</span>
             </div>
+
             <div class="flex justify-between">
               <span class="text-gray-600">Discount</span>
               <span>€{{ (promoTotal.originalTotal - promoTotal.updatedTotal).toFixed(2) }}</span>
             </div>
+
             <div class="flex justify-between">
               <span class="text-gray-600">Delivery Fee</span>
               <span>€{{ Number(promoTotal.deliveryFee || 0).toFixed(2) }}</span>
             </div>
+
+            <div v-if="orderStore.editOrder" class="flex justify-between">
+              <span class="text-gray-600">Paid</span>
+              <span class="text-green-600">€{{ paidAmount.toFixed(2) }}</span>
+            </div>
+
             <div class="flex justify-between font-bold text-xs pt-1 border-t">
-              <span v-if="orderStore.editOrder">
-                Total
-                <span class="text-green-600"> · PAID €{{ (orderStore.editOrder.editOrderTotal || 0).toFixed(2) }}</span>
+              <span>Total</span>
+              <span>€{{ currentOrderTotal.toFixed(2) }}</span>
+            </div>
+
+            <div v-if="orderStore.editOrder" class="flex justify-between text-xs pt-0.5">
+              <span class="text-gray-600">Difference</span>
+              <span class="font-semibold" :class="editDifference > 0 ? 'text-red-600' : 'text-green-600'">
+                €{{ editDifference.toFixed(2) }}
               </span>
-              <span v-else>Total</span>
-              <span v-if="orderStore.editOrder">€{{ getTotalPrice }}</span>
-              <span v-else>€{{ promoTotal.updatedTotal.toFixed(2) }}</span>
             </div>
           </template>
         </div>
@@ -284,10 +308,10 @@
         <div class="px-4 pb-4">
           <div class="w-full relative">
             <!-- Overlay for disabled state to allow clicks for error message (optional, but requested 'pop up') -->
-            <div 
-               v-if="isServiceRestricted"
-               class="absolute inset-0 z-10 cursor-not-allowed"
-               @click="showRestrictedMessage"
+            <div
+              v-if="isServiceRestricted"
+              class="absolute inset-0 z-10 cursor-not-allowed"
+              @click="showRestrictedMessage"
             ></div>
             <VaButton
               :disabled="
@@ -330,14 +354,16 @@
       @cancelEdit="isEdit = false"
     />
     <CheckOutModal
-      v-model="showCheckoutModal"
-      :date-selected="dateSelected"
+      v-if="showCheckoutModal"
+      :date-selected="orderStore.orderDateTime || dateSelected"
       :delivery-fee="deliveryFee"
       :customer-details-id="customerDetailsId"
       :order-type="orderType"
       :promo-code="promoCode"
       :promo-codes="appliedPromoCodes"
+      :existing-order-id="existingOrderId"
       @cancel="closeCheckoutModal"
+      @success="onCheckoutSuccess"
     />
     <PromotionModal
       ref="promotionModal"
@@ -348,14 +374,14 @@
       :delivery-fee="deliveryFee"
       :customer-details-id="customerDetailsId"
       @cancel="closePromotionModal"
-      @selectCode="onCodeSelected"
-      @selectCodes="onCodesSelected"
+      @select-code="onCodeSelected"
+      @select-codes="onCodesSelected"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, useTemplateRef, watch, nextTick } from 'vue'
+import { ref, computed, useTemplateRef, watch, nextTick, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useOrderStore } from '@/stores/order-store'
 import { useServiceStore } from '@/stores/services.ts'
@@ -363,8 +389,13 @@ import MenuModal from '../modals/MenuModal.vue'
 import CheckOutModal from '../modals/CheckOutModal.vue'
 import OfferModal from '../modals/OfferModal.vue'
 import axios from 'axios'
-import { useToast, useModal } from 'vuestic-ui'
+import { useModal } from 'vuestic-ui'
+import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 import PromotionModal from '../modals/PromotionModal.vue'
+
+import { useMenuStore } from '@/stores/getMenu.js'
+import { useRoute, useRouter } from 'vue-router'
 
 const props = defineProps({
   isCustomerOpen: Boolean,
@@ -375,6 +406,11 @@ const props = defineProps({
   dateSelected: String,
 })
 
+const emit = defineEmits(['restore-context', 'success'])
+
+const route = useRoute()
+const router = useRouter()
+const menuStore = useMenuStore()
 const promotionRef = useTemplateRef('promotionModal')
 const serviceStore = useServiceStore()
 
@@ -389,8 +425,10 @@ const { cartItems, offerItems } = storeToRefs(orderStore)
 const money = (n) => (typeof n === 'number' ? n.toFixed(2) : '0.00')
 
 const formattedLabel = (sel) => {
-  const totalPrice = sel.price * sel.quantity
-  return totalPrice > 0 ? `${sel.name} (+€${totalPrice.toFixed(2)})` : sel.name
+  const qty = Number(sel.quantity) || 1
+  const totalPrice = sel.price * qty
+  const qtyPrefix = qty > 1 ? `${qty}× ` : ''
+  return totalPrice > 0 ? `${qtyPrefix}${sel.name} (+€${totalPrice.toFixed(2)})` : `${qtyPrefix}${sel.name}`
 }
 
 function isBetween11to23(dt) {
@@ -406,7 +444,24 @@ const isFutureTimeAllowed = computed(() => {
   if (!selectedDt.value) return false
   return isBetween11to23(selectedDt.value)
 })
+const paidAmount = computed(() => Number(orderStore.editOrder?.editOrderTotal || 0))
 
+const currentOrderTotal = computed(() => {
+  if (promoTotal.value) {
+    return Number(promoTotal.value.updatedTotal || 0)
+  }
+  return Number(total.value || 0)
+})
+
+const editDifference = computed(() => {
+  if (!orderStore.editOrder) return currentOrderTotal.value
+  return Number((currentOrderTotal.value - paidAmount.value).toFixed(2))
+})
+
+const extraToPay = computed(() => {
+  if (!orderStore.editOrder) return currentOrderTotal.value
+  return Math.max(0, editDifference.value)
+})
 const promoOriginalItems = computed(() => {
   const v = promoTotal.value
   if (!v?.menuItems) return 0
@@ -429,6 +484,16 @@ const promoOriginalOffers = computed(() => {
 })
 
 watch(
+  () => props.customerDetailsId,
+  (newVal, oldVal) => {
+    if (oldVal && newVal !== oldVal) {
+      clearPromoCode()
+      appliedPromoCodes.value = []
+    }
+  },
+)
+
+watch(
   [cartItems, offerItems],
   async (newVal, oldVal) => {
     // If no promo is applied, skip
@@ -441,6 +506,28 @@ watch(
     applyPromoCode()
   },
   { deep: true }, // watch nested changes in arrays/objects
+)
+
+// When an edit order is loaded, restore its promo codes and re-validate
+watch(
+  () => orderStore.editOrder,
+  async (editOrder) => {
+    if (!editOrder) return
+    const codes = Array.isArray(editOrder.promotionCodes) && editOrder.promotionCodes.length
+      ? editOrder.promotionCodes
+      : editOrder.promoCode
+      ? [editOrder.promoCode]
+      : []
+    if (!codes.length) return
+    appliedPromoCodes.value = codes
+    promoCode.value = codes.length === 1 ? codes[0] : codes.join(', ')
+    isPromoValid.value = true
+    // Cart is already populated by now — the cart-change watcher won't fire,
+    // so we must explicitly re-validate here.
+    await nextTick()
+    applyPromoCode()
+  },
+  { immediate: true },
 )
 
 const itemsAfterPromos = computed(() => {
@@ -474,6 +561,67 @@ function onCodesSelected(codes) {
   showPromotionModal.value = false
 }
 
+function getSelectedDeliveryZoneId() {
+  const zone = orderStore.deliveryZone
+  if (!zone) return ''
+  if (typeof zone === 'string') return zone
+  return zone._id || zone.id || ''
+}
+
+function resolvePromoOrderDateTime(fallback = new Date().toISOString()) {
+  if (!props.dateSelected) return fallback
+
+  const parsedDate = new Date(props.dateSelected)
+  return Number.isNaN(parsedDate.getTime()) ? fallback : parsedDate.toISOString()
+}
+
+function isFailedPaymentReturn() {
+  const paymentState = String(route.query.payment || route.query.status || '').toLowerCase()
+  return ['failed', 'cancel', 'cancelled', 'canceled'].includes(paymentState)
+}
+
+async function waitForRestoredCheckoutContext({ customerDetailId, deliveryZoneId, orderType }) {
+  const requiresZone = String(orderType || '').toLowerCase() === 'delivery' && !!deliveryZoneId
+
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const currentCustomerId = String(props.customerDetailsId || '')
+    const currentDeliveryZoneId = String(getSelectedDeliveryZoneId() || '')
+    const hasCustomer = !customerDetailId || currentCustomerId === String(customerDetailId)
+    const hasDeliveryZone = !requiresZone || currentDeliveryZoneId === String(deliveryZoneId)
+
+    if (hasCustomer && hasDeliveryZone) {
+      return
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+}
+
+async function restorePromoAfterPaymentRetry(codes, restoreContext) {
+  if (!codes.length) return
+
+  await waitForRestoredCheckoutContext(restoreContext)
+
+  const single = codes.length === 1 ? codes[0] : null
+  const promoPayload = buildPromoPayloadFromState(codes, {
+    orderFor: restoreContext.orderFor || orderFor.value,
+    customerDetailId: restoreContext.customerDetailId || props.customerDetailsId,
+    orderType: restoreContext.orderType || (props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery'),
+    deliveryZoneId: getSelectedDeliveryZoneId() || restoreContext.deliveryZoneId,
+    address: orderStore.address || restoreContext.address || '',
+    orderNotes: orderStore.orderNotes || restoreContext.orderNotes || '',
+    deliveryFee: Number(props.deliveryFee ?? restoreContext.deliveryFee ?? 0),
+    outletId: restoreContext.outletId || serviceStore.selectedRest,
+    orderDateTime: resolvePromoOrderDateTime(restoreContext.orderDateTime || new Date().toISOString()),
+    ...(single ? { promoCode: single } : {}),
+  })
+
+  const promoRes = await orderStore.validatePromoCode(promoPayload)
+  if (promoRes.data?.success) {
+    orderStore.setOrderTotal(promoRes.data.data)
+  }
+}
+
 // Check if the current service is restricted for the selected zone
 const isServiceRestricted = computed(() => {
   const zone = orderStore.deliveryZone
@@ -501,12 +649,13 @@ function showRestrictedMessage() {
 }
 
 function openCheckoutModal() {
+  log('CHECKOUT_OPENED', { orderType: props.orderType, itemCount: items.value.length + offersItems.value.length })
   if (!isFutureTimeAllowed.value) {
     const msg = 'Future orders must be between 11:00–23:00.'
-    init({ color: 'danger', message: msg })
+    showAlert(msg)
     return
   }
-  
+
   // Check if delivery is selected but no delivery zone is selected
   if (props.orderType === 'delivery' && !props.isDeliveryZoneSelected) {
     confirm({
@@ -518,7 +667,7 @@ function openCheckoutModal() {
     })
     return
   }
-  
+
   // Check if delivery is selected but no address is provided
   if (props.orderType === 'delivery' && !orderStore.address) {
     confirm({
@@ -530,7 +679,7 @@ function openCheckoutModal() {
     })
     return
   }
-  
+
   showCheckoutModal.value = true
 }
 
@@ -554,13 +703,9 @@ function parseSelectedDate(v) {
 
 const getTotalPrice = computed(() => {
   if (orderStore.editOrder) {
-    if (promoTotal.value) {
-      return (promoTotal.value.updatedTotal - orderStore.editOrder.editOrderTotal).toFixed(2) || 0
-    } else {
-      return (total.value - orderStore.editOrder.editOrderTotal).toFixed(2) || 0
-    }
+    return extraToPay.value.toFixed(2)
   }
-  return total.value.toFixed(2)
+  return currentOrderTotal.value.toFixed(2)
 })
 
 const orderItemsStyle = computed(() => {
@@ -640,30 +785,40 @@ const offersItems = computed(() =>
   offerItems.value.map((item, index) => {
     const items = []
     const subItems = []
-    item.selections.map((selection) => {
-      selection.addedItems.map((addedItems) => {
-        addedItems.selectedOptions.forEach((group) => {
-          group.selected.forEach((sel) => {
+
+    ;(item.selections || []).forEach((selection) => {
+      ;(selection.addedItems || []).forEach((addedItem) => {
+        ;(addedItem.selectedOptions || []).forEach((group) => {
+          ;(group.selected || []).forEach((sel) => {
             subItems.push({ text: formattedLabel(sel), type: sel.type })
           })
         })
       })
-      items.push(...selection.addedItems)
+
+      items.push(...(selection.addedItems || []))
     })
-    const totalPrice = item.selectionTotalPrice ? item.price + item.selectionTotalPrice : item.price
+
+    const quantity = Number(item.quantity || 1)
+    const basePrice = Number(item.basePrice ?? item.price ?? 0)
+    const selectionTotalPrice = Number(item.selectionTotalPrice ?? 0)
+
+    // Source of truth must be the store total if it already exists
+    const total = item.totalPrice != null ? Number(item.totalPrice) : (basePrice + selectionTotalPrice) * quantity
+
+    const unitTotal = quantity > 0 ? total / quantity : 0
 
     return {
-      id: item.itemId || index,
-      offerId: item.offerId,
+      id: item.offerId || item._id || item.itemId || index,
+      offerId: item.offerId || item._id,
       name: item.name,
-      quantity: item.quantity,
-      basePrice: item.price,
-      selectionTotalPrice: item.selectionTotalPrice,
+      quantity,
+      basePrice,
+      selectionTotalPrice,
       items,
-      unitTotal: totalPrice,
-      total: totalPrice * item.quantity,
-      fullItem: { ...item, offerId: item.offerId },
-      // fullItem: item,
+      subItems,
+      unitTotal,
+      total,
+      fullItem: { ...item, offerId: item.offerId || item._id },
       __storeIndex: index,
     }
   }),
@@ -822,18 +977,27 @@ const increaseQty = (item) => {
   if (index !== -1) {
     orderStore.cartItems[index].quantity++
     orderStore.calculateItemTotal(index)
+    log('CART_ITEM_QTY_INCREASED', { itemId: item.id, itemName: item.name, newQty: orderStore.cartItems[index].quantity })
   }
 }
 
 const deleteItem = (item) => {
   const index = cartItems.value.findIndex((i) => i.itemId === item.id)
+  log('CART_ITEM_REMOVED', { itemId: item.id, itemName: item.name })
   orderStore.cartItems.splice(index, 1)
   orderStore.calculateItemTotal(index)
 }
 
 const deleteOffer = (item) => {
-  const index = offerItems.value.findIndex((i) => i.itemId === item.id)
-  orderStore.offerItems.splice(index, 1)
+  log('CART_OFFER_REMOVED', { itemId: item.id, offerName: item.name })
+  orderStore.offerItems.splice(item.__storeIndex, 1)
+}
+
+const duplicateOffer = (item) => {
+  const storeItem = offerItems.value[item.__storeIndex]
+  const clone = JSON.parse(JSON.stringify(storeItem))
+  clone.itemId = `dup_${Date.now()}`
+  orderStore.offersAdded(clone)
 }
 
 const decreaseQty = (item) => {
@@ -841,6 +1005,7 @@ const decreaseQty = (item) => {
   if (index !== -1 && orderStore.cartItems[index].quantity > 1) {
     orderStore.cartItems[index].quantity--
     orderStore.calculateItemTotal(index)
+    log('CART_ITEM_QTY_DECREASED', { itemId: item.id, itemName: item.name, newQty: orderStore.cartItems[index].quantity })
   }
 }
 
@@ -849,6 +1014,15 @@ const showCheckoutModal = ref(false)
 
 function closeCheckoutModal() {
   showCheckoutModal.value = false
+  existingOrderId.value = ''
+}
+
+function onCheckoutSuccess() {
+  clearPromoCode()
+  appliedPromoCodes.value = []
+  showCheckoutModal.value = false
+  existingOrderId.value = ''
+  emit('success')
 }
 
 // -----------------TO OPEN THE EDIT MODAL-------------------------
@@ -857,8 +1031,11 @@ const selectedItemWithArticlesOptionsGroups = ref({})
 const showMenuModal = ref(false)
 const isEdit = ref(false)
 const isLoading = ref(false)
-const { init } = useToast()
+const { showAlert } = useCallCenterAlert()
 const { confirm } = useModal()
+const { log } = useCallCenterLogger()
+import { useToast } from 'vuestic-ui'
+const { init } = useToast()
 
 async function openPromotionModal() {
   const url = import.meta.env.VITE_API_BASE_URL
@@ -872,32 +1049,22 @@ async function openPromotionModal() {
       promotionData.value = validPromotions
       showPromotionModal.value = true
     } else {
-      init({ message: 'No promotions available at Call Center.', color: 'danger' })
+      showAlert('No promotions available at Call Center.')
     }
   } catch (error) {
-    init({ message: 'Invalid or expired promotion code.', color: 'danger' })
+    log('ERROR_FETCH_PROMOTIONS', { errorMessage: error?.response?.data?.message || 'Invalid or expired promotion code.' })
+    showAlert('Invalid or expired promotion code.')
   }
 }
 function parseCodes(raw) {
-  const tokens = (raw || '')
+  return (raw || '')
     .split(/[\s,;\n\r]+/g)
     .map((s) => s.trim())
     .filter(Boolean)
-
-  const seen = new Set()
-  const out = []
-  for (const t of tokens) {
-    const k = t.toLowerCase()
-    if (!seen.has(k)) {
-      seen.add(k)
-      out.push(t)
-    }
-  }
-  return out
 }
 
 // Build payload identical to the modal (keys + types)
-function buildPromoPayloadFromState(promoCodes) {
+function buildPromoPayloadFromState(promoCodes, overrides = {}) {
   const menuItems = orderStore.cartItems.map((e) => ({
     menuItem: e.itemId,
     quantity: e.quantity,
@@ -931,39 +1098,45 @@ function buildPromoPayloadFromState(promoCodes) {
     orderFor: orderFor.value,
     customerDetailId: props.customerDetailsId,
     orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
-    deliveryZoneId: orderStore.deliveryZone?._id,
+    deliveryZoneId: getSelectedDeliveryZoneId(),
     address: orderStore.address,
     menuItems,
     offerMenuItems,
     orderNotes: orderStore.orderNotes || '',
     deliveryFee: props.deliveryFee,
     outletId: serviceStore.selectedRest,
-    orderDateTime: new Date(props.dateSelected).toISOString(),
+    orderDateTime: resolvePromoOrderDateTime(),
     paymentMode: '',
     promoCodes: promoCodes, // array (no empty strings)
     hasOtherOffers: offerMenuItems.length, // number (not boolean)
+    ...overrides,
   }
 
-  if (single) payload.promoCode = single
+  if (single && !payload.promoCode) payload.promoCode = single
   return payload
 }
 
 async function applyPromoCode() {
   const codes = parseCodes(promoCode.value)
+console.log({
+  promoCodeRaw: promoCode.value,
+  parsedCodes: codes,
+})
+  
   if (!codes.length) {
-    init({ message: 'Please enter a promotion code.', color: 'warning' })
+    showAlert('Please enter a promotion code.')
     return
   }
   if (props.orderType === 'takeaway' && !props.isDeliveryZoneSelected) {
-    init({ message: 'Please select a delivery zone first.', color: 'warning' })
+    showAlert('Please select a delivery zone first.')
     return
   }
   if (!props.customerDetailsId) {
-    init({ message: 'Please select a customer first.', color: 'warning' })
+    showAlert('Please select a customer first.')
     return
   }
   if (total.value === 0) {
-    init({ message: 'Cart is empty. Please add items to the cart.', color: 'warning' })
+    showAlert('Cart is empty. Please add items to the cart.')
     return
   }
 
@@ -972,23 +1145,24 @@ async function applyPromoCode() {
     const response = await orderStore.validatePromoCode(payload)
 
     if (response.data && response.data.success) {
+      log('PROMO_CODE_APPLIED', { codes, success: true })
       orderStore.setOrderTotal(response.data.data)
       isPromoValid.value = true
       // ✅ keep the input readable and in sync
       promoCode.value = codes.join(', ')
+      appliedPromoCodes.value = codes
       init({ message: `PromoCode${codes.length > 1 ? 's' : ''} selected`, color: 'success' })
     } else {
       orderStore.setOrderTotal(null)
       isPromoValid.value = false
-      init({ message: (response.data && response.data.message) || 'PromoCode invalid', color: 'danger' })
+      log('PROMO_CODE_FAILED', { codes, success: false, errorMessage: response.data?.message || 'PromoCode invalid' })
+      showAlert((response.data && response.data.message) || 'PromoCode invalid')
     }
   } catch (err) {
     orderStore.setOrderTotal(null)
     isPromoValid.value = false
-    init({
-      message: (err && err.response && err.response.data && err.response.data.message) || 'PromoCode invalid',
-      color: 'danger',
-    })
+    log('PROMO_CODE_FAILED', { codes, errorMessage: err?.response?.data?.message || 'PromoCode invalid' })
+    showAlert((err && err.response && err.response.data && err.response.data.message) || 'PromoCode invalid')
   }
 }
 
@@ -996,7 +1170,7 @@ function clearPromoCode() {
   promoCode.value = ''
   isPromoValid.value = false
   if (promotionRef.value) {
-    promotionRef.value.selectedCode = ''
+    promotionRef.value.clearSelection()
   }
   orderStore.setOrderTotal(null)
 }
@@ -1023,7 +1197,8 @@ const getMenuOptions = async (selectedItem) => {
       openMenuModal()
     }
   } catch (error) {
-    init({ message: 'Something went wrong', color: 'danger' })
+    log('ERROR_EDIT_ITEM_FETCH', { itemId: selectedItem?.itemId, errorMessage: error?.response?.data?.message || 'Failed to fetch item options.' })
+    showAlert('Something went wrong. Please try again.')
   } finally {
     isLoading.value = false
   }
@@ -1074,6 +1249,140 @@ function closeOfferModal() {
 function closePromotionModal() {
   showPromotionModal.value = false
 }
+
+const existingOrderId = ref('')
+
+onMounted(async () => {
+  if (isFailedPaymentReturn() && route.query.orderId) {
+    console.log('[PaymentRetry] Detected failed payment redirect', route.query)
+    isLoading.value = true
+    try {
+      const oid = String(route.query.orderId)
+      // 1. Fetch order
+      const res = await orderStore.getOrderStatus(oid)
+      console.log('[PaymentRetry] Order status response:', res.data)
+
+      if (res.data?.data) {
+        const order = res.data.data
+        console.log('[PaymentRetry] Order data:', order)
+
+        // Check if SPECIFIC menu items are loaded
+        const requiredItemIds = (order.menuItems || []).map((i) => i.menuItem)
+        console.log('[PaymentRetry] Required Item IDs:', requiredItemIds)
+
+        let retries = 0
+        let allItemsFound = false
+
+        while (!allItemsFound && retries < 40) {
+          // Increased retries to 40 (20s)
+          const loadedIds = new Set(menuStore.unFilteredMenuItems.map((m) => m._id))
+          const missing = requiredItemIds.filter((id) => !loadedIds.has(id))
+
+          if (missing.length === 0) {
+            allItemsFound = true
+            console.log('[PaymentRetry] All required menu items found.')
+          } else {
+            console.warn(`[PaymentRetry] Missing items: ${missing.join(', ')}. Waiting... (${retries + 1}/40)`)
+            if (retries % 5 === 0) console.log(`[PaymentRetry] Loaded count: ${menuStore.unFilteredMenuItems.length}`)
+            await new Promise((resolve) => setTimeout(resolve, 500))
+            retries++
+          }
+        }
+
+        if (menuStore.unFilteredMenuItems.length === 0) {
+          console.error('[PaymentRetry] Menu items failed to load after timeout. Cart restoration may be incomplete.')
+          showAlert('Menu data missing. Order details may be incomplete.')
+        } else {
+          console.log('[PaymentRetry] Menu items loaded. Proceeding with restoration.')
+        }
+
+        // 2. Restore cart
+        await orderStore.restoreCartFromOrder(order, menuStore)
+        console.log('[PaymentRetry] Cart restored. Cart items:', orderStore.cartItems)
+
+        // 2b. Restore customer context saved before the Visa redirect
+        const savedCustomer = (() => {
+          try { return JSON.parse(sessionStorage.getItem('cc_pending_customer') || 'null') } catch { return null }
+        })()
+        sessionStorage.removeItem('cc_pending_customer')
+
+        const customerPhone = savedCustomer?.phone || order.phoneNo || ''
+        const customerName = savedCustomer?.customerName || order.customerName || ''
+        const deliveryZoneId = savedCustomer?.deliveryZoneId || order.deliveryZoneId || ''
+        const customerDetailsId = savedCustomer?.customerDetailId || order.customerDetailId
+        const restoredAddress = savedCustomer?.address || order.address || ''
+        const restoredDeliveryNotes = savedCustomer?.deliveryNotes ?? order.deliveryNotes ?? ''
+        const restoredOrderType = String(order.orderType || savedCustomer?.orderType || '').toLowerCase() === 'delivery'
+          ? 'Delivery'
+          : 'Takeaway'
+        orderStore.setCustomerName(customerName)
+
+        // 2c. Emit context to parent (index.vue) to update props
+        emit('restore-context', {
+          customerDetailsId: customerDetailsId,
+          orderType: restoredOrderType.toLowerCase(),
+          deliveryFee: Number(order.deliveryFee || 0),
+          isDeliveryZoneSelected: !!deliveryZoneId,
+          dateSelected: order.orderDateTime || order.createdAt,
+          order: {
+            ...order,
+            phoneNo: customerPhone,
+            customerName,
+            deliveryZoneId,
+            customerDetailId: customerDetailsId,
+            address: restoredAddress,
+            deliveryNotes: restoredDeliveryNotes,
+          },
+        })
+
+        existingOrderId.value = oid
+        orderStore.orderDateTime = order.orderDateTime || order.createdAt
+        console.log('[OrderDetails] Restored payment retry state. Opening checkout modal.')
+        showCheckoutModal.value = true
+
+        // Restore promo codes so the input field shows the applied codes
+        const codes = Array.isArray(order.promotionCodes) && order.promotionCodes.length
+          ? order.promotionCodes
+          : order.promotionCode
+          ? [order.promotionCode]
+          : []
+        if (codes.length) {
+          promoCode.value = codes.join(', ')
+          appliedPromoCodes.value = codes
+          isPromoValid.value = true
+          // Re-validate promo after the customer + zone restore has settled.
+          try {
+            await restorePromoAfterPaymentRetry(codes, {
+              orderFor: order.orderFor || 'current',
+              customerDetailId: customerDetailsId,
+              orderType: restoredOrderType,
+              deliveryZoneId,
+              address: restoredAddress,
+              orderNotes: order.orderNotes || '',
+              deliveryFee: order.deliveryFee || 0,
+              outletId: order.outletId,
+              orderDateTime: order.orderDateTime || order.createdAt,
+            })
+          } catch {
+            // promo may have expired — ignore, user can retry manually
+          }
+        }
+
+        const q = { ...route.query }
+        delete q.payment
+        delete q.orderId
+        delete q.status
+        router.replace({ query: q })
+      }
+    } catch (e) {
+      console.error('Failed to restore failed payment order', e)
+      log('ERROR_PAYMENT_RETRY_RESTORE', { orderId: oid, errorMessage: e?.message || 'Failed to restore order for retry.' })
+      showAlert('Failed to restore order for retry.')
+    } finally {
+      isLoading.value = false
+    }
+  }
+})
 </script>
 <style>
 .original-price {

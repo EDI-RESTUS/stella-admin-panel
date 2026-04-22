@@ -33,6 +33,8 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
+const { log } = useCallCenterLogger()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -59,17 +61,20 @@ const close = () => {
 
 const saveNote = () => {
   if (!note.value.trim()) return
+  log('ORDER_NOTE_ADDED', { orderId: props.orderId })
   emits('saved', { orderId: props.orderId, text: note.value })
   close()
 }
 
 const updateNote = () => {
   if (!note.value.trim()) return
+  log('ORDER_NOTE_UPDATED', { orderId: props.note.orderId })
   emits('updated', { orderId: props.note.orderId, text: note.value })
   close()
 }
 
 const removeNote = () => {
+  log('ORDER_NOTE_REMOVED', { orderId: props.note.orderId })
   emits('removed', { orderId: props.note.orderId })
   close()
 }

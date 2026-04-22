@@ -13,6 +13,7 @@ export const useOrderStore = defineStore('order', {
     deliveryZone: '',
     address: '',
     phoneNumber: '',
+    customerName: '',
     orderFor: 'current',
     orderNotes: '',
     deliveryNotes: '',
@@ -68,22 +69,25 @@ export const useOrderStore = defineStore('order', {
               .reduce((sum, it) => sum + Number(it.originalPrice) + Number(it.optionsPrice || 0), 0)
               .toFixed(2),
           )
-        : 0,
+        : s.cartItems.reduce((acc, item: any) => acc + (item.totalPrice || 0), 0),
 
     // Offers (before promos) = sum of basePrice in offerDetails
     originalOffersTotal: (s) =>
       s.validation?.offerDetails?.length
         ? Number(s.validation.offerDetails.reduce((sum, o) => sum + Number(o.basePrice || 0), 0).toFixed(2))
-        : 0,
+        : s.offerItems.reduce((acc, offer: any) => acc + (offer.totalPrice || 0), 0),
 
     // Items after promos = sum of updatedPrice
     itemsAfterPromos: (s) =>
       s.validation
         ? Number(s.validation.menuItems.reduce((sum, it) => sum + Number(it.updatedPrice || 0), 0).toFixed(2))
-        : 0,
+        : s.cartItems.reduce((acc, item: any) => acc + (item.totalPrice || 0), 0),
 
     // Offers after promos = backend aggregate updatedOffersTotal
-    offersAfterPromos: (s) => (s.validation ? Number((s.validation.updatedOffersTotal || 0).toFixed(2)) : 0),
+    offersAfterPromos: (s) =>
+      s.validation
+        ? Number((s.validation.updatedOffersTotal || 0).toFixed(2))
+        : s.offerItems.reduce((acc, offer: any) => acc + (offer.totalPrice || 0), 0),
 
     deliveryFeeValidated: (s) => (s.validation ? Number((s.validation.deliveryFee || 0).toFixed(2)) : 0),
 
@@ -211,9 +215,219 @@ export const useOrderStore = defineStore('order', {
       const url = import.meta.env.VITE_API_BASE_URL
       return await axios.get(`${url}/orders/${orderId}/status`)
     },
+    async restoreCartFromOrder(order: any, menuStore: any) {
+      const orderId = order.id || order._id
+      console.log('[OrderStore] Restoring cart from order:', orderId)
+      // 1. Clear current cart
+      this.resetEditOrder()
+      this.setCartItems([])
+      this.offerItems = []
+
+      // 2. Map Menu Items
+      const cartSeed = (order.menuItems || []).map((menuItem: any) => {
+        // Find cached menu details if available
+        // Ensure we are comparing strings
+        const targetId = String(menuItem.menuItem || '').trim()
+
+        // DEBUG: Log the first few available IDs to check format
+        if (menuStore.unFilteredMenuItems.length > 0) {
+          const sample = menuStore.unFilteredMenuItems[0]
+          console.log(
+            `[OrderStore] Debug ID format - Target: "${targetId}" | First Store Item: "${
+              sample._id
+            }" (type: ${typeof sample._id}) | Sample Name: ${sample.name}`,
+          )
+        }
+
+        const originalMenuItem = menuStore.unFilteredMenuItems.find((m: any) => {
+          const mId = String(m._id || m.id).trim()
+          return mId === targetId
+        })
+
+        if (!originalMenuItem) {
+          console.warn(`[OrderStore] Original menu item not found for ID: "${targetId}". Checking simple match...`)
+          const byName = menuStore.unFilteredMenuItems.find((m: any) => m.name === menuItem.name)
+          if (byName) {
+            console.log(`[OrderStore] !FOUND BY NAME! ID mismatch? Store ID: "${byName._id}" vs Target: "${targetId}"`)
+          }
+        } else {
+          console.log(`[OrderStore] Found original item: ${originalMenuItem.name} (${originalMenuItem._id})`)
+        }
+
+        // Build a mutable pool so each stored option is consumed only once,
+        // preventing the same option ID matching into multiple groups (e.g. Half & Half).
+        const remainingOptions = [...(menuItem.options || [])]
+
+        const mappedOptions = (originalMenuItem?.articlesOptionsGroup || [])
+          .map((group: any) => {
+            const selected = (group.articlesOptions || [])
+              .reduce((acc: any[], opt: any) => {
+                const idx = remainingOptions.findIndex(
+                  (o: any) => o.option === opt._id || o.option?._id === opt._id,
+                )
+                if (idx === -1) return acc
+                const found = remainingOptions.splice(idx, 1)[0]
+                acc.push({
+                  ...opt,
+                  optionId: opt._id,
+                  optionName: opt.name,
+                  price: parseFloat(opt.price) || 0,
+                  type: opt.type,
+                  quantity: Number(found.quantity) || 1,
+                  selected: true,
+                })
+                return acc
+              }, [])
+
+            if (!selected.length) return null
+
+            return {
+              groupId: group._id,
+              groupName: group.name,
+              categoryId:
+                originalMenuItem.categories && originalMenuItem.categories.length > 0
+                  ? originalMenuItem.categories[0].id
+                  : null,
+              menuItemId: originalMenuItem._id,
+              selected,
+            }
+          })
+          .filter(Boolean)
+
+        return {
+          orderId: orderId,
+          itemId: originalMenuItem?._id || menuItem.menuItem,
+          itemName: originalMenuItem?.name || menuItem.name || 'Unknown Item',
+          basePrice: parseFloat(originalMenuItem?.price) || 0,
+          price: parseFloat(originalMenuItem?.price) || 0,
+          totalPrice: 0,
+          imageUrl: menuItem.imageUrl || originalMenuItem?.imageUrl || '',
+          promotionCode: menuItem.promotionCode || '',
+          isRepeatedOrder: true,
+          quantity: menuItem.quantity,
+          isFree: !!menuItem.isFree,
+          selectedOptions: mappedOptions,
+        }
+      })
+
+      cartSeed.forEach((e: any) => {
+        this.addItemToCart(e)
+        const newIndex = this.cartItems.length - 1
+        this.calculateItemTotal(newIndex)
+      })
+
+      // 3. Map Offers - Fetch each offer so we know the selection groups,
+      //    then distribute stored offerItems into their correct group.
+      //    Without this, editing an offer after a failed-payment restore shows
+      //    empty selection slots (group _id / items don't match the stored shape).
+      if (order.offerDetails && order.offerDetails.length) {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL
+        for (const od of order.offerDetails) {
+          let fullOffer: any = null
+          try {
+            const params: Record<string, string> = {}
+            const dzId = (menuStore as any).deliveryZoneId
+            if (dzId) params.deliveryZoneId = dzId
+            const offerResp = await axios.get(`${baseUrl}/offers/${od.offerId}`, { params })
+            fullOffer = offerResp.data?.data || null
+          } catch (err) {
+            console.warn('[OrderStore] Failed to fetch offer for restore', od.offerId, err)
+          }
+
+          const buildOptionsFromOfferItem = (oi: any) =>
+            (oi.options || []).length
+              ? [
+                  {
+                    groupId: 'restored-group',
+                    groupName: 'Options',
+                    selected: (oi.options || []).map((opt: any) => ({
+                      optionId: opt.option || opt._id,
+                      name: opt.name,
+                      price: parseFloat(opt.price || 0),
+                      quantity: opt.quantity || 1,
+                      type: opt.type || 'extra',
+                    })),
+                  },
+                ]
+              : []
+
+          let selections: any[]
+          if (fullOffer && Array.isArray(fullOffer.selections) && fullOffer.selections.length) {
+            const remaining = [...(od.offerItems || [])]
+            selections = fullOffer.selections.map((group: any) => {
+              const groupItemIds = new Set(
+                (group.menuItems || []).map((mi: any) => String(mi.id || mi.menuItemId)),
+              )
+              const addedItems: any[] = []
+              for (let i = 0; i < remaining.length; ) {
+                const oi: any = remaining[i]
+                const oiId = String(oi.menuItem || '')
+                if (groupItemIds.has(oiId)) {
+                  const mi: any =
+                    (group.menuItems || []).find((m: any) => String(m.id || m.menuItemId) === oiId) || {}
+                  addedItems.push({
+                    itemId: oiId,
+                    itemName: oi.name || mi.name || 'Unknown Item',
+                    itemDescription: mi.description || '',
+                    basePrice: parseFloat(oi.price || mi.customPrice || mi.price || 0),
+                    imageUrl: mi.imageUrl || '',
+                    quantity: oi.quantity || 1,
+                    selectedOptions: buildOptionsFromOfferItem(oi),
+                    totalPrice: 0,
+                    selectionTotalPrice: 0,
+                  })
+                  remaining.splice(i, 1)
+                } else {
+                  i++
+                }
+              }
+              return { ...group, addedItems }
+            })
+          } else {
+            // Fallback: preserve legacy single-group shape if offer fetch failed
+            selections = [
+              {
+                addedItems: (od.offerItems || []).map((oi: any) => ({
+                  itemId: oi.menuItem || oi._id,
+                  itemName: oi.name,
+                  quantity: oi.quantity || 1,
+                  selectedOptions: buildOptionsFromOfferItem(oi),
+                })),
+              },
+            ]
+          }
+
+          this.offersAdded({
+            ...(fullOffer || {}),
+            _id: od.offerId,
+            offerId: od.offerId,
+            name: od.offerName, // CheckOutModal uses .name
+            basePrice: parseFloat(od.basePrice || 0),
+            price: parseFloat(od.totalPrice),
+            selectionTotalPrice: 0, // Already included in totalPrice usually
+            totalPrice: parseFloat(od.totalPrice),
+            quantity: 1,
+            selections,
+          })
+        }
+      }
+
+      // 4. Set context
+      this.setOrderFor(order.orderFor)
+      this.setDeliveryZone(order.deliveryZoneId ? { _id: order.deliveryZoneId } : '')
+      this.setAddress(order.address)
+      this.setOrderNotes(order.orderNotes || order.note)
+      this.setDeliveryNotes(order.deliveryNotes)
+      this.setPhoneNumber(order.phoneNo || order.customer?.MobilePhone || '')
+
+    },
     async cancelOrder(orderId: string) {
       const url = import.meta.env.VITE_API_BASE_URL
       return await axios.put(`${url}/orders/${orderId}/cancel`)
+    },
+    async patchOrder(orderId: string, payload: any) {
+      const url = import.meta.env.VITE_API_BASE_URL
+      return await axios.patch(`${url}/orders/${orderId}/patch`, payload)
     },
     async createPayment({ orderId: orderId, paymentTypeId: paymentTypeId }) {
       const url = import.meta.env.VITE_API_BASE_URL
@@ -236,6 +450,9 @@ export const useOrderStore = defineStore('order', {
     },
     setPhoneNumber(payload: string) {
       this.phoneNumber = payload
+    },
+    setCustomerName(payload: string) {
+      this.customerName = payload
     },
 
     // --- additions inside `actions: { ... }` ---

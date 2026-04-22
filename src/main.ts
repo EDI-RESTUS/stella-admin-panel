@@ -27,4 +27,12 @@ if (import.meta.env.VITE_APP_GTM_ENABLED) {
   )
 }
 
+import axios from 'axios'
+
+// Option 2A: Restore global Authorization header if present
+const savedAuth = localStorage.getItem('admin_auth')
+if (savedAuth) {
+  axios.defaults.headers.common.Authorization = savedAuth
+}
+
 app.mount('#app')

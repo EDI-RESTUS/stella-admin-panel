@@ -68,7 +68,9 @@ import { useOrderStore } from '@/stores/order-store'
 import SelectionGroup from './SelectionGroup.vue'
 import axios from 'axios'
 import { useMenuStore } from '@/stores/getMenu'
+import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
 const orderStore = useOrderStore()
+const { log } = useCallCenterLogger()
 
 const showOfferModal = ref(true)
 const emits = defineEmits(['cancel', 'cancel-edit'])
@@ -102,7 +104,7 @@ function getMenu() {
           const hasSelection = props.isEdit ? props.item.selections.find((a) => a._id === group._id) : null
           return {
             ...group,
-            addedItems: props.isEdit && hasSelection ? hasSelection.addedItems : [],
+            addedItems: props.isEdit && hasSelection ? JSON.parse(JSON.stringify(hasSelection.addedItems)) : [],
           }
         }),
       }
@@ -150,7 +152,7 @@ const { addOnPrice } = storeToRefs(menuStore)
 function addToBasket() {
   if (!props.isEdit) {
     orderStore.offersAdded({
-      ...offer.value,
+      ...JSON.parse(JSON.stringify(offer.value)),
       offerId: offer.value._id,
       selectionTotalPrice: addOnPrice.value,
       quantity: 1,
@@ -158,7 +160,7 @@ function addToBasket() {
     })
   } else {
     orderStore.offersUpdated({
-      ...offer.value,
+      ...JSON.parse(JSON.stringify(offer.value)),
       offerId: offer.value._id,
       selectionTotalPrice: addOnPrice.value,
       quantity: 1,
@@ -166,6 +168,11 @@ function addToBasket() {
       index: props.item.index,
     })
   }
+  log(props.isEdit ? 'OFFER_UPDATED_IN_CART' : 'OFFER_ADDED_TO_CART', {
+    offerId: offer.value?._id,
+    offerName: offer.value?.name,
+    price: offer.value?.price + addOnPrice.value,
+  })
   emits('cancel')
 }
 </script>
