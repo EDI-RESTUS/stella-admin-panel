@@ -425,8 +425,10 @@ const { cartItems, offerItems } = storeToRefs(orderStore)
 const money = (n) => (typeof n === 'number' ? n.toFixed(2) : '0.00')
 
 const formattedLabel = (sel) => {
-  const totalPrice = sel.price * sel.quantity
-  return totalPrice > 0 ? `${sel.name} (+€${totalPrice.toFixed(2)})` : sel.name
+  const qty = Number(sel.quantity) || 1
+  const totalPrice = sel.price * qty
+  const qtyPrefix = qty > 1 ? `${qty}× ` : ''
+  return totalPrice > 0 ? `${qtyPrefix}${sel.name} (+€${totalPrice.toFixed(2)})` : `${qtyPrefix}${sel.name}`
 }
 
 function isBetween11to23(dt) {

@@ -316,18 +316,27 @@ export const useOrderStore = defineStore('order', {
         this.calculateItemTotal(newIndex)
       })
 
-      // 3. Map Offers - Use order details directly
+      // 3. Map Offers - Fetch each offer so we know the selection groups,
+      //    then distribute stored offerItems into their correct group.
+      //    Without this, editing an offer after a failed-payment restore shows
+      //    empty selection slots (group _id / items don't match the stored shape).
       if (order.offerDetails && order.offerDetails.length) {
-        order.offerDetails.forEach((od: any) => {
-          // Construct selections from offerItems
-          // We group them into a single "Options" group per item to match CheckOutModal structure
-          const selections = [
-            {
-              addedItems: (od.offerItems || []).map((oi: any) => ({
-                itemId: oi.menuItem || oi._id,
-                itemName: oi.name,
-                quantity: oi.quantity || 1,
-                selectedOptions: [
+        const baseUrl = import.meta.env.VITE_API_BASE_URL
+        for (const od of order.offerDetails) {
+          let fullOffer: any = null
+          try {
+            const params: Record<string, string> = {}
+            const dzId = (menuStore as any).deliveryZoneId
+            if (dzId) params.deliveryZoneId = dzId
+            const offerResp = await axios.get(`${baseUrl}/offers/${od.offerId}`, { params })
+            fullOffer = offerResp.data?.data || null
+          } catch (err) {
+            console.warn('[OrderStore] Failed to fetch offer for restore', od.offerId, err)
+          }
+
+          const buildOptionsFromOfferItem = (oi: any) =>
+            (oi.options || []).length
+              ? [
                   {
                     groupId: 'restored-group',
                     groupName: 'Options',
@@ -339,12 +348,57 @@ export const useOrderStore = defineStore('order', {
                       type: opt.type || 'extra',
                     })),
                   },
-                ],
-              })),
-            },
-          ]
+                ]
+              : []
+
+          let selections: any[]
+          if (fullOffer && Array.isArray(fullOffer.selections) && fullOffer.selections.length) {
+            const remaining = [...(od.offerItems || [])]
+            selections = fullOffer.selections.map((group: any) => {
+              const groupItemIds = new Set(
+                (group.menuItems || []).map((mi: any) => String(mi.id || mi.menuItemId)),
+              )
+              const addedItems: any[] = []
+              for (let i = 0; i < remaining.length; ) {
+                const oi: any = remaining[i]
+                const oiId = String(oi.menuItem || '')
+                if (groupItemIds.has(oiId)) {
+                  const mi: any =
+                    (group.menuItems || []).find((m: any) => String(m.id || m.menuItemId) === oiId) || {}
+                  addedItems.push({
+                    itemId: oiId,
+                    itemName: oi.name || mi.name || 'Unknown Item',
+                    itemDescription: mi.description || '',
+                    basePrice: parseFloat(oi.price || mi.customPrice || mi.price || 0),
+                    imageUrl: mi.imageUrl || '',
+                    quantity: oi.quantity || 1,
+                    selectedOptions: buildOptionsFromOfferItem(oi),
+                    totalPrice: 0,
+                    selectionTotalPrice: 0,
+                  })
+                  remaining.splice(i, 1)
+                } else {
+                  i++
+                }
+              }
+              return { ...group, addedItems }
+            })
+          } else {
+            // Fallback: preserve legacy single-group shape if offer fetch failed
+            selections = [
+              {
+                addedItems: (od.offerItems || []).map((oi: any) => ({
+                  itemId: oi.menuItem || oi._id,
+                  itemName: oi.name,
+                  quantity: oi.quantity || 1,
+                  selectedOptions: buildOptionsFromOfferItem(oi),
+                })),
+              },
+            ]
+          }
 
           this.offersAdded({
+            ...(fullOffer || {}),
             _id: od.offerId,
             offerId: od.offerId,
             name: od.offerName, // CheckOutModal uses .name
@@ -353,9 +407,9 @@ export const useOrderStore = defineStore('order', {
             selectionTotalPrice: 0, // Already included in totalPrice usually
             totalPrice: parseFloat(od.totalPrice),
             quantity: 1,
-            selections: selections,
+            selections,
           })
-        })
+        }
       }
 
       // 4. Set context

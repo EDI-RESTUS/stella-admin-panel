@@ -14,6 +14,7 @@ const filterUser = ref('')
 const filterLevel = ref<'all' | 'error' | 'warning' | 'normal'>('all')
 const filterTimeFrom = ref('')
 const filterTimeTo = ref('')
+const filterOrderNo = ref('')
 
 const API = import.meta.env.VITE_API_BASE_URL
 
@@ -65,6 +66,13 @@ async function fetchLogs() {
   }
 }
 
+function matchesOrderNo(entry: any, q: string) {
+  if (!q) return true
+  const table = String(entry?.details?.tableNumber ?? '').toLowerCase()
+  const oid = String(entry?.details?.orderId ?? '').toLowerCase()
+  return table.includes(q) || oid.includes(q)
+}
+
 // ─── Filtering ───────────────────────────────────────────────────────────────
 const filteredLogs = computed(() => {
   let result = logs.value
@@ -92,6 +100,11 @@ const filteredLogs = computed(() => {
       const d = new Date(l.timestamp)
       return d.getHours() * 60 + d.getMinutes() <= th * 60 + tm
     })
+  }
+
+  if (filterOrderNo.value.trim()) {
+    const q = filterOrderNo.value.trim().toLowerCase()
+    result = result.filter((l) => matchesOrderNo(l, q))
   }
 
   return [...result].reverse()
@@ -209,7 +222,13 @@ const sessions = computed((): Session[] => {
 
   for (const s of result) s.outcome = sessionOutcome(s.logs)
 
-  return result.reverse()
+  let final = result
+  if (filterOrderNo.value.trim()) {
+    const q = filterOrderNo.value.trim().toLowerCase()
+    final = final.filter((s) => s.logs.some((l) => matchesOrderNo(l, q)))
+  }
+
+  return final.reverse()
 })
 
 const expandedSession = ref<number | null>(null)
@@ -284,6 +303,14 @@ const sessionBorder: Record<Session['outcome'], string> = {
         v-model="filterUser"
         placeholder="Filter by user..."
         label="User"
+        style="min-width: 180px"
+        clearable
+      />
+
+      <VaInput
+        v-model="filterOrderNo"
+        placeholder="Filter by order no..."
+        label="Order No"
         style="min-width: 180px"
         clearable
       />
@@ -429,12 +456,12 @@ const sessionBorder: Record<Session['outcome'], string> = {
               {{ formatTime(session.startTimestamp) }} – {{ formatTime(session.lastTimestamp) }}
             </span>
 
-            <!-- Order ID if completed -->
+            <!-- Order No (tableNumber) if completed -->
             <span
               v-if="session.outcome === 'completed'"
               class="text-xs font-mono bg-green-50 border border-green-200 text-green-800 rounded px-2 py-0.5 shrink-0"
             >
-              {{ session.logs.find((l) => l.action === 'ORDER_PLACED')?.details?.orderId || '' }}
+              #{{ session.logs.find((l) => l.action === 'ORDER_PLACED')?.details?.tableNumber ?? '—' }}
             </span>
 
             <span class="ml-auto text-xs text-slate-400">{{ session.logs.length }} events</span>
@@ -460,7 +487,7 @@ const sessionBorder: Record<Session['outcome'], string> = {
                   <span class="text-slate-500">→ {{ formatDatetime(entry.details.datetime) }}</span>
                 </template>
                 <template v-else-if="entry.action === 'ORDER_PLACED'">
-                  <span class="text-slate-500">orderId: {{ entry.details?.orderId }} | table: {{ entry.details?.tableNumber ?? '—' }} | {{ entry.details?.orderType }}</span>
+                  <span class="text-slate-500">order #{{ entry.details?.tableNumber ?? '—' }} | {{ entry.details?.orderType }}</span>
                 </template>
                 <template v-else-if="entry.details && Object.keys(entry.details).length">
                   <span class="text-slate-400 truncate max-w-xs">{{ JSON.stringify(entry.details) }}</span>
