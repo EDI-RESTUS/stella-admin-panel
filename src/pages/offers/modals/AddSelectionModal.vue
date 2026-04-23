@@ -808,9 +808,25 @@ const getArticles = async () => {
       }),
     }
   })
+  // Sort to match the Sort Menu screen: selected items first, then by the
+  // item's lowest per-category sortOrder (so e.g. pizzas appear in the same
+  // order the operator dragged them in Sort Menu → Articles). Falls back to
+  // name when sortOrder is missing/equal.
+  const primarySortOrder = (item: any): number => {
+    const cats = Array.isArray(item?.categories) ? item.categories : []
+    let smallest = Number.POSITIVE_INFINITY
+    for (const c of cats) {
+      const so = typeof c?.sortOrder === 'number' ? c.sortOrder : Number.POSITIVE_INFINITY
+      if (so < smallest) smallest = so
+    }
+    return smallest
+  }
   items.value.sort((a: any, b: any) => {
     if (!!a.selected && !b.selected) return -1
     if (!a.selected && !!b.selected) return 1
+    const aOrd = primarySortOrder(a)
+    const bOrd = primarySortOrder(b)
+    if (aOrd !== bOrd) return aOrd - bOrd
     return localName(a.name).localeCompare(localName(b.name))
   })
   itemsVersion.value++

@@ -44,8 +44,8 @@
                             'bg-amber-100 text-amber-700': option.type.toLowerCase() === 'modifier',
                           }"
                         >
-                          {{ option.name }}
-                          <span v-if="option.price">€{{ (option.price * option.quantity).toFixed(2) }}</span>
+                          <template v-if="(option.quantity || 1) > 1">{{ option.quantity }}× </template>{{ option.name }}
+                          <span v-if="option.price">€{{ (option.price * (option.quantity || 1)).toFixed(2) }}</span>
                         </span>
                       </div>
                     </div>
@@ -106,8 +106,8 @@
                                 'bg-amber-100 text-amber-700': option.type.toLowerCase() === 'modifier',
                               }"
                             >
-                              {{ option.name }}
-                              <span v-if="option.price">(+€{{ (option.price * option.quantity).toFixed(2) }})</span>
+                              <template v-if="(option.quantity || 1) > 1">{{ option.quantity }}× </template>{{ option.name }}
+                              <span v-if="option.price">(+€{{ (option.price * (option.quantity || 1)).toFixed(2) }})</span>
                             </span>
                           </div>
                         </div>
@@ -204,7 +204,7 @@
               <div class="pt-4">
                 <button
                   id="confirmBtn"
-                  :disabled="apiLoading || !selectedPayment"
+                  :disabled="apiLoading || orderSubmitted || !selectedPayment"
                   class="btn btn-primary !w-full !min-w-0 py-2 !text-2xl"
                   @click="orderStore.editOrder ? updateOrder() : createOrder()"
                 >
@@ -320,6 +320,7 @@ import axios from 'axios'
 const showCheckoutModal = ref(true)
 const selectedPayment: any = ref(null)
 const apiLoading = ref(false)
+const orderSubmitted = ref(false)
 const emits = defineEmits(['cancel', 'success', 'view-history'])
 const { init } = useToast()
 const { confirm } = useModal()
@@ -751,6 +752,7 @@ async function checkPaymentStatus(requestId: string, paymentId: string, isPollin
 }
 
 function handlePaymentSuccess() {
+  orderSubmitted.value = true
   log('ORDER_PLACED', {
     orderId: orderResponse.value?.data?.data?._id || orderId.value,
     tableNumber: completedOrderData.value?.tableNumber || orderStore.editOrder?.tableNumber || null,
@@ -996,6 +998,7 @@ onUnmounted(() => {
 })
 
 async function updateOrder() {
+  if (apiLoading.value || orderSubmitted.value) return
   apiLoading.value = true
 
   // --- Detect promo codes (from props OR original order) ---
@@ -1096,6 +1099,7 @@ async function updateOrder() {
     if (res.data.status === 'Failed') {
       showAlert(res.data.message)
     } else {
+      orderSubmitted.value = true
       init({ message: res.data.message, color: 'success' })
     }
     orderStore.editOrder = null as any
@@ -1267,6 +1271,7 @@ async function updateOrderWithPromo(promoCodes: string[]) {
     if (res.data?.status === 'Failed') {
       showAlert(res.data?.message || 'Order edit failed')
     } else {
+      orderSubmitted.value = true
       init({ message: res.data?.message || 'Order updated with promo', color: 'success' })
     }
     orderStore.editOrder = null as any
@@ -1389,6 +1394,7 @@ function normalizeCodes(singleStr, codesArr) {
 }
 
 async function createOrder(force = false) {
+  if (apiLoading.value || orderSubmitted.value) return
   log('PAYMENT_INITIATED', {
     paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
     orderType: props.orderType,

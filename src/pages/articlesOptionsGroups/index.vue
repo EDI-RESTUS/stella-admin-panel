@@ -27,9 +27,7 @@ const getOptionGroups = async () => {
           searchValue.value,
         )}&sortKey=${encodeURIComponent(sortBy.value)}&sortValue=${encodeURIComponent(
           sortOrder.value,
-        )}&outletId=${encodeURIComponent(servicesStore.selectedRest)}${
-          activeOnly.value ? '&isActive=true' : ''
-        }&rawName=true`,
+        )}&outletId=${encodeURIComponent(servicesStore.selectedRest)}&isActive=${activeOnly.value}&rawName=true`,
     )
     const rawData = response.data
     const item = Array.isArray(rawData) ? rawData : rawData.items || rawData.result || []
@@ -71,7 +69,7 @@ const getOptionGroupsCount = () => {
     .get(
       `${url}/articles-options-groups/count?outletId=${servicesStore.selectedRest}&search=${encodeURIComponent(
         searchValue.value,
-      )}${activeOnly.value ? '&isActive=true' : ''}`,
+      )}&isActive=${activeOnly.value}`,
     )
     .then((response) => {
       count.value = Number(response.data.data || response.data.totalNoRec || response.data.count || 0)

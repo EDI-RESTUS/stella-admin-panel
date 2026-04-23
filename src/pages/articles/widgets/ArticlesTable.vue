@@ -183,7 +183,11 @@ const getAllergenNames = (id) => {
 }
 
 watch(currentPage, (newPage) => {
-  emits('getArticlesForPagination', { page: currentPage.value, searchQuery: searchQuery.value })
+  emits('getArticlesForPagination', {
+    page: currentPage.value,
+    searchQuery: searchQuery.value,
+    activeOnly: activeOnly.value,
+  })
 })
 watch(searchQuery, () => {
   // clear previous timer
@@ -195,6 +199,7 @@ watch(searchQuery, () => {
       page: currentPage.value,
       searchQuery: searchQuery.value,
       categoryFilter: selectedCategoryFilter.value,
+      activeOnly: activeOnly.value,
     })
   }, 500) // 500ms delay
 })
@@ -241,12 +246,16 @@ const filteredItems = computed(() => {
     )
   }
 
-  // Active-only filter
-  if (activeOnly.value) {
-    result = result.filter((item) => item.isActive)
-  }
-
   return result
+})
+
+watch(activeOnly, () => {
+  currentPage.value = 1
+  emits('getArticlesForPagination', {
+    page: 1,
+    searchQuery: searchQuery.value,
+    activeOnly: activeOnly.value,
+  })
 })
 
 const totalVisibleCount = computed(() => {
@@ -442,10 +451,12 @@ function openFileModal(data) {
 
       <!-- Right: Buttons -->
       <div class="flex flex-wrap gap-2 justify-end items-center flex-shrink-0">
-        <!-- Active Only Toggle -->
+        <!-- Active / Inactive Toggle -->
         <div class="flex items-center gap-1">
-          <span class="hidden md:inline text-sm font-medium text-slate-700 dark:text-slate-200">Active Only</span>
-          <label class="relative inline-block w-9 h-5 cursor-pointer">
+          <span class="hidden md:inline text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ activeOnly ? 'Active' : 'Inactive' }}
+          </span>
+          <label class="relative inline-block w-9 h-5 cursor-pointer" title="Toggle to show inactive articles">
             <input v-model="activeOnly" type="checkbox" class="sr-only" />
             <!-- Track -->
             <span

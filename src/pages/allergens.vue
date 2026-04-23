@@ -24,13 +24,13 @@ const items = toRef(props, 'items')
 </script>
 
 <template>
-  <div class="flex flex-col h-full p-4 mt-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm">
+  <div class="flex flex-col h-full p-4 mt-4 bg-white rounded-xl shadow-sm">
     <!-- HEADER -->
     <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
       <!-- Left: Title -->
       <div class="flex flex-1 min-w-0 items-center gap-4 flex-wrap">
         <div class="flex items-center gap-2 flex-shrink-0 mt-1">
-          <h1 class="text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight">Allergens</h1>
+          <h1 class="text-2xl font-semibold text-slate-800 tracking-tight">Allergens</h1>
         </div>
       </div>
       <!-- Right: empty for spacing consistency -->
@@ -60,12 +60,30 @@ const items = toRef(props, 'items')
 
 <style lang="scss" scoped>
 .va-data-table {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+
   ::v-deep(.va-data-table__table-tr) {
     border-bottom: 1px solid var(--va-background-border);
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  ::v-deep(.va-data-table__table td),
+  ::v-deep(.va-data-table__table th) {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  ::v-deep(.va-data-table__table thead tr),
+  ::v-deep(.va-data-table__table thead th) {
+    background-color: #f8fafc !important;
+    color: #64748b !important;
   }
 }
 
-::v-deep(.va-data-table__table tbody tr:hover) {
-  background-color: #f8fafc;
+::v-deep(.va-data-table__table tbody tr:hover),
+::v-deep(.va-data-table__table tbody tr:hover td) {
+  background-color: #f8fafc !important;
 }
 </style>

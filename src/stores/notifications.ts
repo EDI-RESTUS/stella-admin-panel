@@ -63,6 +63,18 @@ export const useNotificationsStore = defineStore('notifications', {
       await Promise.all(unread.map((n) => this.markRead(n._id)))
     },
 
+    async retry(id: string): Promise<{ manualRetryCount: number; escalated: boolean; alreadySent?: boolean } | null> {
+      try {
+        const { data } = await axios.post(`${apiBaseUrl}/notifications/${id}/retry`)
+        const item = this.items.find((n) => n._id === id)
+        if (item) item.read = true
+        return data?.data ?? null
+      } catch (err: any) {
+        console.error('[notifications] retry error:', err)
+        throw err
+      }
+    },
+
     startPolling(intervalMs = 30_000) {
       this.fetchNotifications()
       if (this._pollInterval) clearInterval(this._pollInterval)

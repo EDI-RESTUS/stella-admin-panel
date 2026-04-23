@@ -195,8 +195,19 @@ const onButtonOptionGroupsDelete = async (payload) => {
   })
 
   if (result) {
-    await updateData({ ...payload, isDeleted: true })
-    emits('getOptionGroups', searchQuery.value)
+    const url = import.meta.env.VITE_API_BASE_URL
+    await axios
+      .delete(`${url}/articles-options-groups/${payload._id}`)
+      .then(() => {
+        init({ message: 'Option Group successfully deleted', color: 'success' })
+        emits('getOptionGroups', searchQuery.value)
+      })
+      .catch((err) => {
+        init({
+          message: err.response?.data?.message || err.response?.data?.error || 'Failed to delete option group',
+          color: 'danger',
+        })
+      })
   }
 }
 
@@ -275,10 +286,10 @@ const openEditGroupModal = (group) => {
       </div>
 
       <div class="flex items-center gap-2">
-        <!-- Active Only Toggle -->
+        <!-- Active / Inactive Toggle -->
         <div class="flex items-center gap-2">
-          <span class="text-sm font-medium text-slate-700">Active Only</span>
-          <label class="relative inline-block w-9 h-5 cursor-pointer">
+          <span class="text-sm font-medium text-slate-700">{{ activeOnly ? 'Active' : 'Inactive' }}</span>
+          <label class="relative inline-block w-9 h-5 cursor-pointer" title="Toggle to show inactive option groups">
             <input v-model="activeOnly" type="checkbox" class="sr-only" />
             <span
               class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"

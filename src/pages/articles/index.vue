@@ -28,6 +28,7 @@ const selectedArticle = ref('')
 const isLoading = ref(true)
 const route = useRoute()
 const categories = ref([])
+const activeOnly = ref(true)
 
 const getArticles = async (outletId) => {
   items.value = []
@@ -35,7 +36,7 @@ const getArticles = async (outletId) => {
   isLoading.value = true
   const url = import.meta.env.VITE_API_BASE_URL
 
-  const queryString = `outletId=${outletId}&limit=50&page=${pageNumber.value}&search=${searchQuery.value}&sortKey=${sortBy.value}&sortValue=${sortOrder.value}`
+  const queryString = `outletId=${outletId}&limit=50&page=${pageNumber.value}&search=${searchQuery.value}&sortKey=${sortBy.value}&sortValue=${sortOrder.value}&isActive=${activeOnly.value}`
 
   try {
     const response = await axios.get(`${url}/menuItems?${queryString}`, { timeout: 60000 })
@@ -165,19 +166,10 @@ watch(
 )
 
 async function deleteArticle(payload) {
-  const data = {
-    id: payload._id,
-  }
   const url = import.meta.env.VITE_API_BASE_URL
   axios
-    .patch(`${url}/menuItems/${payload._id}`, {
-      isDeleted: true,
-    })
-    .then((response) => {
-      items.value = response.data
-      isLoading.value = false
-    })
-    .then((response) => {
+    .delete(`${url}/menuItems/${payload._id}`)
+    .then(() => {
       init({
         message: "You've successfully deleted Article",
         color: 'success',
@@ -186,7 +178,7 @@ async function deleteArticle(payload) {
     })
     .catch((err) => {
       init({
-        message: err.response.data.error,
+        message: err.response?.data?.error || err.response?.data?.message || 'Failed to delete article',
         color: 'danger',
       })
     })
@@ -195,6 +187,9 @@ async function deleteArticle(payload) {
 async function getArticlesForPagination(payload) {
   pageNumber.value = payload.page
   searchQuery.value = payload.searchQuery
+  if (typeof payload.activeOnly === 'boolean') {
+    activeOnly.value = payload.activeOnly
+  }
   await getArticles(serviceStore.selectedRest)
   buildStockMapFromItems()
 }

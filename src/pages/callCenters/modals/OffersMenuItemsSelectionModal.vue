@@ -13,7 +13,7 @@
       <div class="modal-body">
         <div class="pizzas-grid">
           <div
-            v-for="item in menuItems.sort((a, b) => (selectedArticle && selectedArticle.id === a.id ? -1 : 1))"
+            v-for="item in sortedMenuItems"
             :key="item._id"
             class="pizza-card"
             :class="{
@@ -56,7 +56,7 @@
 </template>
 
 <script setup>
-import { ref, defineExpose, defineEmits, onMounted } from 'vue'
+import { ref, computed, defineExpose, defineEmits, onMounted } from 'vue'
 import OffersMenuModal from './OffersMenuModal.vue'
 import { useMenuStore } from '@/stores/getMenu'
 import { storeToRefs } from 'pinia'
@@ -79,6 +79,37 @@ const showOptionsGroup = ref(false)
 let groupItemIndex = -1
 let addedItemIndex = -1
 const { offer } = storeToRefs(menuStore)
+
+// Order the slot's items to match the Sort Menu screen.
+// The offer's menuItems arrive enriched with { id, name, price, ... } but
+// without categories/sortOrder, so we look each one up in the full menu
+// (menuStore.unFilteredMenuItems) where each doc carries categories[{id, sortOrder}].
+// We use the item's lowest sortOrder across its categories as a stable rank,
+// then keep the currently-selected item pinned to the top.
+const sortedMenuItems = computed(() => {
+  const all = menuStore.unFilteredMenuItems || []
+  const orderMap = new Map()
+  for (const mi of all) {
+    const cats = Array.isArray(mi?.categories) ? mi.categories : []
+    let smallest = Number.POSITIVE_INFINITY
+    for (const c of cats) {
+      const so = typeof c?.sortOrder === 'number' ? c.sortOrder : Number.POSITIVE_INFINITY
+      if (so < smallest) smallest = so
+    }
+    orderMap.set(String(mi._id), smallest)
+  }
+  const rank = (item) => orderMap.get(String(item?.id ?? item?._id)) ?? Number.POSITIVE_INFINITY
+  return [...(props.menuItems || [])].sort((a, b) => {
+    const aSelected = selectedArticle.value && selectedArticle.value.id === a.id
+    const bSelected = selectedArticle.value && selectedArticle.value.id === b.id
+    if (aSelected && !bSelected) return -1
+    if (bSelected && !aSelected) return 1
+    const aOrd = rank(a)
+    const bOrd = rank(b)
+    if (aOrd !== bOrd) return aOrd - bOrd
+    return String(a?.name || '').localeCompare(String(b?.name || ''))
+  })
+})
 
 onMounted(() => {
   if (props.isEdit) {
