@@ -1,11 +1,23 @@
 <script setup lang="ts">
 import { defineVaDataTableColumns, useModal, useToast } from 'vuestic-ui'
 import { useRouter } from 'vue-router'
-import { ref, toRef } from 'vue'
+import { ref, toRef, computed } from 'vue'
 import { useServiceStore } from '@/stores/services'
+import { useUsersStore } from '@/stores/users'
 import PostCodeModal from '../modals/PostCodeModal.vue'
 import EditDeliveryZoneModal from '../modals/EditDeliveryZoneModal.vue'
 import axios from 'axios'
+
+const usersStore = useUsersStore()
+const isSupervisor = computed(() => (usersStore.userDetails as any)?.role === 'supervisor')
+
+// Supervisor is permitted to change ONLY the D/T checkboxes in the CC and WEB
+// columns. Every other inline edit trigger routes through this guard so the
+// row can't flip into edit mode when the current user is a supervisor.
+const tryEdit = (cb: () => void) => {
+  if (isSupervisor.value) return
+  cb()
+}
 const emits = defineEmits(['getDeliveryZones', 'openModal'])
 const props = defineProps({
   items: {
@@ -161,7 +173,7 @@ const items = toRef(props, 'items')
     <div class="flex items-center justify-between mb-4">
       <h1 class="page-title">Delivery Zones</h1>
       <div class="flex gap-2">
-        <VaButton size="small" color="primary" @click="emits('openModal')">Add Delivery Zone</VaButton>
+        <VaButton v-if="!isSupervisor" size="small" color="primary" @click="emits('openModal')">Add Delivery Zone</VaButton>
       </div>
     </div>
     <VaDataTable
@@ -178,8 +190,9 @@ const items = toRef(props, 'items')
       <template #cell(postalCodes)="{ rowData }">
         <div
           v-if="!rowData.postalCodes.length"
-          class="min-h-[24px] cursor-pointer"
-          @click="openPostcodeModal(rowData)"
+          class="min-h-[24px]"
+          :class="{ 'cursor-pointer': !isSupervisor }"
+          @click="tryEdit(() => openPostcodeModal(rowData))"
         ></div>
         <div class="flex gap-1 flex-wrap">
           <template v-if="rowData.postalCodes.length <= 2">
@@ -188,9 +201,9 @@ const items = toRef(props, 'items')
               :key="postCode"
               color="#B3D943"
               size="small"
-              class="cursor-pointer"
+              :class="{ 'cursor-pointer': !isSupervisor }"
               :text="postCode"
-              @click="openPostcodeModal(rowData)"
+              @click="tryEdit(() => openPostcodeModal(rowData))"
             />
           </template>
           <template v-else>
@@ -199,26 +212,31 @@ const items = toRef(props, 'items')
               :key="postCode"
               color="#B3D943"
               size="small"
-              class="cursor-pointer"
+              :class="{ 'cursor-pointer': !isSupervisor }"
               :text="postCode"
-              @click="openPostcodeModal(rowData)"
+              @click="tryEdit(() => openPostcodeModal(rowData))"
             />
             <VaBadge
               :text="`+${rowData.postalCodes.length - 2} more`"
               color="#B3D943"
-              class="cursor-pointer"
-              @click="openPostcodeModal(rowData)"
+              :class="{ 'cursor-pointer': !isSupervisor }"
+              @click="tryEdit(() => openPostcodeModal(rowData))"
             />
           </template>
         </div>
       </template>
       <template #cell(isActive)="{ rowData }">
         <div class="table-cell-content">
-          <VaCheckbox v-model="rowData.isActive" size="small" @click="updateData(rowData)" />
+          <VaCheckbox
+            v-model="rowData.isActive"
+            size="small"
+            :disabled="isSupervisor"
+            @click="isSupervisor ? null : updateData(rowData)"
+          />
         </div>
       </template>
       <template #cell(serviceZoneId)="{ rowData }">
-        <div class="max-w-[120px] ellipsis" @click="rowData.editServiceZoneId = true">
+        <div class="max-w-[120px] ellipsis" @click="tryEdit(() => (rowData.editServiceZoneId = true))">
           <input
             v-if="rowData.editServiceZoneId"
             v-model="rowData.serviceZoneId"
@@ -234,7 +252,7 @@ const items = toRef(props, 'items')
       </template>
       <template #cell(name)="{ rowData }">
         <div class="table-cell-content">
-          <div v-if="!rowData.editName" @click="rowData.editName = true">{{ rowData.name }}</div>
+          <div v-if="!rowData.editName" @click="tryEdit(() => (rowData.editName = true))">{{ rowData.name }}</div>
           <input
             v-else
             v-model="rowData.name"
@@ -245,7 +263,7 @@ const items = toRef(props, 'items')
         </div>
       </template>
       <template #cell(deliveryCharge)="{ rowData }">
-        <div class="max-w-[120px] ellipsis" @click="rowData.editDeliveryCharge = true">
+        <div class="max-w-[120px] ellipsis" @click="tryEdit(() => (rowData.editDeliveryCharge = true))">
           <input
             v-if="rowData.editDeliveryCharge"
             v-model="rowData.deliveryCharge"
@@ -260,7 +278,7 @@ const items = toRef(props, 'items')
         </div>
       </template>
       <template #cell(futureOrderPromiseTime)="{ rowData }">
-        <div class="max-w-[120px] ellipsis" @click="rowData.editFutureOrderPromiseTime = true">
+        <div class="max-w-[120px] ellipsis" @click="tryEdit(() => (rowData.editFutureOrderPromiseTime = true))">
           <input
             v-if="rowData.editFutureOrderPromiseTime"
             v-model="rowData.futureOrderPromiseTime"
@@ -275,7 +293,7 @@ const items = toRef(props, 'items')
         </div>
       </template>
       <template #cell(deliveryPromiseTime)="{ rowData }">
-        <div class="max-w-[120px] ellipsis" @click="rowData.editDeliveryPromiseTime = true">
+        <div class="max-w-[120px] ellipsis" @click="tryEdit(() => (rowData.editDeliveryPromiseTime = true))">
           <input
             v-if="rowData.editDeliveryPromiseTime"
             v-model="rowData.deliveryPromiseTime"
@@ -290,7 +308,7 @@ const items = toRef(props, 'items')
         </div>
       </template>
       <template #cell(takeawayPromiseTime)="{ rowData }">
-        <div class="max-w-[120px] ellipsis" @click="rowData.editTakeawayPromiseTime = true">
+        <div class="max-w-[120px] ellipsis" @click="tryEdit(() => (rowData.editTakeawayPromiseTime = true))">
           <input
             v-if="rowData.editTakeawayPromiseTime"
             v-model="rowData.takeawayPromiseTime"
@@ -306,7 +324,7 @@ const items = toRef(props, 'items')
       </template>
       <template #cell(terminalNumber)="{ rowData }">
         <div class="table-cell-content">
-          <div v-if="!rowData.editTerminalNumber" @click="rowData.editTerminalNumber = true">
+          <div v-if="!rowData.editTerminalNumber" @click="tryEdit(() => (rowData.editTerminalNumber = true))">
             {{ rowData.terminalNumber }}
           </div>
           <input
@@ -362,7 +380,12 @@ const items = toRef(props, 'items')
               {{ rowData.ccError }}
             </div>
           </template>
-          <div v-else class="ml-2 cursor-pointer" @click="rowData.editCC = true">
+          <div
+            v-else
+            class="ml-2"
+            :class="{ 'cursor-pointer': !isSupervisor }"
+            @click="tryEdit(() => (rowData.editCC = true))"
+          >
             {{ rowData.ccFromTable }} - {{ rowData.ccToTable }}
           </div>
         </div>
@@ -410,14 +433,19 @@ const items = toRef(props, 'items')
               {{ rowData.webError }}
             </div>
           </template>
-          <div v-else class="ml-2 cursor-pointer" @click="rowData.editWeb = true">
+          <div
+            v-else
+            class="ml-2"
+            :class="{ 'cursor-pointer': !isSupervisor }"
+            @click="tryEdit(() => (rowData.editWeb = true))"
+          >
             {{ rowData.webFromTable }} - {{ rowData.webToTable }}
           </div>
         </div>
       </template>
 
       <template #cell(actions)="{ rowData }">
-        <div class="flex gap-2 justify-end">
+        <div v-if="!isSupervisor" class="flex gap-2 justify-end">
           <VaButton preset="primary" size="small" color="primary" icon="mso-edit" @click="openEditModal(rowData)" />
           <VaButton
             preset="primary"

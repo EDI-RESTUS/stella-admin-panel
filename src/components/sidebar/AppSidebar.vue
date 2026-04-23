@@ -48,6 +48,7 @@
         <Transition name="fade">
           <div v-if="menuOpen" class="flex flex-col gap-y-1">
             <RouterLink
+              v-if="userRole !== 'supervisor'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'organizeMenu'
@@ -61,6 +62,7 @@
             </RouterLink>
 
             <RouterLink
+              v-if="userRole !== 'supervisor'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'categories'
@@ -93,7 +95,7 @@
                   ? 'bg-slate-100 text-slate-900 font-semibold'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
               ]"
-              to="/articlesOptions/groups"
+              :to="userRole === 'supervisor' ? '/articlesOptions/list' : '/articlesOptions/groups'"
             >
               <VaIcon name="mso-toggle_on" class="mr-2" />
               Article Options
@@ -113,6 +115,7 @@
             </RouterLink>
 
             <RouterLink
+              v-if="userRole !== 'supervisor'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'promotions'
@@ -126,6 +129,7 @@
             </RouterLink>
 
             <RouterLink
+              v-if="userRole !== 'supervisor'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'allergens'
@@ -139,6 +143,7 @@
             </RouterLink>
 
             <RouterLink
+              v-if="userRole !== 'supervisor'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'deletedArticles'
@@ -189,7 +194,7 @@
       </div>
 
       <!-- Configuration -->
-      <div v-if="userRole.includes('admin')" class="flex flex-col gap-y-1 mb-2">
+      <div v-if="userRole.includes('admin') || userRole === 'supervisor'" class="flex flex-col gap-y-1 mb-2">
         <span
           class="flex items-center justify-between font-bold text-slate-800 uppercase tracking-wide text-xs cursor-pointer py-1 rounded-lg hover:bg-slate-50 transition -ml-2 mr-2 pl-2 pr-2"
           @click="configOpen = !configOpen"
@@ -201,6 +206,7 @@
         <Transition name="fade">
           <div v-if="configOpen" class="flex flex-col gap-y-1">
             <span
+              v-if="userRole !== 'supervisor'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2 cursor-pointer',
                 $route.name === 'update-outlet'
@@ -214,6 +220,7 @@
             </span>
 
             <RouterLink
+              v-if="userRole !== 'supervisor'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'outletUsers'
@@ -227,6 +234,7 @@
             </RouterLink>
 
             <RouterLink
+              v-if="userRole !== 'supervisor'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'areas'
@@ -253,6 +261,7 @@
             </RouterLink>
 
             <RouterLink
+              v-if="userRole !== 'supervisor'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'payments'
@@ -266,6 +275,7 @@
             </RouterLink>
 
             <RouterLink
+              v-if="userRole !== 'supervisor'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'callCenterLogs'
@@ -279,6 +289,7 @@
             </RouterLink>
 
             <span
+              v-if="userRole !== 'supervisor'"
               class="flex items-center py-1 rounded-lg mr-2 pl-2 -ml-2 text-slate-400 cursor-not-allowed"
               title="Coming Soon"
             >
@@ -287,6 +298,7 @@
             </span>
 
             <span
+              v-if="userRole !== 'supervisor'"
               class="flex items-center py-1 rounded-lg mr-2 pl-2 -ml-2 text-slate-400 cursor-not-allowed"
               title="Coming Soon"
             >

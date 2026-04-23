@@ -8,20 +8,20 @@ const routes: Array<RouteRecordRaw> = [
     name: 'loader',
     path: '/loader/:paymentId',
     component: () => import('../pages/loader/index.vue'),
-    meta: { roles: ['admin', 'super-admin', 'caller', 'editor'] },
+    meta: { roles: ['admin', 'super-admin', 'caller', 'editor', 'supervisor'] },
   },
   {
     name: 'admin',
     path: '/',
     component: AppLayout,
-    meta: { roles: ['admin', 'super-admin', 'caller', 'editor', 'caller-editor'] },
+    meta: { roles: ['admin', 'super-admin', 'caller', 'editor', 'caller-editor', 'supervisor'] },
     redirect: { name: 'login' },
     children: [
       {
         name: 'dashboard',
         path: 'dashboard',
         component: () => import('../pages/admin/dashboard/Dashboard.vue'),
-        meta: { roles: ['admin', 'super-admin', 'caller', 'editor', 'caller-editor'] },
+        meta: { roles: ['admin', 'super-admin', 'caller', 'editor', 'caller-editor', 'supervisor'] },
       },
       {
         name: 'stellaUsers',
@@ -57,7 +57,7 @@ const routes: Array<RouteRecordRaw> = [
         name: 'deliveryZone',
         path: 'deliveryZone',
         component: () => import('../pages/deliveryZone/index.vue'),
-        meta: { roles: ['admin', 'super-admin'] },
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
       },
       {
         name: 'organizeMenu',
@@ -75,19 +75,19 @@ const routes: Array<RouteRecordRaw> = [
         name: 'articles',
         path: 'articles',
         component: () => import('../pages/articles/index.vue'),
-        meta: { roles: ['admin', 'super-admin', 'editor', 'caller-editor'] },
+        meta: { roles: ['admin', 'super-admin', 'editor', 'caller-editor', 'supervisor'] },
       },
       {
         name: 'articlesOptions',
         path: 'articlesOptions',
         component: () => import('../pages/articlesOptions/index.vue'),
-        meta: { roles: ['admin', 'super-admin', 'editor', 'caller-editor'] },
+        meta: { roles: ['admin', 'super-admin', 'editor', 'caller-editor', 'supervisor'] },
         children: [
           {
             name: 'articlesOptionsList',
             path: 'list',
             component: () => import('../pages/articlesOptionsList/index.vue'),
-            meta: { roles: ['admin', 'super-admin', 'editor', 'caller-editor'] },
+            meta: { roles: ['admin', 'super-admin', 'editor', 'caller-editor', 'supervisor'] },
           },
           {
             name: 'articlesOptionsGroups',
@@ -101,7 +101,7 @@ const routes: Array<RouteRecordRaw> = [
         name: 'offers',
         path: 'offers',
         component: () => import('../pages/offers/index.vue'),
-        meta: { roles: ['admin', 'super-admin', 'editor', 'caller-editor'] },
+        meta: { roles: ['admin', 'super-admin', 'editor', 'caller-editor', 'supervisor'] },
       },
       {
         name: 'promotions',
@@ -119,7 +119,7 @@ const routes: Array<RouteRecordRaw> = [
         name: 'callCenters',
         path: 'callCenters',
         component: () => import('../pages/callCenters/index.vue'),
-        meta: { roles: ['caller', 'admin', 'super-admin', 'caller-editor'] },
+        meta: { roles: ['caller', 'admin', 'super-admin', 'caller-editor', 'supervisor'] },
       },
       {
         name: 'callCenterLogs',
@@ -287,6 +287,7 @@ router.beforeEach((to, from, next) => {
       editor: 'articles',
       caller: 'callCenters',
       'caller-editor': 'callCenters',
+      supervisor: 'callCenters',
     }
 
     const defaultPage = roleDefaultPages[userRole] || 'articles'

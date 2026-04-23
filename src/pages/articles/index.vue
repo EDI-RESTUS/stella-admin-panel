@@ -9,8 +9,12 @@ import EditArticleModal from './modals/EditArticleModal.vue'
 import ImportArticleModal from './modals/ImportArticleModal.vue'
 import axios from 'axios'
 import { useUsersStore } from '@/stores/users'
+import { computed } from 'vue'
 
 const isEditArticleModalOpen = ref(false)
+
+const usersStore = useUsersStore()
+const isSupervisor = computed(() => (usersStore.userDetails as any)?.role === 'supervisor')
 
 const categoriesStore = useCategoryStore()
 const { init } = useToast()
@@ -68,11 +72,18 @@ function updateSortOrder(payload) {
 }
 
 const updateArticleModal = (payload) => {
+  // Supervisor is stock-only: block opening the full edit modal (used by
+  // Category/Sub-Category/Options/Allergens edit triggers in the table).
+  if (isSupervisor.value) return
   isEditArticleModalOpen.value = true
   selectedArticle.value = payload
 }
 
 const updateArticleDirectly = (payload) => {
+  // Supervisor is allowed to change stock-by-zone only; block every other
+  // inline PATCH. Stock updates use a dedicated endpoint in ArticlesTable
+  // (toggleZoneStock), so short-circuiting here doesn't affect them.
+  if (isSupervisor.value) return
   const item = originalItems.value.find((e) => e._id === payload._id)
   const data = { ...payload }
   data.outletId = serviceStore.selectedRest

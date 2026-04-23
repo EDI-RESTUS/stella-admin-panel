@@ -3,9 +3,13 @@ import { defineVaDataTableColumns, useModal, useToast } from 'vuestic-ui'
 import { ref, computed, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { useServiceStore } from '@/stores/services'
 import { useSubCategoriesStore } from '@/stores/subCategories'
+import { useUsersStore } from '@/stores/users'
 import FileUpload from '@/components/file-uploader/FileUpload.vue'
 import axios from 'axios'
 import { Funnel, Columns3, Import, Plus, Search, CirclePlus, Pencil, Copy } from 'lucide-vue-next'
+
+const usersStore = useUsersStore()
+const isSupervisor = computed(() => (usersStore.userDetails as any)?.role === 'supervisor')
 const props = defineProps({
   items: {
     type: Array,
@@ -413,8 +417,17 @@ function deleteArticle(payload) {
 }
 
 function openFileModal(data) {
+  if (isSupervisor.value) return
   console.log(data)
   document.getElementById('file-upload-' + data._id).click()
+}
+
+// Supervisor is read-only for everything except the Stock column — used by
+// every inline edit trigger so operators with this role can't flip to edit
+// mode on Name/Description/Code/Price cells or open edit modals.
+const tryEdit = (cb: () => void) => {
+  if (isSupervisor.value) return
+  cb()
 }
 </script>
 
@@ -518,6 +531,7 @@ function openFileModal(data) {
 
         <!-- Import Button -->
         <button
+          v-if="!isSupervisor"
           class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow-md h-10 w-10 md:w-auto md:h-auto"
           @click="onImportClick"
         >
@@ -527,6 +541,7 @@ function openFileModal(data) {
 
         <!-- Add Article Button -->
         <button
+          v-if="!isSupervisor"
           class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow-md h-10 w-10 md:w-auto md:h-auto"
           @click="onAddClick"
         >
@@ -631,7 +646,7 @@ function openFileModal(data) {
                 emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value });
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editName = true))">
               <span>{{ getLocalizedValue(rowData.name) }}</span>
               <Pencil
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -655,7 +670,7 @@ function openFileModal(data) {
                 emits('updateArticle', { ...rowData, searchQuery: searchQuery.value, page: currentPage.value });
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editDescription = true))">
               <span class="line-clamp-3">{{ getLocalizedValue(rowData.description) || '' }}</span>
               <Pencil
                 v-if="getLocalizedValue(rowData.description)"
@@ -679,7 +694,7 @@ function openFileModal(data) {
                 rowData.editing = '';
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'code'">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editing = 'code'))">
               <span>{{ rowData.code || '' }}</span>
 
               <!-- Pencil icon for existing code -->
@@ -692,7 +707,7 @@ function openFileModal(data) {
               <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors"
-                @click.stop="rowData.editing = 'code'"
+                @click.stop="tryEdit(() => (rowData.editing = 'code'))"
               />
             </div>
           </div>
@@ -711,7 +726,7 @@ function openFileModal(data) {
                 rowData.editing = '';
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editing = 'price'">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editing = 'price'))">
               <span>{{ rowData.price ? `€ ${parseFloat(rowData.price).toFixed(2)}` : '' }}</span>
 
               <!-- Pencil icon for existing price -->
@@ -724,7 +739,7 @@ function openFileModal(data) {
               <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 cursor-pointer hover:text-blue-500 transition-colors"
-                @click.stop="rowData.editing = 'price'"
+                @click.stop="tryEdit(() => (rowData.editing = 'price'))"
               />
             </div>
           </div>
@@ -969,13 +984,18 @@ function openFileModal(data) {
         <!-- ACTIVE COLUMN -->
         <template #cell(isActive)="{ rowData }">
           <div class="flex justify-center items-center">
-            <label class="relative inline-block w-9 h-5 cursor-pointer">
+            <label
+              class="relative inline-block w-9 h-5"
+              :class="isSupervisor ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
+            >
               <input
                 :checked="rowData.isActive"
                 type="checkbox"
                 class="sr-only"
+                :disabled="isSupervisor"
                 @change="
                   (e) => {
+                    if (isSupervisor) return;
                     emits('updateArticle', {
                       ...rowData,
                       isActive: e.target.checked,
@@ -1074,7 +1094,7 @@ function openFileModal(data) {
 
         <!-- ACTIONS COLUMN -->
         <template #cell(actions)="{ rowData }">
-          <div class="flex justify-end items-center gap-1">
+          <div v-if="!isSupervisor" class="flex justify-end items-center gap-1">
             <!-- Duplicate -->
             <button
               class="flex items-center justify-center w-7 h-7 rounded-lg text-slate-600 hover:bg-slate-200 transition-colors duration-150 active:scale-95"

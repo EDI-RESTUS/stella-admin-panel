@@ -60,6 +60,7 @@ const props = defineProps({
 
 const isAddSelectionModalOpen = ref(false)
 const onAddOfferClick = () => {
+  if (userStore.userDetails?.role === 'supervisor') return
   emits('openOfferModal')
 }
 const { confirm } = useModal()
@@ -71,6 +72,15 @@ const router = useRouter()
 const filterMode = ref(2)
 const servicesStore = useServiceStore()
 const userStore = useUsersStore()
+const isSupervisor = computed(() => (userStore.userDetails as any)?.role === 'supervisor')
+
+// Supervisor is allowed to change stock-by-zone only; every inline edit trigger
+// routes through this guard so the row can't flip into edit mode.
+const tryEdit = (cb: () => void) => {
+  if (isSupervisor.value) return
+  cb()
+}
+
 const stockUpdating = ref(new Set()) // Track which rows are currently updating stock
 const rowSelectedZones = reactive<Record<string, string[]>>({}) // Track selected delivery zones per row
 const columns = defineVaDataTableColumns([
@@ -307,6 +317,9 @@ function isValidDateString(dateStr) {
 }
 
 async function updateData(rowData) {
+  // Supervisor can only change stock-by-zone, which has its own dedicated
+  // endpoint (toggleZoneStock). Block any other inline PUT.
+  if (isSupervisor.value) return
   if (!rowData._id) {
     console.error('Missing _id for offer update:', rowData)
     init({ message: 'Offer ID missing, cannot update.', color: 'danger' })
@@ -350,6 +363,7 @@ async function updateData(rowData) {
 }
 
 const onButtonOfferDelete = async (payload) => {
+  if (isSupervisor.value) return
   const result = await confirm({
     message: 'Are you sure you want to see delete this Offer?',
     okText: 'Yes',
@@ -363,6 +377,7 @@ const onButtonOfferDelete = async (payload) => {
 }
 
 const onDeleteSelection = async (payload) => {
+  if (isSupervisor.value) return
   const result = await confirm({
     message: 'Are you sure you want to see delete this Offer selection?',
     okText: 'Yes',
@@ -388,6 +403,7 @@ async function deleteOffer(payload) {
 }
 
 function duplicateOffer(payload) {
+  if (isSupervisor.value) return
   const { _id, __v, createdAt, updatedAt, ...rest } = payload
   const duplicate = {
     ...rest,
@@ -447,6 +463,7 @@ const isGroupActive = (offerDays, groupDays) => {
   return groupDays.some((day) => lowerDays.includes(day))
 }
 function openFileModal(data) {
+  if (isSupervisor.value) return
   console.log(data)
   document.getElementById('file-upload-' + data._id).click()
 }
@@ -462,6 +479,7 @@ const deleteAsset = async (assetId) => {
     })
 }
 const onButtonOptionImageDelete = async (payload) => {
+  if (isSupervisor.value) return
   const result = await confirm({
     message: 'Are you sure you want to delete this image?',
     okText: 'Yes',
@@ -619,6 +637,7 @@ function formatReadableDate(dateStr: string): string {
 
         <!-- Add Offer Button -->
         <button
+          v-if="!isSupervisor"
           class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow-md h-10 w-10 md:w-auto md:h-auto"
           @click="onAddOfferClick"
         >
@@ -713,7 +732,7 @@ function formatReadableDate(dateStr: string): string {
                 updateData(rowData);
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editName = true">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editName = true))">
               <span>{{ getLocalizedValue(rowData.name) || '' }}</span>
               <Pencil
                 v-if="rowData.name"
@@ -722,7 +741,7 @@ function formatReadableDate(dateStr: string): string {
               <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 hover:text-blue-500 transition-colors"
-                @click.stop="rowData.editName = true"
+                @click.stop="tryEdit(() => (rowData.editName = true))"
               />
             </div>
           </div>
@@ -743,7 +762,7 @@ function formatReadableDate(dateStr: string): string {
                 updateData(rowData);
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editDescription = true))">
               <span>{{ getLocalizedValue(rowData.description) || '' }}</span>
               <Pencil
                 v-if="rowData.description"
@@ -752,7 +771,7 @@ function formatReadableDate(dateStr: string): string {
               <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 hover:text-blue-500 transition-colors"
-                @click.stop="rowData.editDescription = true"
+                @click.stop="tryEdit(() => (rowData.editDescription = true))"
               />
             </div>
           </div>
@@ -772,7 +791,7 @@ function formatReadableDate(dateStr: string): string {
                 updateData(rowData);
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editCode = true">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editCode = true))">
               <span>{{ rowData.code || '' }}</span>
               <Pencil
                 v-if="rowData.code"
@@ -781,7 +800,7 @@ function formatReadableDate(dateStr: string): string {
               <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 hover:text-blue-500 transition-colors"
-                @click.stop="rowData.editCode = true"
+                @click.stop="tryEdit(() => (rowData.editCode = true))"
               />
             </div>
           </div>
@@ -801,7 +820,7 @@ function formatReadableDate(dateStr: string): string {
                 updateData(rowData);
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editPrice = true">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editPrice = true))">
               <span>{{ rowData.price ? `€ ${parseFloat(rowData.price).toFixed(2)}` : '' }}</span>
               <Pencil
                 v-if="rowData.price"
@@ -810,7 +829,7 @@ function formatReadableDate(dateStr: string): string {
               <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 hover:text-blue-500 transition-colors"
-                @click.stop="rowData.editPrice = true"
+                @click.stop="tryEdit(() => (rowData.editPrice = true))"
               />
             </div>
           </div>
@@ -840,7 +859,7 @@ function formatReadableDate(dateStr: string): string {
                     : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
                 "
                 :style="index > 0 ? 'border-left:1px solid rgba(100,116,139,0.3);' : ''"
-                @click.stop="toggleDay(rowData, day)"
+                @click.stop="tryEdit(() => toggleDay(rowData, day))"
               >
                 {{ weekdayShortMap[day] }}
               </span>
@@ -858,7 +877,7 @@ function formatReadableDate(dateStr: string): string {
                     : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
                 "
                 :style="index > 0 ? 'border-left:1px solid rgba(100,116,139,0.3);' : ''"
-                @click.stop="toggleDay(rowData, day)"
+                @click.stop="tryEdit(() => toggleDay(rowData, day))"
               >
                 {{ weekdayShortMap[day] }}
               </span>
@@ -914,6 +933,7 @@ function formatReadableDate(dateStr: string): string {
           <div class="expandable_table mt-2 mb-2 rounded-lg overflow-hidden border">
             <div class="flex justify-end p-4">
               <button
+                v-if="!isSupervisor"
                 class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow-md h-10 w-10 md:w-auto md:h-auto"
                 @click="(isAddSelectionModalOpen = true), (offerData = rowData)"
               >
@@ -936,7 +956,7 @@ function formatReadableDate(dateStr: string): string {
               <tbody>
                 <tr v-for="selection in rowData.selections" :key="selection._id" class="border-b hover:bg-gray-50">
                   <td class="py-2 px-3">
-                    <div v-if="!selection.editName" @click="selection.editName = true">{{ selection.name }}</div>
+                    <div v-if="!selection.editName" @click="tryEdit(() => (selection.editName = true))">{{ selection.name }}</div>
                     <input
                       v-else
                       v-model="selection.name"
@@ -954,7 +974,7 @@ function formatReadableDate(dateStr: string): string {
                   <td class="py-2 px-3 text-center">{{ selection.menuItems?.length || 0 }} Articles</td>
 
                   <td class="py-2 px-3 text-center">
-                    <div v-if="!selection.editMinChoice" @click="selection.editMinChoice = true">
+                    <div v-if="!selection.editMinChoice" @click="tryEdit(() => (selection.editMinChoice = true))">
                       {{ selection.min }}
                     </div>
                     <input
@@ -972,7 +992,7 @@ function formatReadableDate(dateStr: string): string {
                   </td>
 
                   <td class="py-2 px-3 text-center">
-                    <div v-if="!selection.editMaxChoice" @click="selection.editMaxChoice = true">
+                    <div v-if="!selection.editMaxChoice" @click="tryEdit(() => (selection.editMaxChoice = true))">
                       {{ selection.max }}
                     </div>
                     <input
@@ -990,7 +1010,7 @@ function formatReadableDate(dateStr: string): string {
                   </td>
 
                   <td class="py-2 px-3 text-right">
-                    <div class="flex justify-end gap-2">
+                    <div v-if="!isSupervisor" class="flex justify-end gap-2">
                       <!-- Edit Button -->
                       <button
                         class="flex items-center justify-center w-7 h-7 rounded-lg text-slate-600 hover:bg-slate-200 transition-colors duration-150 active:scale-95"
@@ -1099,12 +1119,16 @@ function formatReadableDate(dateStr: string): string {
         <!-- ACTIVE -->
         <template #cell(isActive)="{ rowData }">
           <div class="flex justify-center items-center">
-            <label class="relative inline-block w-9 h-5 cursor-pointer">
+            <label
+              class="relative inline-block w-9 h-5"
+              :class="isSupervisor ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
+            >
               <input
                 type="checkbox"
                 :checked="rowData.isActive"
                 class="sr-only"
-                @change="updateData({ ...rowData, isActive: $event.target.checked })"
+                :disabled="isSupervisor"
+                @change="isSupervisor ? null : updateData({ ...rowData, isActive: $event.target.checked })"
               />
               <span
                 class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"
@@ -1120,7 +1144,7 @@ function formatReadableDate(dateStr: string): string {
 
         <!-- ACTIONS -->
         <template #cell(actions)="{ rowData }">
-          <div class="flex justify-end items-center gap-1">
+          <div v-if="!isSupervisor" class="flex justify-end items-center gap-1">
             <!-- Edit -->
             <button
               class="flex items-center justify-center w-7 h-7 rounded-lg text-slate-600 hover:bg-slate-200 transition-colors duration-150 active:scale-95"
