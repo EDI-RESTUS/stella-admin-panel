@@ -162,7 +162,14 @@ function hideEditModal() {
 }
 
 async function deleteDelivery(payload) {
-  await updateData({ ...payload, isDeleted: true })
+  const url = import.meta.env.VITE_API_BASE_URL
+  try {
+    await axios.delete(`${url}/deliveryZones/${payload._id}`)
+    init({ message: "You've successfully deleted a delivery zone", color: 'success' })
+    emits('getDeliveryZones')
+  } catch (err: any) {
+    init({ message: err.response?.data?.message || 'Failed to delete delivery zone', color: 'danger' })
+  }
 }
 
 const items = toRef(props, 'items')

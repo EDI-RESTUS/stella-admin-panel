@@ -343,7 +343,7 @@ const onButtonCategoryDelete = async (payload) => {
               "
             />
             <div v-else class="editable-text cursor-pointer" @click="rowData.editDescription = true">
-              <span class="line-clamp-3">{{ getLocalizedValue(rowData.description) || '' }}</span>
+              <span class="line-clamp-3 whitespace-pre-line">{{ getLocalizedValue(rowData.description) || '' }}</span>
               <Pencil
                 v-if="getLocalizedValue(rowData.description)"
                 class="w-4 h-4 absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"

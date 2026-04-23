@@ -275,6 +275,20 @@
             </RouterLink>
 
             <RouterLink
+              v-if="userRole.includes('admin')"
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'employees'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/employees"
+            >
+              <VaIcon name="badge" class="mr-2"></VaIcon>
+              Employees
+            </RouterLink>
+
+            <RouterLink
               v-if="userRole !== 'supervisor'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',

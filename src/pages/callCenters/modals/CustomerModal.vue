@@ -427,7 +427,7 @@ const phoneNumber = computed({
   get: () => phonePrefix.value + phoneLocal.value,
   set: (val) => {
     // If setting full number externally, we try to parse it
-    const raw = String(val || '').replace(/\D/g, '')
+    const raw = String(val || '').replace(/\D/g, '').replace(/^00/, '')
     const found = countryPrefixes.find((p) => raw.startsWith(p.value))
     if (found) {
       phonePrefix.value = found.value
@@ -508,6 +508,7 @@ if (props.selectedUser) {
   const raw = String(props.selectedUser['MobilePhone'] || props.selectedUser['Phone'] || '')
     .trim()
     .replace(/\D/g, '')
+    .replace(/^00/, '')
   const found = countryPrefixes.find((p) => raw.startsWith(p.value))
   if (found) {
     phonePrefix.value = found.value
@@ -549,6 +550,7 @@ if (props.selectedUser) {
   const raw = String(props.userNumber ?? '')
     .trim()
     .replace(/\D/g, '')
+    .replace(/^00/, '')
   const found = countryPrefixes.find((p) => raw.startsWith(p.value))
   if (found) {
     phonePrefix.value = found.value
@@ -851,9 +853,8 @@ async function addOrUpdateCustomerDetails() {
   const servicesStore = useServiceStore()
   const outletId = servicesStore.selectedRest
 
-  // normalize phone to digits only
-  // phoneNumber is now computed, so we use prefix + local
-  const fullPhone = (phonePrefix.value + phoneLocal.value).replace(/\D+/g, '')
+  // Normalize phone to 00<countryCode><localNumber> (digits only).
+  const fullPhone = '00' + (phonePrefix.value + phoneLocal.value).replace(/\D+/g, '')
 
   const base = {
     name: String(name.value || '').trim(),

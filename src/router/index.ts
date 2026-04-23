@@ -54,6 +54,12 @@ const routes: Array<RouteRecordRaw> = [
         meta: { roles: ['admin', 'super-admin'] },
       },
       {
+        name: 'employees',
+        path: 'employees',
+        component: () => import('../pages/employees/index.vue'),
+        meta: { roles: ['admin', 'super-admin'] },
+      },
+      {
         name: 'deliveryZone',
         path: 'deliveryZone',
         component: () => import('../pages/deliveryZone/index.vue'),

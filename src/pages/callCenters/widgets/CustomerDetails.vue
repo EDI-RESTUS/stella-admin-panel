@@ -414,7 +414,7 @@ const phoneNumber = computed({
     return phonePrefix.value + phoneLocal.value
   },
   set(val) {
-    const raw = String(val || '').replace(/\D/g, '')
+    const raw = String(val || '').replace(/\D/g, '').replace(/^00/, '')
     if (!raw) {
       phoneLocal.value = ''
       return
@@ -451,7 +451,8 @@ const isRestoringOrderContext = ref(false)
 const restoredDeliveryZoneId = ref('')
 
 watch(phoneNumber, (val) => {
-  orderStore.setPhoneNumber(val)
+  const digits = String(val || '').replace(/\D/g, '').replace(/^00/, '')
+  orderStore.setPhoneNumber(digits ? '00' + digits : '')
 })
 
 // Nuclear option: forcefully prevent notes from being set in takeaway mode
@@ -796,6 +797,10 @@ async function fetchCustomerDetails(setUser = false) {
                   if (!u._id && stellaUser._id) {
                     u._id = stellaUser._id
                   }
+                  if (stellaUser.isStaff) {
+                    u.isStaff = true
+                    if (stellaUser.staffName) u.staffName = stellaUser.staffName
+                  }
                   if (u.OtherAddresses) {
                     u.OtherAddresses.forEach((wmAddr) => {
                       const match = stellaAddrs.find(
@@ -996,7 +1001,24 @@ async function selectUser(user) {
     }, 0)
   }
 
+  await promptIfStaff(selectedUser.value)
   await promptIfActiveOrders(selectedUser.value)
+}
+
+async function promptIfStaff(user) {
+  if (!user?.isStaff) return
+  log('STAFF_CUSTOMER_SELECTED', {
+    customerName: user?.Name || user?.customerName,
+    phone: user?.MobilePhone || user?.phoneNo,
+    staffName: user?.staffName,
+  })
+  await confirm({
+    title: 'Staff Customer',
+    message: `This customer is staff${user?.staffName ? ` (${user.staffName})` : ''}.`,
+    okText: 'OK',
+    cancelText: '',
+    size: 'small',
+  })
 }
 
 async function promptIfActiveOrders(user) {
