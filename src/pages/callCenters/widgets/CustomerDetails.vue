@@ -1005,6 +1005,11 @@ async function promptIfActiveOrders(user) {
   const outletId = servicesStore.selectedRest
   if (!customerDetailId || !outletId) return
 
+  // Shops 1-15 are internal service-zone "customers" that routinely carry
+  // multiple simultaneous active orders — suppress the existing-orders prompt
+  // for them so the operator isn't interrupted on every customer select.
+  if (isLocationLocked.value) return
+
   let items = []
   try {
     const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/orders/customer-active`, {

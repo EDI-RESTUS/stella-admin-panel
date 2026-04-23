@@ -1446,6 +1446,18 @@ async function createOrder(force = false) {
       const dateVal = props.dateSelected ? new Date(props.dateSelected) : new Date()
       const orderDateTime = !isNaN(dateVal.getTime()) ? dateVal.toISOString() : new Date().toISOString()
 
+      // Shops 1-15: internal service-zone "customers" whose phone is just 1..15
+      // (stored locally as "357" prefix + local "1".."15"). They routinely
+      // place multiple orders in a short window, so force past the backend's
+      // duplicate-order guard instead of prompting the operator.
+      const isShop1to15 = (() => {
+        const raw = String(orderStore.phoneNumber || '').replace(/\D/g, '')
+        const local = raw.startsWith('357') ? raw.slice(3) : raw
+        if (local.length === 0 || local.length > 2) return false
+        const num = Number(local)
+        return num >= 1 && num <= 15
+      })()
+
       const payload = {
         orderFor: orderFor.value,
         customerDetailId: props.customerDetailsId,
@@ -1463,7 +1475,7 @@ async function createOrder(force = false) {
         phoneNo: orderStore.phoneNumber || '',
         ...(codes.length ? { promoCodes: codes } : {}),
         ...(codes.length === 1 ? { promoCode: codes[0] } : {}),
-        ...(force ? { force: true } : {}),
+        ...(force || isShop1to15 ? { force: true } : {}),
       }
 
       orderResponse.value = await orderStore.createOrder(payload)
