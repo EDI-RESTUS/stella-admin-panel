@@ -624,55 +624,58 @@ const promoUnitsMap = computed(() => {
  * For a given cart line at render index `idx`, compute which units from the promo map belong to it.
  * We sum quantities of same itemId before this index to find the correct slice (FIFO per itemId).
  */
-function linePromoCart(item: any, idx: number) {
+function linePromoCart(item: any, _idx: number) {
+  // Anchor lineOriginal to the cart's own truth so the strikethrough always matches
+  // the line's actual total — independent of how the validator response splits
+  // entries (per-unit vs per-line vs per-bundle), which has previously inflated the
+  // strikethrough when a single cart line carries quantity > 1.
+  const cartLineTotal = Number(item.totalPrice || 0)
+
   if (!promoTotal.value) {
     return {
       hasAnyEffect: false,
-      lineOriginal: item.totalPrice,
-      lineUpdated: item.totalPrice,
+      lineOriginal: cartLineTotal,
+      lineUpdated: cartLineTotal,
       lineDiscount: 0,
       units: [] as any[],
     }
   }
 
   const id = (item.menuItemId as string) || (item.itemId as string)
-  const allUnits = promoUnitsMap.value.get(id) || []
+  const lines = ((promoTotal.value as any).menuItems || []).filter((l: any) => l.menuItemId === id)
 
-  // Count preceding units of the same itemId
-  let precedingUnits = 0
-  for (let i = 0; i < idx; i++) {
-    const it = orderStore.cartItems[i]
-    const itId = (it.menuItemId as string) || (it.itemId as string)
-    if (itId === id) {
-      precedingUnits += Number(it.quantity || 1)
-    }
-  }
-
-  const start = precedingUnits
-  const end = Math.min(start + Number(item.quantity || 1), allUnits.length)
-  const units = allUnits.slice(start, end)
-
-  if (!units.length) {
+  if (!lines.length) {
     return {
       hasAnyEffect: false,
-      lineOriginal: item.totalPrice,
-      lineUpdated: item.totalPrice,
+      lineOriginal: cartLineTotal,
+      lineUpdated: cartLineTotal,
       lineDiscount: 0,
-      units,
+      units: [] as any[],
     }
   }
 
-  const lineOriginal = units.reduce((s, u) => s + (u.originalPrice + u.optionsPrice), 0)
-  const lineUpdated = units.reduce((s, u) => s + u.updatedPrice, 0)
-  const lineDiscount = units.reduce((s, u) => s + (u.isAffected ? u.discount : 0), 0)
-  const hasAnyEffect = units.some((u) => u.isAffected)
+  const totalOrigForId = lines.reduce(
+    (s: number, l: any) => s + Number(l.originalPrice || 0) + Number(l.optionsPrice || 0),
+    0,
+  )
+  const totalUpdForId = lines.reduce((s: number, l: any) => s + Number(l.updatedPrice || 0), 0)
+  const totalDiscountForId = Math.max(0, totalOrigForId - totalUpdForId)
+  const hasAnyAffected = lines.some((l: any) => !!l.isAffected) || totalDiscountForId > 0.005
+
+  const totalCartQtyForId = (orderStore.cartItems as any[]).reduce((s, it) => {
+    const itId = (it.menuItemId as string) || (it.itemId as string)
+    return itId === id ? s + Number(it.quantity || 1) : s
+  }, 0)
+  const myShare = totalCartQtyForId > 0 ? Number(item.quantity || 1) / totalCartQtyForId : 1
+  const lineDiscount = Math.min(cartLineTotal, Number((totalDiscountForId * myShare).toFixed(2)))
+  const lineUpdated = Math.max(0, Number((cartLineTotal - lineDiscount).toFixed(2)))
 
   return {
-    hasAnyEffect,
-    lineOriginal,
+    hasAnyEffect: hasAnyAffected && lineDiscount > 0.005,
+    lineOriginal: cartLineTotal,
     lineUpdated,
     lineDiscount,
-    units,
+    units: [] as any[],
   }
 }
 /** ------------------------------------------------------------------------------ */
@@ -1530,6 +1533,35 @@ async function createOrder(force = false) {
             address: orderStore.address || '',
             deliveryNotes: orderStore.deliveryNotes || '',
           }))
+          // Survive the gateway redirect so we can log the success-return on the
+          // next page load, even if the success URL doesn't carry orderId in the query.
+          // localStorage is preferred over sessionStorage because some browsers drop
+          // sessionStorage on cross-origin redirects from payment gateways.
+          // We also snapshot userId/userName/outletId here because the user/service
+          // stores may not be populated yet when the redirected page mounts and tries
+          // to post the log — passing them through avoids a 400 on /cc/logs.
+          const pendingPaymentMarker = JSON.stringify({
+            orderId: orderResponse.value?.data?.data?._id || null,
+            paymentRequestId: response.data.data.requestId || null,
+            paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId || null,
+            orderType: props.orderType || null,
+            gateway: selectedPayment.value?.paymentGateway || 'Saferpay',
+            startedAt: new Date().toISOString(),
+            userId: userStore.userDetails?._id || null,
+            userName: userStore.userDetails?.name || userStore.userDetails?.email || 'unknown',
+            outletId: serviceStore.selectedRest || null,
+            phoneNo: orderStore.phoneNumber || null,
+          })
+          try {
+            localStorage.setItem('cc_pending_payment', pendingPaymentMarker)
+          } catch {
+            // ignore
+          }
+          try {
+            sessionStorage.setItem('cc_pending_payment', pendingPaymentMarker)
+          } catch {
+            // ignore
+          }
           // setInter()
           window.top.location.href = response.data.data.redirectUrl
         }

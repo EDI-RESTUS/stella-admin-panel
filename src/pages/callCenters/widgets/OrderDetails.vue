@@ -386,6 +386,7 @@ import { ref, computed, useTemplateRef, watch, nextTick, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useOrderStore } from '@/stores/order-store'
 import { useServiceStore } from '@/stores/services.ts'
+import { useUsersStore } from '@/stores/users'
 import MenuModal from '../modals/MenuModal.vue'
 import CheckOutModal from '../modals/CheckOutModal.vue'
 import OfferModal from '../modals/OfferModal.vue'
@@ -868,52 +869,58 @@ const promoUnitsMap = computed(() => {
 })
 
 function linePromo(item) {
+  // Anchor lineOriginal to the cart's own truth so the strikethrough always matches
+  // the line's actual total — independent of how the validator response shape splits
+  // entries (per-unit vs per-line vs per-bundle), which has previously inflated the
+  // strikethrough when a single cart line carries quantity > 1.
+  const cartLineTotal = Number(item.total || 0)
+
   if (!promoTotal.value) {
     return {
       hasAnyEffect: false,
-      lineOriginal: item.total,
-      lineUpdated: item.total,
+      lineOriginal: cartLineTotal,
+      lineUpdated: cartLineTotal,
       lineDiscount: 0,
       units: [],
     }
   }
 
   const id = item.menuItemId || item.id
-  const allUnits = promoUnitsMap.value.get(id) || []
+  const lines = (promoTotal.value.menuItems || []).filter((l) => l.menuItemId === id)
 
-  let precedingUnits = 0
-  for (const it of items.value) {
-    if (it.__renderIndex >= item.__renderIndex) break
-    if ((it.menuItemId || it.id) === id) {
-      precedingUnits += Number(it.quantity || 1)
-    }
-  }
-
-  const start = precedingUnits
-  const end = Math.min(start + Number(item.quantity || 1), allUnits.length)
-  const units = allUnits.slice(start, end)
-
-  if (!units.length) {
+  if (!lines.length) {
     return {
       hasAnyEffect: false,
-      lineOriginal: item.total,
-      lineUpdated: item.total,
+      lineOriginal: cartLineTotal,
+      lineUpdated: cartLineTotal,
       lineDiscount: 0,
       units: [],
     }
   }
 
-  const lineOriginal = units.reduce((s, u) => s + (u.originalPrice + u.optionsPrice), 0)
-  const lineUpdated = units.reduce((s, u) => s + u.updatedPrice, 0)
-  const lineDiscount = units.reduce((s, u) => s + (u.isAffected ? u.discount : 0), 0)
-  const hasAnyEffect = units.some((u) => u.isAffected)
+  const totalOrigForId = lines.reduce(
+    (s, l) => s + Number(l.originalPrice || 0) + Number(l.optionsPrice || 0),
+    0,
+  )
+  const totalUpdForId = lines.reduce((s, l) => s + Number(l.updatedPrice || 0), 0)
+  const totalDiscountForId = Math.max(0, totalOrigForId - totalUpdForId)
+  const hasAnyAffected = lines.some((l) => !!l.isAffected) || totalDiscountForId > 0.005
+
+  // Apportion the menuItemId-level discount across cart lines by quantity share
+  const totalCartQtyForId = items.value.reduce(
+    (s, it) => ((it.menuItemId || it.id) === id ? s + Number(it.quantity || 1) : s),
+    0,
+  )
+  const myShare = totalCartQtyForId > 0 ? Number(item.quantity || 1) / totalCartQtyForId : 1
+  const lineDiscount = Math.min(cartLineTotal, Number((totalDiscountForId * myShare).toFixed(2)))
+  const lineUpdated = Math.max(0, Number((cartLineTotal - lineDiscount).toFixed(2)))
 
   return {
-    hasAnyEffect,
-    lineOriginal,
+    hasAnyEffect: hasAnyAffected && lineDiscount > 0.005,
+    lineOriginal: cartLineTotal,
     lineUpdated,
     lineDiscount,
-    units,
+    units: [],
   }
 }
 
@@ -1254,6 +1261,88 @@ function closePromotionModal() {
 const existingOrderId = ref('')
 
 onMounted(async () => {
+  // Gateway success return (Saferpay etc): if we set a pending-payment marker before
+  // the redirect and we're not coming back via the failed/cancelled flow, treat this
+  // as a successful return. localStorage (rather than sessionStorage) is used because
+  // some browsers drop sessionStorage on cross-origin redirects from payment gateways.
+  let pendingPayment = null
+  try {
+    const raw = localStorage.getItem('cc_pending_payment') || sessionStorage.getItem('cc_pending_payment') || 'null'
+    pendingPayment = JSON.parse(raw)
+  } catch {
+    // ignore
+  }
+  console.log('[PaymentReturn] cc_pending_payment marker:', pendingPayment, 'failedReturn:', isFailedPaymentReturn())
+
+  if (pendingPayment && !isFailedPaymentReturn()) {
+    const lookupId = String(pendingPayment.orderId || route.query.orderId || '')
+    let order = null
+    try {
+      if (lookupId) {
+        const res = await orderStore.getOrderStatus(lookupId)
+        order = res.data?.data
+      }
+    } catch {
+      // backend may not have reflected payment completion yet — log anyway
+    }
+    // Wait briefly for the user/service stores to hydrate after the redirect — they
+    // load asynchronously and may not be ready the instant onMounted fires.
+    const usersStore = useUsersStore()
+    let outletId =
+      order?.outletId || pendingPayment.outletId || serviceStore.selectedRest || null
+    let userId = usersStore.userDetails?._id || pendingPayment.userId || null
+    let userName =
+      usersStore.userDetails?.name || usersStore.userDetails?.email || pendingPayment.userName || 'unknown'
+    for (let i = 0; i < 20 && (!outletId || !userId); i++) {
+      await new Promise((r) => setTimeout(r, 100))
+      outletId = outletId || serviceStore.selectedRest || null
+      userId = userId || usersStore.userDetails?._id || null
+      userName = userName !== 'unknown' ? userName : usersStore.userDetails?.name || usersStore.userDetails?.email || 'unknown'
+    }
+    const entry = {
+      userId,
+      userName,
+      outletId,
+      action: 'ORDER_PLACED',
+      details: {
+        orderId: order?._id || pendingPayment.orderId || lookupId,
+        tableNumber: order?.tableNumber || null,
+        phoneNo: order?.phoneNo || pendingPayment.phoneNo || null,
+        paymentRequestId: pendingPayment.paymentRequestId || '',
+        paymentMethod:
+          order?.paymentMode?.name ||
+          order?.paymentMode?.paymentTypeId ||
+          pendingPayment.paymentMethod ||
+          'CreditCard',
+        orderType: order?.orderType || pendingPayment.orderType || null,
+        success: true,
+      },
+      timestamp: new Date().toISOString(),
+    }
+    if (!outletId) {
+      console.error('[PaymentReturn] outletId still missing after waiting; skipping ORDER_PLACED log')
+    } else {
+      try {
+        await axios.post(`${import.meta.env.VITE_API_BASE_URL}/cc/logs`, entry)
+      } catch (e) {
+        console.error('[PaymentReturn] failed to post ORDER_PLACED log', e)
+      }
+    }
+    try {
+      localStorage.removeItem('cc_pending_payment')
+      sessionStorage.removeItem('cc_pending_payment')
+      sessionStorage.removeItem('cc_pending_customer')
+    } catch {
+      // ignore
+    }
+    const q = { ...route.query }
+    delete q.payment
+    delete q.orderId
+    delete q.status
+    router.replace({ query: q })
+    return
+  }
+
   if (isFailedPaymentReturn() && route.query.orderId) {
     console.log('[PaymentRetry] Detected failed payment redirect', route.query)
     isLoading.value = true

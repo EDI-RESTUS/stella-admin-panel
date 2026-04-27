@@ -11,9 +11,10 @@ import axios from 'axios'
 const usersStore = useUsersStore()
 const isSupervisor = computed(() => (usersStore.userDetails as any)?.role === 'supervisor')
 
-// Supervisor is permitted to change ONLY the D/T checkboxes in the CC and WEB
-// columns. Every other inline edit trigger routes through this guard so the
-// row can't flip into edit mode when the current user is a supervisor.
+// Supervisor is permitted to change the D/T checkboxes in the CC and WEB
+// columns and the Delivery/Takeaway Promise Time cells. Every other inline
+// edit trigger routes through this guard so the row can't flip into edit mode
+// when the current user is a supervisor.
 const tryEdit = (cb: () => void) => {
   if (isSupervisor.value) return
   cb()
@@ -300,7 +301,7 @@ const items = toRef(props, 'items')
         </div>
       </template>
       <template #cell(deliveryPromiseTime)="{ rowData }">
-        <div class="max-w-[120px] ellipsis" @click="tryEdit(() => (rowData.editDeliveryPromiseTime = true))">
+        <div class="max-w-[120px] ellipsis cursor-pointer" @click="rowData.editDeliveryPromiseTime = true">
           <input
             v-if="rowData.editDeliveryPromiseTime"
             v-model="rowData.deliveryPromiseTime"
@@ -315,7 +316,7 @@ const items = toRef(props, 'items')
         </div>
       </template>
       <template #cell(takeawayPromiseTime)="{ rowData }">
-        <div class="max-w-[120px] ellipsis" @click="tryEdit(() => (rowData.editTakeawayPromiseTime = true))">
+        <div class="max-w-[120px] ellipsis cursor-pointer" @click="rowData.editTakeawayPromiseTime = true">
           <input
             v-if="rowData.editTakeawayPromiseTime"
             v-model="rowData.takeawayPromiseTime"
