@@ -241,7 +241,16 @@ async function getOptionGroups() {
     const raw = response.data
     const items = Array.isArray(raw) ? raw : raw.items || raw.result || []
     optionGroupOptions.value = items
-      .map((g: any) => ({ text: getLocalizedValue(g.name), value: String(g._id) }))
+      .map((g: any) => {
+        // Show internalName so back-office users see the staff-facing label.
+        // Fall back to the localized name if internalName isn't set so the
+        // dropdown never goes blank.
+        const internal = typeof g.internalName === 'string' ? g.internalName.trim() : ''
+        return {
+          text: internal || getLocalizedValue(g.name),
+          value: String(g._id),
+        }
+      })
       .filter((o) => !!o.value)
   } catch (err) {
     console.error('Failed to fetch option groups', err)
