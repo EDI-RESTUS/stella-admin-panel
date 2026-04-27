@@ -251,7 +251,10 @@ async function getOptionGroups() {
           value: String(g._id),
         }
       })
-      .filter((o) => !!o.value)
+      .filter((o: { text: string; value: string }) => !!o.value)
+      .sort((a: { text: string }, b: { text: string }) =>
+        a.text.localeCompare(b.text, undefined, { sensitivity: 'base' }),
+      )
   } catch (err) {
     console.error('Failed to fetch option groups', err)
   }
