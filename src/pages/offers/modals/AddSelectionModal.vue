@@ -271,6 +271,7 @@
             <div class="flex items-center justify-between mb-2">
               <div class="text-sm font-semibold text-blue-600 uppercase tracking-wide">Options</div>
               <button
+                type="button"
                 class="text-xs font-medium px-2 py-0.5 rounded-full border transition-colors duration-150"
                 :class="
                   allVisibleOptionsSelected
