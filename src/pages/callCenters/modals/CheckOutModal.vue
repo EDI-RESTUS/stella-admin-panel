@@ -44,8 +44,8 @@
                             'bg-amber-100 text-amber-700': option.type.toLowerCase() === 'modifier',
                           }"
                         >
-                          {{ option.name }}
-                          <span v-if="option.price">€{{ (option.price * option.quantity).toFixed(2) }}</span>
+                          <template v-if="(option.quantity || 1) > 1">{{ option.quantity }}× </template>{{ option.name }}
+                          <span v-if="option.price">€{{ (option.price * (option.quantity || 1)).toFixed(2) }}</span>
                         </span>
                       </div>
                     </div>
@@ -106,8 +106,8 @@
                                 'bg-amber-100 text-amber-700': option.type.toLowerCase() === 'modifier',
                               }"
                             >
-                              {{ option.name }}
-                              <span v-if="option.price">(+€{{ (option.price * option.quantity).toFixed(2) }})</span>
+                              <template v-if="(option.quantity || 1) > 1">{{ option.quantity }}× </template>{{ option.name }}
+                              <span v-if="option.price">(+€{{ (option.price * (option.quantity || 1)).toFixed(2) }})</span>
                             </span>
                           </div>
                         </div>
@@ -204,7 +204,7 @@
               <div class="pt-4">
                 <button
                   id="confirmBtn"
-                  :disabled="apiLoading || !selectedPayment"
+                  :disabled="apiLoading || orderSubmitted || !selectedPayment"
                   class="btn btn-primary !w-full !min-w-0 py-2 !text-2xl"
                   @click="orderStore.editOrder ? updateOrder() : createOrder()"
                 >
@@ -307,7 +307,7 @@
 </template>
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
-import { useToast } from 'vuestic-ui'
+import { useToast, useModal } from 'vuestic-ui'
 import { useOrderStore } from '@/stores/order-store'
 import { useCallCenterAlert } from '@/composables/useCallCenterAlert'
 import { useCallCenterLogger } from '@/composables/useCallCenterLogger'
@@ -320,8 +320,10 @@ import axios from 'axios'
 const showCheckoutModal = ref(true)
 const selectedPayment: any = ref(null)
 const apiLoading = ref(false)
-const emits = defineEmits(['cancel', 'success'])
+const orderSubmitted = ref(false)
+const emits = defineEmits(['cancel', 'success', 'view-history'])
 const { init } = useToast()
+const { confirm } = useModal()
 const { showAlert } = useCallCenterAlert()
 const { log, queueRefreshLog } = useCallCenterLogger()
 const props = defineProps<{
@@ -600,12 +602,16 @@ const promoUnitsMap = computed(() => {
     const id = line.menuItemId as string
     const arr = map.get(id) ?? []
     const qty = Math.max(1, Number((line as any).quantity ?? 1))
+    const perUnitOriginal = Number((line as any).originalPrice ?? 0) / qty
+    const perUnitOptions = Number((line as any).optionsPrice ?? 0) / qty
+    const perUnitUpdated = Number((line as any).updatedPrice ?? 0) / qty
+    const perUnitDiscount = Number((line as any).discount ?? 0) / qty
     for (let i = 0; i < qty; i++) {
       arr.push({
-        originalPrice: Number((line as any).originalPrice ?? 0),
-        optionsPrice: Number((line as any).optionsPrice ?? 0),
-        updatedPrice: Number((line as any).updatedPrice ?? 0),
-        discount: Number((line as any).discount ?? 0),
+        originalPrice: perUnitOriginal,
+        optionsPrice: perUnitOptions,
+        updatedPrice: perUnitUpdated,
+        discount: perUnitDiscount,
         isAffected: Boolean((line as any).isAffected),
       })
     }
@@ -618,55 +624,58 @@ const promoUnitsMap = computed(() => {
  * For a given cart line at render index `idx`, compute which units from the promo map belong to it.
  * We sum quantities of same itemId before this index to find the correct slice (FIFO per itemId).
  */
-function linePromoCart(item: any, idx: number) {
+function linePromoCart(item: any, _idx: number) {
+  // Anchor lineOriginal to the cart's own truth so the strikethrough always matches
+  // the line's actual total — independent of how the validator response splits
+  // entries (per-unit vs per-line vs per-bundle), which has previously inflated the
+  // strikethrough when a single cart line carries quantity > 1.
+  const cartLineTotal = Number(item.totalPrice || 0)
+
   if (!promoTotal.value) {
     return {
       hasAnyEffect: false,
-      lineOriginal: item.totalPrice,
-      lineUpdated: item.totalPrice,
+      lineOriginal: cartLineTotal,
+      lineUpdated: cartLineTotal,
       lineDiscount: 0,
       units: [] as any[],
     }
   }
 
   const id = (item.menuItemId as string) || (item.itemId as string)
-  const allUnits = promoUnitsMap.value.get(id) || []
+  const lines = ((promoTotal.value as any).menuItems || []).filter((l: any) => l.menuItemId === id)
 
-  // Count preceding units of the same itemId
-  let precedingUnits = 0
-  for (let i = 0; i < idx; i++) {
-    const it = orderStore.cartItems[i]
-    const itId = (it.menuItemId as string) || (it.itemId as string)
-    if (itId === id) {
-      precedingUnits += Number(it.quantity || 1)
-    }
-  }
-
-  const start = precedingUnits
-  const end = Math.min(start + Number(item.quantity || 1), allUnits.length)
-  const units = allUnits.slice(start, end)
-
-  if (!units.length) {
+  if (!lines.length) {
     return {
       hasAnyEffect: false,
-      lineOriginal: item.totalPrice,
-      lineUpdated: item.totalPrice,
+      lineOriginal: cartLineTotal,
+      lineUpdated: cartLineTotal,
       lineDiscount: 0,
-      units,
+      units: [] as any[],
     }
   }
 
-  const lineOriginal = units.reduce((s, u) => s + (u.originalPrice + u.optionsPrice), 0)
-  const lineUpdated = units.reduce((s, u) => s + u.updatedPrice, 0)
-  const lineDiscount = units.reduce((s, u) => s + (u.isAffected ? u.discount : 0), 0)
-  const hasAnyEffect = units.some((u) => u.isAffected)
+  const totalOrigForId = lines.reduce(
+    (s: number, l: any) => s + Number(l.originalPrice || 0) + Number(l.optionsPrice || 0),
+    0,
+  )
+  const totalUpdForId = lines.reduce((s: number, l: any) => s + Number(l.updatedPrice || 0), 0)
+  const totalDiscountForId = Math.max(0, totalOrigForId - totalUpdForId)
+  const hasAnyAffected = lines.some((l: any) => !!l.isAffected) || totalDiscountForId > 0.005
+
+  const totalCartQtyForId = (orderStore.cartItems as any[]).reduce((s, it) => {
+    const itId = (it.menuItemId as string) || (it.itemId as string)
+    return itId === id ? s + Number(it.quantity || 1) : s
+  }, 0)
+  const myShare = totalCartQtyForId > 0 ? Number(item.quantity || 1) / totalCartQtyForId : 1
+  const lineDiscount = Math.min(cartLineTotal, Number((totalDiscountForId * myShare).toFixed(2)))
+  const lineUpdated = Math.max(0, Number((cartLineTotal - lineDiscount).toFixed(2)))
 
   return {
-    hasAnyEffect,
-    lineOriginal,
+    hasAnyEffect: hasAnyAffected && lineDiscount > 0.005,
+    lineOriginal: cartLineTotal,
     lineUpdated,
     lineDiscount,
-    units,
+    units: [] as any[],
   }
 }
 /** ------------------------------------------------------------------------------ */
@@ -746,6 +755,7 @@ async function checkPaymentStatus(requestId: string, paymentId: string, isPollin
 }
 
 function handlePaymentSuccess() {
+  orderSubmitted.value = true
   log('ORDER_PLACED', {
     orderId: orderResponse.value?.data?.data?._id || orderId.value,
     tableNumber: completedOrderData.value?.tableNumber || orderStore.editOrder?.tableNumber || null,
@@ -991,13 +1001,18 @@ onUnmounted(() => {
 })
 
 async function updateOrder() {
+  if (apiLoading.value || orderSubmitted.value) return
   apiLoading.value = true
 
   // --- Detect promo codes (from props OR original order) ---
+  // If the user (re)selected codes via PromotionModal, trust that array verbatim —
+  // duplicates matter for TXPY codes with size directives like "(XL+XL)", where each
+  // engine application is capped to a single bundle, so [code,code,code] = 3 bundles.
+  // Only fall back to the order's stored codes when nothing was reselected.
   const codes = normalizeCodes(props.promoCode, props.promoCodes)
   const editPromos =
     orderStore.editOrder.promoCodes || (orderStore.editOrder.promoCode ? [orderStore.editOrder.promoCode] : [])
-  const allCodes = [...new Set([...codes, ...editPromos].filter(Boolean))]
+  const allCodes = (codes.length ? codes : editPromos).filter(Boolean)
   const hasPromo = allCodes.length > 0
 
   if (hasPromo) {
@@ -1087,6 +1102,7 @@ async function updateOrder() {
     if (res.data.status === 'Failed') {
       showAlert(res.data.message)
     } else {
+      orderSubmitted.value = true
       init({ message: res.data.message, color: 'success' })
     }
     orderStore.editOrder = null as any
@@ -1258,6 +1274,7 @@ async function updateOrderWithPromo(promoCodes: string[]) {
     if (res.data?.status === 'Failed') {
       showAlert(res.data?.message || 'Order edit failed')
     } else {
+      orderSubmitted.value = true
       init({ message: res.data?.message || 'Order updated with promo', color: 'success' })
     }
     orderStore.editOrder = null as any
@@ -1379,11 +1396,13 @@ function normalizeCodes(singleStr, codesArr) {
   return codes
 }
 
-async function createOrder() {
+async function createOrder(force = false) {
+  if (apiLoading.value || orderSubmitted.value) return
   log('PAYMENT_INITIATED', {
     paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
     orderType: props.orderType,
     isEdit: !!orderStore.editOrder,
+    force,
   })
   apiLoading.value = true
 
@@ -1430,6 +1449,18 @@ async function createOrder() {
       const dateVal = props.dateSelected ? new Date(props.dateSelected) : new Date()
       const orderDateTime = !isNaN(dateVal.getTime()) ? dateVal.toISOString() : new Date().toISOString()
 
+      // Shops 1-15: internal service-zone "customers" whose phone is just 1..15
+      // (stored locally as "357" prefix + local "1".."15"). They routinely
+      // place multiple orders in a short window, so force past the backend's
+      // duplicate-order guard instead of prompting the operator.
+      const isShop1to15 = (() => {
+        const raw = String(orderStore.phoneNumber || '').replace(/\D/g, '')
+        const local = raw.startsWith('357') ? raw.slice(3) : raw
+        if (local.length === 0 || local.length > 2) return false
+        const num = Number(local)
+        return num >= 1 && num <= 15
+      })()
+
       const payload = {
         orderFor: orderFor.value,
         customerDetailId: props.customerDetailsId,
@@ -1447,6 +1478,7 @@ async function createOrder() {
         phoneNo: orderStore.phoneNumber || '',
         ...(codes.length ? { promoCodes: codes } : {}),
         ...(codes.length === 1 ? { promoCode: codes[0] } : {}),
+        ...(force || isShop1to15 ? { force: true } : {}),
       }
 
       orderResponse.value = await orderStore.createOrder(payload)
@@ -1501,6 +1533,35 @@ async function createOrder() {
             address: orderStore.address || '',
             deliveryNotes: orderStore.deliveryNotes || '',
           }))
+          // Survive the gateway redirect so we can log the success-return on the
+          // next page load, even if the success URL doesn't carry orderId in the query.
+          // localStorage is preferred over sessionStorage because some browsers drop
+          // sessionStorage on cross-origin redirects from payment gateways.
+          // We also snapshot userId/userName/outletId here because the user/service
+          // stores may not be populated yet when the redirected page mounts and tries
+          // to post the log — passing them through avoids a 400 on /cc/logs.
+          const pendingPaymentMarker = JSON.stringify({
+            orderId: orderResponse.value?.data?.data?._id || null,
+            paymentRequestId: response.data.data.requestId || null,
+            paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId || null,
+            orderType: props.orderType || null,
+            gateway: selectedPayment.value?.paymentGateway || 'Saferpay',
+            startedAt: new Date().toISOString(),
+            userId: userStore.userDetails?._id || null,
+            userName: userStore.userDetails?.name || userStore.userDetails?.email || 'unknown',
+            outletId: serviceStore.selectedRest || null,
+            phoneNo: orderStore.phoneNumber || null,
+          })
+          try {
+            localStorage.setItem('cc_pending_payment', pendingPaymentMarker)
+          } catch {
+            // ignore
+          }
+          try {
+            sessionStorage.setItem('cc_pending_payment', pendingPaymentMarker)
+          } catch {
+            // ignore
+          }
           // setInter()
           window.top.location.href = response.data.data.redirectUrl
         }
@@ -1532,6 +1593,51 @@ async function createOrder() {
       errorData.outOfStockItems.length
     ) {
       errorMessage = `${errorMessage} Items: ${errorData.outOfStockItems.join(', ')}`
+    }
+
+    // Possible duplicate order — backend safety net
+    if (errorData?.code === 'DUPLICATE_ORDER_SUSPECTED') {
+      log('ORDER_DUPLICATE_SUSPECTED', {
+        kind: errorData.kind,
+        match: errorData.match,
+        paymentMethod: selectedPayment.value?.name || selectedPayment.value?.paymentTypeId,
+        orderType: props.orderType,
+      })
+
+      const m = errorData.match || {}
+      const isFuture = String(m.orderFor || '').toLowerCase() === 'future'
+      const when = m.orderDateTime || m.createdAt
+      const whenStr = when ? new Date(when).toLocaleString() : ''
+      const totalStr = Number(m.total || 0).toFixed(2)
+      const tableStr = m.tableNumber ? ` (table ${m.tableNumber})` : ''
+
+      const message =
+        `${errorData.message}\n\n` +
+        `• ${isFuture ? 'Scheduled' : 'Placed'}: ${whenStr}\n` +
+        `• Total: €${totalStr}${tableStr}\n` +
+        `• Status: ${m.status || ''}\n\n` +
+        `View the customer's order history, or proceed and place this order anyway?`
+
+      apiLoading.value = false
+      orderStore.setPaymentLink('')
+
+      const proceed = await confirm({
+        title: 'Possible duplicate order',
+        message,
+        okText: 'Proceed Anyway',
+        cancelText: 'View History',
+        size: 'medium',
+      })
+
+      if (proceed) {
+        log('ORDER_DUPLICATE_PROCEED', { match: errorData.match })
+        await createOrder(true)
+      } else {
+        log('ORDER_DUPLICATE_VIEW_HISTORY', { match: errorData.match })
+        emits('view-history')
+        emits('cancel')
+      }
+      return
     }
 
     log('ORDER_FAILED', {

@@ -112,8 +112,18 @@
                 </div>
               </div>
 
-              <!-- Dismiss button -->
-              <div class="flex justify-end pt-1">
+              <!-- Retry / Dismiss buttons -->
+              <div class="flex justify-end gap-2 pt-1">
+                <VaButton
+                  preset="primary"
+                  size="small"
+                  color="warning"
+                  :loading="retryingIds.has(item._id)"
+                  :disabled="retryingIds.has(item._id)"
+                  @click="onRetry(item._id)"
+                >
+                  Retry
+                </VaButton>
                 <VaButton preset="secondary" size="small" @click="store.markRead(item._id)">
                   Dismiss
                 </VaButton>
@@ -128,17 +138,46 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useToast } from 'vuestic-ui'
 import VaIconNotification from '../../../icons/VaIconNotification.vue'
 import { useNotificationsStore, type WinmaxNotification, type OrderItem } from '../../../../stores/notifications'
 
 const store = useNotificationsStore()
 const expandedIds = ref<Set<string>>(new Set())
+const retryingIds = ref<Set<string>>(new Set())
+const { init } = useToast()
 
 function toggleExpand(id: string) {
   if (expandedIds.value.has(id)) {
     expandedIds.value.delete(id)
   } else {
     expandedIds.value.add(id)
+  }
+}
+
+async function onRetry(id: string) {
+  if (retryingIds.value.has(id)) return
+  retryingIds.value.add(id)
+  try {
+    const result = await store.retry(id)
+    if (result?.alreadySent) {
+      init({ message: 'Order was already sent to Winmax.', color: 'info' })
+    } else if (result?.escalated) {
+      init({
+        message: `Re-queued. This order has been retried ${result.manualRetryCount} times — notifying the team.`,
+        color: 'warning',
+      })
+    } else {
+      init({ message: 'Order re-queued for Winmax.', color: 'success' })
+    }
+    store.fetchNotifications()
+  } catch (err: any) {
+    init({
+      message: err?.response?.data?.message || 'Failed to re-queue order.',
+      color: 'danger',
+    })
+  } finally {
+    retryingIds.value.delete(id)
   }
 }
 

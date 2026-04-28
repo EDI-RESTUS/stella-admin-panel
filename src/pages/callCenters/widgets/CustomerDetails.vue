@@ -414,7 +414,7 @@ const phoneNumber = computed({
     return phonePrefix.value + phoneLocal.value
   },
   set(val) {
-    const raw = String(val || '').replace(/\D/g, '')
+    const raw = String(val || '').replace(/\D/g, '').replace(/^00/, '')
     if (!raw) {
       phoneLocal.value = ''
       return
@@ -451,7 +451,8 @@ const isRestoringOrderContext = ref(false)
 const restoredDeliveryZoneId = ref('')
 
 watch(phoneNumber, (val) => {
-  orderStore.setPhoneNumber(val)
+  const digits = String(val || '').replace(/\D/g, '').replace(/^00/, '')
+  orderStore.setPhoneNumber(digits ? '00' + digits : '')
 })
 
 // Nuclear option: forcefully prevent notes from being set in takeaway mode
@@ -796,6 +797,10 @@ async function fetchCustomerDetails(setUser = false) {
                   if (!u._id && stellaUser._id) {
                     u._id = stellaUser._id
                   }
+                  if (stellaUser.isStaff) {
+                    u.isStaff = true
+                    if (stellaUser.staffName) u.staffName = stellaUser.staffName
+                  }
                   if (u.OtherAddresses) {
                     u.OtherAddresses.forEach((wmAddr) => {
                       const match = stellaAddrs.find(
@@ -950,7 +955,7 @@ function setNewUser(payload) {
   fetchCustomerDetails(true)
 }
 
-function selectUser(user) {
+async function selectUser(user) {
   // normalize different payload shapes
   const normName = user['Name'] ?? user['customerName'] ?? user['name'] ?? ''
   const normPhone = user['MobilePhone'] ?? user['Phone'] ?? user['phoneNo'] ?? user['phone'] ?? ''
@@ -994,6 +999,86 @@ function selectUser(user) {
     setTimeout(() => {
       orderStore.deliveryNotes = ''
     }, 0)
+  }
+
+  await promptIfStaff(selectedUser.value)
+  await promptIfActiveOrders(selectedUser.value)
+}
+
+async function promptIfStaff(user) {
+  if (!user?.isStaff) return
+  log('STAFF_CUSTOMER_SELECTED', {
+    customerName: user?.Name || user?.customerName,
+    phone: user?.MobilePhone || user?.phoneNo,
+    staffName: user?.staffName,
+  })
+  await confirm({
+    title: 'Staff Customer',
+    message: `This customer is staff${user?.staffName ? ` (${user.staffName})` : ''}.`,
+    okText: 'OK',
+    cancelText: '',
+    size: 'small',
+  })
+}
+
+async function promptIfActiveOrders(user) {
+  const customerDetailId = user?._id
+  const servicesStore = useServiceStore()
+  const outletId = servicesStore.selectedRest
+  if (!customerDetailId || !outletId) return
+
+  // Shops 1-15 are internal service-zone "customers" that routinely carry
+  // multiple simultaneous active orders — suppress the existing-orders prompt
+  // for them so the operator isn't interrupted on every customer select.
+  if (isLocationLocked.value) return
+
+  let items = []
+  try {
+    const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/orders/customer-active`, {
+      params: { customerDetailId, outletId },
+    })
+    items = Array.isArray(res?.data?.data) ? res.data.data : []
+  } catch (err) {
+    console.warn('[CustomerDetails] active orders lookup failed:', err)
+    return
+  }
+
+  if (!items.length) return
+
+  log('ACTIVE_ORDERS_FOUND', {
+    customerDetailId,
+    count: items.length,
+    orderIds: items.map((o) => o._id),
+  })
+
+  const lines = items.slice(0, 3).map((o) => {
+    const isFuture = String(o.orderFor || '').toLowerCase() === 'future'
+    const when = new Date(isFuture ? o.orderDateTime : o.createdAt).toLocaleString()
+    const total = Number(o.total || 0).toFixed(2)
+    const tag = isFuture ? 'Scheduled' : 'Recent'
+    return `• ${tag} ${o.orderType || ''} — €${total} — ${when}${o.tableNumber ? ` (table ${o.tableNumber})` : ''}`
+  })
+  const more = items.length > 3 ? `\n…and ${items.length - 3} more` : ''
+
+  const message =
+    `${user?.Name || 'This customer'} already has ${items.length} active order${items.length > 1 ? 's' : ''}:\n\n` +
+    lines.join('\n') +
+    more +
+    `\n\nOpen the order history to edit one, or continue and place a new order?`
+
+  const openHistory = await confirm({
+    title: 'Existing orders found',
+    message,
+    okText: 'Open History',
+    cancelText: 'Place New',
+    size: 'medium',
+  })
+
+  if (openHistory) {
+    log('ACTIVE_ORDERS_OPEN_HISTORY', { customerDetailId })
+    showHistoryModal.value = true
+  } else {
+    log('ACTIVE_ORDERS_PLACE_NEW', { customerDetailId })
   }
 }
 
@@ -1579,9 +1664,14 @@ watch(orderFor, (newVal) => {
   orderStore.setOrderFor(newVal)
 })
 
+function openHistoryModal() {
+  showHistoryModal.value = true
+}
+
 defineExpose({
   isOpen,
   fromEditOrder,
+  openHistoryModal,
 })
 </script>
 

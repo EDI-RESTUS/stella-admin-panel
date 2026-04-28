@@ -2,10 +2,21 @@
 import { defineVaDataTableColumns, useModal, useToast } from 'vuestic-ui'
 import { ref, reactive, computed, watch, onMounted, onUnmounted, toRef } from 'vue'
 import { useServiceStore } from '@/stores/services'
+import { useUsersStore } from '@/stores/users'
 import EditArticleOptionModal from '../modals/EditArticleOptionModal.vue'
 import FileUpload from '@/components/file-uploader/FileUpload.vue'
 import axios from 'axios'
 import { Search, Plus, Columns3, Pencil, CirclePlus, Copy } from 'lucide-vue-next'
+
+const usersStore = useUsersStore()
+const isSupervisor = computed(() => (usersStore.userDetails as any)?.role === 'supervisor')
+
+// Supervisor is allowed to change stock-by-zone only; every inline edit trigger
+// routes through this guard so the row can't flip into edit mode.
+const tryEdit = (cb: () => void) => {
+  if (isSupervisor.value) return
+  cb()
+}
 
 const isEditArticleOptionModal = ref(false)
 const selectedOptions = ref('')
@@ -143,6 +154,10 @@ watch(
 
 // Update option
 async function updateData(rowData) {
+  // Supervisor can only change stock-by-zone, which has its own dedicated
+  // endpoint (toggleZoneStock). Block any other inline PATCH so they can't
+  // accidentally overwrite name/code/price/etc.
+  if (isSupervisor.value) return
   const url = import.meta.env.VITE_API_BASE_URL
   const data = { ...rowData, outletId: selectedRest.value }
   try {
@@ -182,10 +197,12 @@ const cloneArticle = (article) => {
 }
 
 const openEditModal = (option) => {
+  if (isSupervisor.value) return
   selectedOptions.value = option
   isEditArticleOptionModal.value = true
 }
 function openFileModal(data) {
+  if (isSupervisor.value) return
   document.getElementById('file-upload-' + data._id)?.click()
 }
 const deleteAsset = async (assetId: string) => {
@@ -275,7 +292,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
     <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
       <div class="flex items-center gap-2">
         <!-- Option Groups / Options Toggle -->
-        <div class="flex bg-slate-100 rounded-xl shadow-sm overflow-hidden h-9">
+        <div v-if="!isSupervisor" class="flex bg-slate-100 rounded-xl shadow-sm overflow-hidden h-9">
           <button
             :class="[
               'whitespace-nowrap px-4 text-base font-medium transition-colors',
@@ -376,6 +393,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
 
         <!-- Add Option -->
         <button
+          v-if="!isSupervisor"
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow-md"
           @click="isEditArticleOptionModal = true"
         >
@@ -491,7 +509,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
                 updateData(rowData);
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editPOSName = true">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editPOSName = true))">
               <span>{{ rowData.posName || '' }}</span>
               <Pencil
                 v-if="rowData.posName"
@@ -515,7 +533,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
                 updateData(rowData);
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editCode = true">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editCode = true))">
               <span>{{ rowData.code || '' }}</span>
               <Pencil
                 v-if="rowData.code"
@@ -535,7 +553,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
                 getTypeClasses(rowData.type),
                 'flex items-center gap-1 px-3 py-1.5 text-sm rounded-full font-medium transition-colors',
               ]"
-              @click.stop="rowData.showTypeDropdown = !rowData.showTypeDropdown"
+              @click.stop="tryEdit(() => (rowData.showTypeDropdown = !rowData.showTypeDropdown))"
             >
               {{
                 rowData.type
@@ -594,7 +612,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
                 updateData(rowData);
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editPrice = true">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editPrice = true))">
               <span>
                 {{ rowData.price ? `€ ${formatPrice(rowData.price)}` : '' }}
               </span>
@@ -609,7 +627,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
               <CirclePlus
                 v-else
                 class="w-4 h-4 text-slate-300 hover:text-blue-500 transition-colors"
-                @click.stop="rowData.editPrice = true"
+                @click.stop="tryEdit(() => (rowData.editPrice = true))"
               />
             </div>
           </div>
@@ -629,7 +647,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
                 updateData(rowData);
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editMinimumChoices = true">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editMinimumChoices = true))">
               <span>{{ rowData.minimumChoices }}</span>
               <Pencil
                 v-if="rowData.minimumChoices !== null && rowData.minimumChoices !== undefined"
@@ -654,7 +672,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
                 updateData(rowData);
               "
             />
-            <div v-else class="editable-text cursor-pointer" @click="rowData.editMaximumChoices = true">
+            <div v-else class="editable-text cursor-pointer" @click="tryEdit(() => (rowData.editMaximumChoices = true))">
               <span>{{ rowData.maximumChoices }}</span>
               <Pencil
                 v-if="rowData.maximumChoices !== null && rowData.maximumChoices !== undefined"
@@ -668,8 +686,17 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
         <!-- ACTIVE -->
         <template #cell(isActive)="{ rowData }">
           <div class="flex justify-center items-center">
-            <label class="relative inline-block w-9 h-5 cursor-pointer">
-              <input v-model="rowData.isActive" type="checkbox" class="sr-only" @change="updateData(rowData)" />
+            <label
+              class="relative inline-block w-9 h-5"
+              :class="isSupervisor ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
+            >
+              <input
+                v-model="rowData.isActive"
+                type="checkbox"
+                class="sr-only"
+                :disabled="isSupervisor"
+                @change="isSupervisor ? null : updateData(rowData)"
+              />
               <span
                 :class="rowData.isActive ? 'bg-emerald-500' : 'bg-slate-300'"
                 class="block rounded-full h-5 w-9 transition-colors duration-300"
@@ -757,7 +784,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
 
         <!-- ACTIONS -->
         <template #cell(actions)="{ rowData }">
-          <div class="flex justify-end items-center gap-1">
+          <div v-if="!isSupervisor" class="flex justify-end items-center gap-1">
             <button
               class="flex items-center justify-center w-7 h-7 rounded-lg text-slate-600 hover:bg-slate-200 transition-colors duration-150 active:scale-95"
               title="Duplicate Option"

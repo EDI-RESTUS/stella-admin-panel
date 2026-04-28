@@ -137,6 +137,7 @@
               :is-customer-open="accordian[0]"
               @restore-context="updateContext"
               @success="resetContext"
+              @view-history="customerRef?.openHistoryModal?.()"
             />
           </VaCardContent>
         </VaCard>

@@ -2055,10 +2055,16 @@ const fetchOrders = async () => {
 
   try {
     const phone = props.customer?.MobilePhone || props.customer?.Phone || props.customer?.phoneNo || ''
-    log('HISTORY_VIEWED', { phone })
-    const res = await axios.get(
-      `${url}/orders/history?phone=${phone}&page=1&limit=500&from=2025-01-01&status=Completed`,
-    )
+    const customerDetailId = props.customer?._id || props.customer?.id || ''
+    log('HISTORY_VIEWED', { phone, customerDetailId })
+    const res = await axios.get(`${url}/orders/history`, {
+      params: {
+        ...(customerDetailId ? { customerDetailId } : {}),
+        ...(phone ? { phone } : {}),
+        page: 1,
+        limit: 500,
+      },
+    })
 
     if (res.data?.status === 'Success') {
       orders.value = res.data.data.items.map((order) => {

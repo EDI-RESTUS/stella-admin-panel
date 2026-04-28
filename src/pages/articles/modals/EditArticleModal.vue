@@ -47,7 +47,15 @@
       </div>
       <div class="flex items-center gap-x-10">
         <VaInput v-model="formData.price" label="Price" placeholder="Price" type="number" class="mb-1 max-w-[200px]" />
-        <VaSelect id="options" disabled label="Options" :multiple="true" value-by="value" class="mb-1 max-w-[200px]" />
+        <VaSelect
+          id="options"
+          v-model="formData.articlesOptionsGroupIds"
+          label="Options"
+          :options="optionGroupOptions"
+          :multiple="true"
+          value-by="value"
+          class="mb-1 max-w-[200px]"
+        />
         <VaSelect
           id="allergens"
           v-model="formData.allergenIds"
@@ -140,9 +148,13 @@ const formData = ref({
   inStock: true,
   outletId: '',
   subCategories: [] as string[],
+  articlesOptionsGroupIds: [] as string[],
   assetId: '',
   _id: '',
 })
+
+const optionGroupOptions = ref<{ text: string; value: string }[]>([])
+const existingOptionGroups = ref<Record<string, any>>({})
 
 function validate() {
   if (Object.keys(formData.value.name).length === 0) {
@@ -189,6 +201,17 @@ const getOutletDetails = async () => {
 }
 
 if (props.selectedCategory) {
+  const existingGroups = Array.isArray(props.selectedCategory.articlesOptionsGroup)
+    ? props.selectedCategory.articlesOptionsGroup
+    : []
+  const existingGroupIds = existingGroups
+    .map((g: any) => String(g?.id || g?._id || ''))
+    .filter((id: string) => !!id)
+  existingGroups.forEach((g: any) => {
+    const id = String(g?.id || g?._id || '')
+    if (id) existingOptionGroups.value[id] = g
+  })
+
   formData.value = {
     ...formData.value,
     ...props.selectedCategory,
@@ -202,12 +225,44 @@ if (props.selectedCategory) {
         : { ...props.selectedCategory.description },
     categories: props.selectedCategory.categories.map((e) => e.wCode),
     subCategories: props.selectedCategory.subCategories.map((e) => e.wCode),
+    articlesOptionsGroupIds: existingGroupIds,
     assetId: props.selectedCategory.assetId ? props.selectedCategory.assetId._id : null,
+  }
+}
+
+async function getOptionGroups() {
+  if (!servicesStore.selectedRest) return
+  try {
+    const response = await axios.get(
+      `${import.meta.env.VITE_API_BASE_URL}/articles-options-groups?limit=500&page=1&outletId=${encodeURIComponent(
+        servicesStore.selectedRest,
+      )}&isActive=true&rawName=true`,
+    )
+    const raw = response.data
+    const items = Array.isArray(raw) ? raw : raw.items || raw.result || []
+    optionGroupOptions.value = items
+      .map((g: any) => {
+        // Show internalName so back-office users see the staff-facing label.
+        // Fall back to the localized name if internalName isn't set so the
+        // dropdown never goes blank.
+        const internal = typeof g.internalName === 'string' ? g.internalName.trim() : ''
+        return {
+          text: internal || getLocalizedValue(g.name),
+          value: String(g._id),
+        }
+      })
+      .filter((o: { text: string; value: string }) => !!o.value)
+      .sort((a: { text: string }, b: { text: string }) =>
+        a.text.localeCompare(b.text, undefined, { sensitivity: 'base' }),
+      )
+  } catch (err) {
+    console.error('Failed to fetch option groups', err)
   }
 }
 
 onMounted(() => {
   getOutletDetails()
+  getOptionGroups()
 })
 
 const selectedRest = computed(() => servicesStore.selectedRest)
@@ -295,7 +350,7 @@ const titleName = computed(() => {
 
 const submit = () => {
   if (validate()) {
-    const data = formData.value
+    const data: any = formData.value
     // data.code = formData.value.code.toString()
     const cate = JSON.parse(JSON.stringify(categories.value))
     const subCate = JSON.parse(JSON.stringify(subCategories.value))
@@ -308,7 +363,6 @@ const submit = () => {
       .filter((a) => a.id)
     data.subCategories = formData.value.subCategories
       .map((e) => {
-        console.log(e, subCategories)
         {
           return {
             id: subCate.find((subCat) => subCat.wCode === e) ? subCate.find((subCat) => subCat.wCode === e)._id : '',
@@ -324,24 +378,17 @@ const submit = () => {
       delete data.assetId
     }
 
-    // Sanitize articlesOptionsGroup to remove Mongoose wrappers
-    if (data.articlesOptionsGroup && Array.isArray(data.articlesOptionsGroup) && data.articlesOptionsGroup.length > 0) {
-      // If the array contains a Mongoose wrapper with __parentArray (as per user report), use that array
-      if ((data.articlesOptionsGroup[0] as any).__parentArray) {
-        data.articlesOptionsGroup = (data.articlesOptionsGroup[0] as any).__parentArray
+    // Build articlesOptionsGroup from the selected option group IDs, preserving
+    // any inner articlesOptions that were already attached to an existing group.
+    data.articlesOptionsGroup = (formData.value.articlesOptionsGroupIds || []).map((id, idx) => {
+      const prev = existingOptionGroups.value[id]
+      return {
+        id,
+        sortOrder: idx,
+        ...(prev?.articlesOptions ? { articlesOptions: prev.articlesOptions } : {}),
       }
-
-      // Map to ensure we use clear objects (unwrapping _doc if present)
-      data.articlesOptionsGroup = data.articlesOptionsGroup.map((group: any) => {
-        const cleanGroup = group._doc ? group._doc : group
-        // Ensure id is present or fallback to _id if id is missing but _id exists
-        // (Though typically _doc has id if virtuals are enabled, or we use _id as id)
-        if (!cleanGroup.id && cleanGroup._id) {
-          cleanGroup.id = cleanGroup._id
-        }
-        return cleanGroup
-      })
-    }
+    })
+    delete data.articlesOptionsGroupIds
     const url: any = import.meta.env.VITE_API_BASE_URL
     if (formData.value._id) {
       // if (data.code === props.selectedCategory.code) {

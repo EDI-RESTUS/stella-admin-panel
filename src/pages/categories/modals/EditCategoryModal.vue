@@ -48,6 +48,32 @@
         </div>
       </div>
       <div
+        v-if="formData.updating === '' || formData.updating === 'all'"
+        class="flex-1 mb-2"
+      >
+        <label
+          class="va-input-label va-input-wrapper__label va-input-wrapper__label--outer mt-2"
+          style="color: var(--va-primary)"
+          >Image</label
+        >
+        <FileUpload
+          :selected-rest="servicesStore.selectedRest"
+          @uploadSuccess="(data) => ((formData.imageUrl = data.url), (formData.assetId = data._id))"
+        />
+        <div class="flex items-center">
+          <img v-if="formData.imageUrl" :src="formData.imageUrl" alt="Category" class="w-32 h-32 mt-2 object-cover" />
+          <VaButton
+            v-if="formData.assetId"
+            preset="primary"
+            size="medium"
+            color="danger"
+            icon="mso-delete"
+            class="ml-2 h-12 w-12"
+            @click="deleteAsset"
+          />
+        </div>
+      </div>
+      <div
         v-if="formData.updating === '' || formData.updating === 'all' || formData.updating === 'subCategory'"
         class="cursor-pointer text-primary font-semibold underline flex justify-end items-center"
         @click="formData.subCategories.push({ wCode: '', name: '', description: '' })"
@@ -207,6 +233,7 @@ import axios from 'axios'
 import { validators } from '@/services/utils'
 import { useServiceStore } from '@/stores/services'
 import { useToast, useForm } from 'vuestic-ui'
+import FileUpload from '@/components/file-uploader/FileUpload.vue'
 const emits = defineEmits(['cancel'])
 const props = defineProps({
   selectedCategory: {
@@ -264,6 +291,8 @@ const formData = ref({
   outletId: '',
   subCategories: [],
   updating: '',
+  imageUrl: '',
+  assetId: '',
   schedule: {
     selected: 'daily',
     daily: {
@@ -328,6 +357,11 @@ if (props.selectedCategory) {
     areaId: Array.isArray(props.selectedCategory.areaId)
       ? props.selectedCategory.areaId
       : [props.selectedCategory.areaId],
+    imageUrl: props.selectedCategory.imageUrl || props.selectedCategory.image?.url || '',
+    assetId:
+      typeof props.selectedCategory.assetId === 'object' && props.selectedCategory.assetId
+        ? props.selectedCategory.assetId._id
+        : props.selectedCategory.assetId || '',
   }
 }
 
@@ -340,16 +374,14 @@ const submit = () => {
     delete data.__v // delete __v key for unnecessary used
     data.outletId = servicesStore.selectedRest
     data.areaId = formData.value.areaId.filter((a: any) => a !== null)
+    if (!data.assetId) delete data.assetId
+    if (!data.imageUrl) delete data.imageUrl
     data.subCategories = []
     formData.value.subCategories.forEach((a) => {
       const payload = JSON.parse(JSON.stringify(a))
       delete payload.sortOrder
-      delete payload._id
       delete payload.updatedAt
       delete payload.__v
-      if (a._id) {
-        delete a.wCode
-      }
       data.subCategories.push(payload)
     })
     const url: any = import.meta.env.VITE_API_BASE_URL
@@ -378,6 +410,24 @@ const submit = () => {
         })
     }
   }
+}
+
+const deleteAsset = () => {
+  if (!formData.value.assetId) {
+    formData.value.imageUrl = ''
+    return
+  }
+  const url: any = import.meta.env.VITE_API_BASE_URL
+  axios
+    .delete(`${url}/assets/${formData.value.assetId}`)
+    .then(() => {
+      formData.value.imageUrl = ''
+      formData.value.assetId = ''
+      init({ message: 'Image deleted', color: 'success' })
+    })
+    .catch((err) => {
+      init({ message: err?.response?.data?.error || 'Failed to delete image', color: 'danger' })
+    })
 }
 </script>
 

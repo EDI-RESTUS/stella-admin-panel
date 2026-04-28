@@ -481,11 +481,7 @@ async function deleteZone() {
 
   loading.value = true
   try {
-    const data = {
-      ...props.rowData,
-      isDeleted: true,
-    }
-    await axios.patch(`${url}/deliveryZones/${props.rowData._id}`, data)
+    await axios.delete(`${url}/deliveryZones/${props.rowData._id}`)
     init({ message: 'Delivery zone deleted successfully', color: 'success' })
     isVisible.value = false
   } catch (error: any) {

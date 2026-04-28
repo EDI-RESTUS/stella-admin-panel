@@ -150,7 +150,110 @@ function formatDatetime(iso: string) {
 }
 
 // ─── View mode ───────────────────────────────────────────────────────────────
-const viewMode = ref<'logs' | 'sessions'>('logs')
+const viewMode = ref<'logs' | 'sessions' | 'call-times'>('logs')
+
+// ─── Call-times report (per-user time-on-phone per order) ────────────────────
+type CallTimesUser = {
+  userId: string | null
+  userName: string
+  placedCount: number
+  placedTotalSec: number
+  placedAvgSec: number
+  placedMedianSec: number
+  placedP95Sec: number
+  cancelledCount: number
+  cancelledTotalSec: number
+  cancelledAvgSec: number
+  unterminatedCount: number
+  totalOnPhoneSec: number
+}
+
+const today = new Date().toISOString().slice(0, 10)
+const callTimesFrom = ref(today)
+const callTimesTo = ref(today)
+const callTimesUsers = ref<CallTimesUser[]>([])
+const isLoadingCallTimes = ref(false)
+
+async function fetchCallTimes() {
+  const outletId = serviceStore.selectedRest
+  if (!outletId || !callTimesFrom.value || !callTimesTo.value) return
+  isLoadingCallTimes.value = true
+  try {
+    const { data } = await axios.get(`${API}/cc/logs/call-times`, {
+      params: {
+        outletId,
+        from: callTimesFrom.value,
+        to: callTimesTo.value,
+      },
+    })
+    callTimesUsers.value = data?.users || []
+  } catch {
+    callTimesUsers.value = []
+  } finally {
+    isLoadingCallTimes.value = false
+  }
+}
+
+function formatDuration(totalSec: number) {
+  if (!totalSec) return '0s'
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  if (h) return `${h}h ${m}m ${s}s`
+  if (m) return `${m}m ${s}s`
+  return `${s}s`
+}
+
+function exportCallTimesCsv() {
+  const rows = [
+    [
+      'User',
+      'Placed',
+      'Avg (placed)',
+      'Median (placed)',
+      'P95 (placed)',
+      'Total (placed)',
+      'Cancelled',
+      'Avg (cancelled)',
+      'Total (cancelled)',
+      'Unterminated',
+      'Total on phone',
+    ],
+    ...callTimesUsers.value.map((u) => [
+      u.userName,
+      u.placedCount,
+      u.placedAvgSec,
+      u.placedMedianSec,
+      u.placedP95Sec,
+      u.placedTotalSec,
+      u.cancelledCount,
+      u.cancelledAvgSec,
+      u.cancelledTotalSec,
+      u.unterminatedCount,
+      u.totalOnPhoneSec,
+    ]),
+  ]
+  const csv = rows
+    .map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `call-times_${callTimesFrom.value}_${callTimesTo.value}.csv`
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
+watch(viewMode, (m) => {
+  if (m === 'call-times') fetchCallTimes()
+})
+watch(
+  () => serviceStore.selectedRest,
+  () => {
+    callTimesUsers.value = []
+    if (viewMode.value === 'call-times') fetchCallTimes()
+  },
+)
 
 // ─── Session grouping ────────────────────────────────────────────────────────
 const SESSION_GAP_MS = 30 * 60 * 1000
@@ -285,11 +388,16 @@ const sessionBorder: Record<Session['outcome'], string> = {
           :class="viewMode === 'sessions' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'"
           @click="viewMode = 'sessions'"
         >Sessions</button>
+        <button
+          class="px-4 py-1.5 font-medium transition"
+          :class="viewMode === 'call-times' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'"
+          @click="viewMode = 'call-times'"
+        >Call Times</button>
       </div>
     </div>
 
-    <!-- Top filters row -->
-    <div class="flex flex-wrap gap-4 mb-4">
+    <!-- Top filters row (logs / sessions only) -->
+    <div v-if="viewMode !== 'call-times'" class="flex flex-wrap gap-4 mb-4">
       <VaSelect
         v-model="selectedDate"
         :options="dates"
@@ -332,8 +440,8 @@ const sessionBorder: Record<Session['outcome'], string> = {
 
     </div>
 
-    <!-- Level filter pills -->
-    <div class="flex flex-wrap gap-2 mb-5">
+    <!-- Level filter pills (logs / sessions only) -->
+    <div v-if="viewMode !== 'call-times'" class="flex flex-wrap gap-2 mb-5">
       <button
         v-for="lvl in (['all', 'error', 'warning', 'normal'] as const)"
         :key="lvl"
@@ -357,11 +465,11 @@ const sessionBorder: Record<Session['outcome'], string> = {
       Please select an outlet from the top navigation bar.
     </div>
 
-    <div v-else-if="isLoadingLogs" class="flex justify-center py-10">
+    <div v-else-if="viewMode !== 'call-times' && isLoadingLogs" class="flex justify-center py-10">
       <VaProgressCircle indeterminate />
     </div>
 
-    <div v-else-if="!selectedDate" class="text-slate-400 text-sm">
+    <div v-else-if="viewMode !== 'call-times' && !selectedDate" class="text-slate-400 text-sm">
       Select a date to view logs.
     </div>
 
@@ -423,6 +531,67 @@ const sessionBorder: Record<Session['outcome'], string> = {
             <pre class="text-xs text-slate-600 whitespace-pre-wrap break-all">{{ JSON.stringify(entry.details, null, 2) }}</pre>
           </div>
         </div>
+      </div>
+    </template>
+
+    <!-- ── CALL TIMES VIEW ────────────────────────────────────────────────── -->
+    <template v-else-if="viewMode === 'call-times'">
+      <div class="flex flex-wrap items-end gap-3 mb-4">
+        <VaInput v-model="callTimesFrom" type="date" label="From" style="min-width: 160px" />
+        <VaInput v-model="callTimesTo" type="date" label="To" style="min-width: 160px" />
+        <VaButton size="small" :loading="isLoadingCallTimes" @click="fetchCallTimes">Run Report</VaButton>
+        <VaButton
+          preset="secondary"
+          size="small"
+          icon="download"
+          :disabled="!callTimesUsers.length"
+          @click="exportCallTimesCsv"
+        >CSV</VaButton>
+      </div>
+
+      <div v-if="isLoadingCallTimes" class="flex justify-center py-10">
+        <VaProgressCircle indeterminate />
+      </div>
+
+      <div v-else-if="!callTimesUsers.length" class="text-slate-400 text-sm">
+        No activity in this range. Set a date range and click <b>Run Report</b>.
+      </div>
+
+      <div v-else class="overflow-x-auto">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-slate-100 text-slate-700 text-left">
+              <th class="px-3 py-2 font-semibold">User</th>
+              <th class="px-3 py-2 font-semibold text-right">Placed</th>
+              <th class="px-3 py-2 font-semibold text-right">Avg</th>
+              <th class="px-3 py-2 font-semibold text-right">Median</th>
+              <th class="px-3 py-2 font-semibold text-right">P95</th>
+              <th class="px-3 py-2 font-semibold text-right">Total (placed)</th>
+              <th class="px-3 py-2 font-semibold text-right">Cancelled</th>
+              <th class="px-3 py-2 font-semibold text-right">Avg (cancel)</th>
+              <th class="px-3 py-2 font-semibold text-right">Unterminated</th>
+              <th class="px-3 py-2 font-semibold text-right">Total on phone</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="u in callTimesUsers"
+              :key="u.userId || u.userName"
+              class="border-b border-slate-100 hover:bg-slate-50"
+            >
+              <td class="px-3 py-2 font-medium text-slate-800">{{ u.userName }}</td>
+              <td class="px-3 py-2 text-right">{{ u.placedCount }}</td>
+              <td class="px-3 py-2 text-right">{{ formatDuration(u.placedAvgSec) }}</td>
+              <td class="px-3 py-2 text-right">{{ formatDuration(u.placedMedianSec) }}</td>
+              <td class="px-3 py-2 text-right">{{ formatDuration(u.placedP95Sec) }}</td>
+              <td class="px-3 py-2 text-right">{{ formatDuration(u.placedTotalSec) }}</td>
+              <td class="px-3 py-2 text-right">{{ u.cancelledCount }}</td>
+              <td class="px-3 py-2 text-right">{{ formatDuration(u.cancelledAvgSec) }}</td>
+              <td class="px-3 py-2 text-right">{{ u.unterminatedCount }}</td>
+              <td class="px-3 py-2 text-right font-semibold">{{ formatDuration(u.totalOnPhoneSec) }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </template>
 

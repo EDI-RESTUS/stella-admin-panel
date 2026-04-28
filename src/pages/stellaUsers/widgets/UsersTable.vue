@@ -65,6 +65,7 @@ const types = [
   { text: 'Caller', value: 'caller' },
   { text: 'Caller & Editor', value: 'caller-editor' },
   { text: 'Editor', value: 'editor' },
+  { text: 'Supervisor', value: 'supervisor' },
 ]
 
 const items = toRef(props, 'items')

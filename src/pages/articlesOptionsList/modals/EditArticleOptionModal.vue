@@ -25,7 +25,14 @@
           </div>
         </div>
         <VaInput v-model="formData.posName" label="POS Name" placeholder="POS Name" type="text" />
-        <VaInput v-model="formData.code" label="Code" placeholder="Code" type="text" />
+        <VaInput
+          v-model="formData.code"
+          :rules="[validators.required]"
+          required-mark
+          label="Code"
+          placeholder="Code"
+          type="text"
+        />
         <VaSelect
           v-model="formData.type"
           :rules="[validators.required]"

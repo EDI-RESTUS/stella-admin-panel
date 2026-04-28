@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useToast } from 'vuestic-ui'
 import { useRoute } from 'vue-router'
 import CategoriesTable from './widgets/CategoriesTable.vue'
@@ -41,12 +41,29 @@ const getCategories = (outletId) => {
 
 function updateSortBy(payload) {
   sortBy.value = payload
+  if (payload === 'wCode') return
   getCategories(serviceStore.selectedRest)
 }
 function updateSortOrder(payload) {
   sortOrder.value = payload
+  if (sortBy.value === 'wCode') return
   getCategories(serviceStore.selectedRest)
 }
+
+const displayedItems = computed(() => {
+  if (sortBy.value !== 'wCode') return items.value
+  const dir = sortOrder.value === 'desc' ? -1 : 1
+  return [...items.value].sort((a: any, b: any) => {
+    const na = Number(a.wCode)
+    const nb = Number(b.wCode)
+    const aNum = Number.isFinite(na)
+    const bNum = Number.isFinite(nb)
+    if (aNum && bNum) return (na - nb) * dir
+    if (aNum) return -1 * dir
+    if (bNum) return 1 * dir
+    return String(a.wCode ?? '').localeCompare(String(b.wCode ?? '')) * dir
+  })
+})
 
 const updateCategory = (payload) => {
   isEditCategoryModalOpen.value = true
@@ -121,7 +138,7 @@ const isImportCategoryModalOpen = ref(false)
     <VaCard class="mt-4">
       <VaCardContent>
         <CategoriesTable
-          :items="items"
+          :items="displayedItems"
           :loading="isLoading"
           :sort-by="sortBy"
           :sort-order="sortOrder"
