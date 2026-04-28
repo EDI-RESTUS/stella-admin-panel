@@ -820,27 +820,47 @@ async function fetchCustomerDetails(setUser = false) {
             }
 
             // Winmax HAS a match → use it
+            const mappedWmList = wmList.map((user) => ({
+              ...user,
+              OtherAddresses: Array.isArray(user.OtherAddresses)
+                ? user.OtherAddresses.map((add) => ({
+                    ...add,
+                    Address: typeof add.Address === 'string' ? add.Address : '',
+                    ZipCode:
+                      add.PostCode || add.postalCode || add.ZipCode
+                        ? add.PostCode || add.postalCode || add.ZipCode
+                        : add.Designation && (add.Designation.startsWith('Meet') || add.Designation.startsWith('M.P'))
+                          ? '' // Meeting points may not have a zip
+                          : typeof add.Address === 'string' && add.Address.split(',').length > 1
+                            ? add.Address.split(',')[add.Address.split(',').length - 1].trim()
+                            : '',
+                    deliveryNote: add.deliveryNote || '', // ADD THIS
+                  }))
+                : [],
+            }))
+
             if (!setUser) {
-              userResults.value = wmList.map((user) => ({
-                ...user,
-                OtherAddresses: Array.isArray(user.OtherAddresses)
-                  ? user.OtherAddresses.map((add) => ({
-                      ...add,
-                      Address: typeof add.Address === 'string' ? add.Address : '',
-                      ZipCode:
-                        add.PostCode || add.postalCode || add.ZipCode
-                          ? add.PostCode || add.postalCode || add.ZipCode
-                          : add.Designation && (add.Designation.startsWith('Meet') || add.Designation.startsWith('M.P'))
-                            ? '' // Meeting points may not have a zip
-                            : typeof add.Address === 'string' && add.Address.split(',').length > 1
-                              ? add.Address.split(',')[add.Address.split(',').length - 1].trim()
-                              : '',
-                      deliveryNote: add.deliveryNote || '', // ADD THIS
-                    }))
-                  : [],
-              }))
+              userResults.value = mappedWmList
             } else {
-              selectUser(wmList[0])
+              // Prefer an exact phone match before auto-selecting. We send
+              // both Phone and Name to Winmax, so a search like "35799842658
+              // + georgia" can return a different "georgia" whose phone is
+              // 35796269091 — auto-picking wmList[0] would silently switch
+              // the operator to the wrong customer. Fall back to showing the
+              // list when phone was typed but doesn't match any result, so
+              // the operator picks consciously or adds the customer.
+              const norm = (s) => String(s || '').replace(/\D+/g, '')
+              const wanted = norm(phoneNumber.value)
+              const exact = wanted
+                ? mappedWmList.find((u) => norm(u.MobilePhone || u.Phone) === wanted)
+                : null
+              if (exact) {
+                selectUser(exact)
+              } else if (!wanted) {
+                selectUser(mappedWmList[0])
+              } else {
+                userResults.value = mappedWmList
+              }
             }
             return
           }
