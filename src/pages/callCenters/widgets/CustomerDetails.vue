@@ -756,216 +756,134 @@ async function fetchCustomerDetails(setUser = false) {
   isUserLoading.value = true
   log('CUSTOMER_SEARCHED', { phone: phoneNumber.value, name: name.value, orderType: selectedTab.value })
 
-  if (!phoneNumber.value && !name.value) {
-    showAlert('Please provide name or phone number.')
+  if (!phoneNumber.value) {
+    showAlert('Please provide a phone number.')
     isUserLoading.value = false
     return
-  } else {
-    const servicesStore = useServiceStore()
+  }
 
-    await axios
-      .get(`${import.meta.env.VITE_API_BASE_URL}/winmax/entities`, {
-        params: {
-          outletId: servicesStore.selectedRest,
-          ...(phoneNumber.value && { Phone: phoneNumber.value }),
-          ...(name.value && { Name: name.value }),
-        },
+  const servicesStore = useServiceStore()
+  const norm = (s) => String(s || '').replace(/\D+/g, '')
+  const wanted = norm(phoneNumber.value)
+
+  // Phone is the unique identifier — and the only key we look customers up
+  // by. Matching by name can pull in someone else with the same name but a
+  // different phone, so the name field is intentionally ignored here.
+  const stellaParams = { phoneNo: phoneNumber.value }
+  const winmaxParams = { Phone: phoneNumber.value }
+
+  const mapStellaUser = (e) => ({
+    ...e,
+    Name: e.customerName,
+    MobilePhone: e.phoneNo,
+    OtherAddresses: (Array.isArray(e?.address) ? e.address : []).map((address) => ({
+      Designation: address.designation,
+      Address: [
+        address.aptNo,
+        address.floor,
+        address.streetName,
+        address.streetNo,
+        address.district,
+        address.city,
+        address.postalCode,
+      ]
+        .filter((val) => val && String(val).trim())
+        .join(','),
+      ZipCode: address.postalCode,
+      Phone: '',
+      Fax: '',
+      Location: '',
+      CountryCode: '',
+      deliveryNote: address.deliveryNote || '',
+    })),
+  })
+
+  const mapWinmaxUser = (user) => ({
+    ...user,
+    OtherAddresses: Array.isArray(user.OtherAddresses)
+      ? user.OtherAddresses.map((add) => ({
+          ...add,
+          Address: typeof add.Address === 'string' ? add.Address : '',
+          ZipCode:
+            add.PostCode || add.postalCode || add.ZipCode
+              ? add.PostCode || add.postalCode || add.ZipCode
+              : add.Designation && (add.Designation.startsWith('Meet') || add.Designation.startsWith('M.P'))
+                ? '' // Meeting points may not have a zip
+                : typeof add.Address === 'string' && add.Address.split(',').length > 1
+                  ? add.Address.split(',')[add.Address.split(',').length - 1].trim()
+                  : '',
+          deliveryNote: add.deliveryNote || '',
+        }))
+      : [],
+  })
+
+  try {
+    // 1) Stella first. If the customer was created via web or CC, this is
+    //    where they live. Backend returns hits sorted "best first" (has
+    //    password / most addresses / canonical "00…" phone), so hits[0] is
+    //    always the canonical record — even if a stub for the same phone
+    //    exists.
+    const stellaRes = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/customers/search`, {
+      params: { outletId: servicesStore.selectedRest, ...stellaParams },
+    })
+    const stellaHits = Array.isArray(stellaRes?.data?.data) ? stellaRes.data.data : []
+
+    if (stellaHits.length) {
+      const mapped = stellaHits.map(mapStellaUser)
+      userResults.value = mapped
+      if (setUser) {
+        // Backend already sorts hits "best first" (canonical phone, has
+        // password, most addresses), so mapped[0] is the right pick when no
+        // exact-string phone match exists across stored variants.
+        const exact = mapped.find((u) => norm(u.MobilePhone || u.Phone) === wanted)
+        selectUser(exact || mapped[0])
+      }
+      return
+    }
+
+    // 2) No Stella record → consult Winmax. This covers customers created
+    //    outside our pipelines (aggregators like Wolt/Foody/Bolt, or entities
+    //    entered directly in Winmax) and not yet imported to Stella.
+    let wmList = []
+    let winmaxNotFound = true
+    try {
+      const winmaxRes = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/winmax/entities`, {
+        params: { outletId: servicesStore.selectedRest, ...winmaxParams },
       })
-      .then(async (response) => {
-        if (response.status === 200) {
-          const wm = response.data
-          const wmList = Array.isArray(wm?.data) ? wm.data : []
-          const winmaxNotFound = /not\s*found/i.test(String(wm?.message || '')) || wmList.length === 0
+      const wm = winmaxRes.data
+      wmList = Array.isArray(wm?.data) ? wm.data : []
+      winmaxNotFound = /not\s*found/i.test(String(wm?.message || '')) || wmList.length === 0
+    } catch (err) {
+      console.warn('Winmax entity lookup failed', err)
+    }
 
-          if (!winmaxNotFound) {
-            // Winmax HAS a match → check Stella for 'deliveryNote' and merge BEFORE mapping/selecting
-            try {
-              const stellaRes = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/customers/search`, {
-                params: {
-                  outletId: servicesStore.selectedRest,
-                  ...(phoneNumber.value && { phoneNo: phoneNumber.value }),
-                  ...(name.value && { customerName: name.value }),
-                },
-              })
-              const hits = Array.isArray(stellaRes?.data?.data) ? stellaRes.data.data : []
-              if (hits.length > 0) {
-                const stellaUser = hits[0]
-                const stellaAddrs = Array.isArray(stellaUser.address) ? stellaUser.address : []
+    if (winmaxNotFound) {
+      openCustomerModal()
+      return
+    }
 
-                // Merge Stella _id and deliveryNote into Winmax list
-                wmList.forEach((u) => {
-                  if (!u._id && stellaUser._id) {
-                    u._id = stellaUser._id
-                  }
-                  if (stellaUser.isStaff) {
-                    u.isStaff = true
-                    if (stellaUser.staffName) u.staffName = stellaUser.staffName
-                  }
-                  if (u.OtherAddresses) {
-                    u.OtherAddresses.forEach((wmAddr) => {
-                      const match = stellaAddrs.find(
-                        (sa) =>
-                          (sa.designation || '').trim().toLowerCase() ===
-                          (wmAddr.Designation || '').trim().toLowerCase(),
-                      )
-                      if (match && match.deliveryNote) {
-                        wmAddr.deliveryNote = match.deliveryNote
-                      }
-                    })
-                  }
-                })
-              }
-            } catch (err) {
-              console.warn('Failed to fetch Stella details for merging notes', err)
-            }
+    const mappedWmList = wmList.map(mapWinmaxUser)
 
-            // Winmax HAS a match → use it
-            const mappedWmList = wmList.map((user) => ({
-              ...user,
-              OtherAddresses: Array.isArray(user.OtherAddresses)
-                ? user.OtherAddresses.map((add) => ({
-                    ...add,
-                    Address: typeof add.Address === 'string' ? add.Address : '',
-                    ZipCode:
-                      add.PostCode || add.postalCode || add.ZipCode
-                        ? add.PostCode || add.postalCode || add.ZipCode
-                        : add.Designation && (add.Designation.startsWith('Meet') || add.Designation.startsWith('M.P'))
-                          ? '' // Meeting points may not have a zip
-                          : typeof add.Address === 'string' && add.Address.split(',').length > 1
-                            ? add.Address.split(',')[add.Address.split(',').length - 1].trim()
-                            : '',
-                    deliveryNote: add.deliveryNote || '', // ADD THIS
-                  }))
-                : [],
-            }))
+    if (!setUser) {
+      userResults.value = mappedWmList
+      return
+    }
 
-            if (!setUser) {
-              userResults.value = mappedWmList
-            } else {
-              // Prefer an exact phone match before auto-selecting. We send
-              // both Phone and Name to Winmax, so a search like "35799842658
-              // + georgia" can return a different "georgia" whose phone is
-              // 35796269091 — auto-picking wmList[0] would silently switch
-              // the operator to the wrong customer. Fall back to showing the
-              // list when phone was typed but doesn't match any result, so
-              // the operator picks consciously or adds the customer.
-              const norm = (s) => String(s || '').replace(/\D+/g, '')
-              const wanted = norm(phoneNumber.value)
-              const exact = wanted
-                ? mappedWmList.find((u) => norm(u.MobilePhone || u.Phone) === wanted)
-                : null
-              if (exact) {
-                selectUser(exact)
-              } else if (!wanted) {
-                selectUser(mappedWmList[0])
-              } else {
-                userResults.value = mappedWmList
-              }
-            }
-            return
-          }
-
-          // Winmax returned 200 + "Entity not found..." OR empty data → query Stella
-          const stellaRes = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/customers/search`, {
-            params: {
-              outletId: servicesStore.selectedRest,
-              ...(phoneNumber.value && { phoneNo: phoneNumber.value }),
-              ...(name.value && { customerName: name.value }),
-            },
-          })
-
-          const hits = Array.isArray(stellaRes?.data?.data) ? stellaRes.data.data : []
-          if (hits.length) {
-            userResults.value = hits.map((e) => ({
-              ...e,
-              Name: e.customerName,
-              MobilePhone: e.phoneNo,
-              OtherAddresses: (Array.isArray(e?.address) ? e.address : []).map((address) => ({
-                Designation: address.designation,
-                Address: [
-                  address.aptNo,
-                  address.floor,
-                  address.streetName,
-                  address.streetNo,
-                  address.district,
-                  address.city,
-                  address.postalCode,
-                ]
-                  .filter((val) => val && String(val).trim())
-                  .join(','),
-                ZipCode: address.postalCode,
-                Phone: '',
-                Fax: '',
-                Location: '',
-                CountryCode: '',
-                deliveryNote: address.deliveryNote || '',
-              })),
-            }))
-
-            // If we need to auto-pick, prefer exact phone match
-            if (setUser && userResults.value.length) {
-              const norm = (s) => String(s || '').replace(/\D+/g, '')
-              const wanted = norm(phoneNumber.value)
-              const exact = userResults.value.find((u) => norm(u.MobilePhone || u.Phone) === wanted)
-              selectUser(exact || userResults.value[0])
-            }
-          } else {
-            // Neither Winmax nor Stella → open create modal
-            openCustomerModal()
-          }
-        }
-      })
-      .catch(async () => {
-        // If Winmax call errored (non-200), try Stella
-        await axios
-          .get(`${import.meta.env.VITE_API_BASE_URL}/customers/search`, {
-            params: {
-              outletId: servicesStore.selectedRest,
-              ...(phoneNumber.value && { phoneNo: phoneNumber.value }),
-              ...(name.value && { customerName: name.value }),
-            },
-          })
-          .then((response) => {
-            const arr = Array.isArray(response?.data?.data) ? response.data.data : []
-            userResults.value = arr.map((e) => ({
-              ...e,
-              Name: e.customerName,
-              MobilePhone: e.phoneNo,
-              OtherAddresses: (Array.isArray(e?.address) ? e.address : []).map((address) => ({
-                Designation: address.designation,
-                Address: [
-                  address.aptNo,
-                  address.floor,
-                  address.streetName,
-                  address.streetNo,
-                  address.district,
-                  address.city,
-                  address.postalCode,
-                ]
-                  .filter((val) => val && String(val).trim())
-                  .join(','),
-                ZipCode: address.postalCode,
-                Phone: '',
-                Fax: '',
-                Location: '',
-                CountryCode: '',
-                deliveryNote: address.deliveryNote || '',
-              })),
-            }))
-          })
-
-        if (!userResults.value.length) {
-          openCustomerModal()
-        } else if (setUser) {
-          const norm = (s) => String(s || '').replace(/\D+/g, '')
-          const wanted = norm(phoneNumber.value)
-          const exact = userResults.value.find((u) => norm(u.MobilePhone || u.Phone) === wanted)
-          selectUser(exact || userResults.value[0])
-        }
-      })
-      .finally(() => {
-        isUserLoading.value = false
-      })
+    // Auto-select only on exact phone match. If Winmax returns entities
+    // whose phones don't exactly match (different format, partial match),
+    // surface the list so the operator picks consciously rather than getting
+    // silently switched to a different customer.
+    const exact = mappedWmList.find((u) => norm(u.MobilePhone || u.Phone) === wanted)
+    if (exact) {
+      selectUser(exact)
+    } else {
+      userResults.value = mappedWmList
+    }
+  } catch (err) {
+    console.warn('Customer fetch failed', err)
+    openCustomerModal()
+  } finally {
+    isUserLoading.value = false
   }
 }
 
