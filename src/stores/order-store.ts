@@ -71,10 +71,25 @@ export const useOrderStore = defineStore('order', {
           )
         : s.cartItems.reduce((acc, item: any) => acc + (item.totalPrice || 0), 0),
 
-    // Offers (before promos) = sum of basePrice in offerDetails
+    // Offers (before promos) = sum of basePrice in offerDetails.
+    // Papa Pairings is special: basePrice is configured at 0 with pricing
+    // distributed onto items, so totalPrice is the correct "original" amount
+    // for that offer only. Every other offer keeps the original basePrice path.
     originalOffersTotal: (s) =>
       s.validation?.offerDetails?.length
-        ? Number(s.validation.offerDetails.reduce((sum, o) => sum + Number(o.basePrice || 0), 0).toFixed(2))
+        ? Number(
+            s.validation.offerDetails
+              .reduce((sum, o: any) => {
+                const name = String(o?.offerName || '').trim().toLowerCase()
+                const code = String(o?.code || '').trim().toUpperCase()
+                const isPapaPairings = name === 'papa pairings' || code === 'O-036'
+                const value = isPapaPairings
+                  ? Number(o.totalPrice ?? o.basePrice ?? 0)
+                  : Number(o.basePrice || 0)
+                return sum + value
+              }, 0)
+              .toFixed(2),
+          )
         : s.offerItems.reduce((acc, offer: any) => acc + (offer.totalPrice || 0), 0),
 
     // Items after promos = sum of updatedPrice

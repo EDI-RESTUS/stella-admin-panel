@@ -898,6 +898,72 @@ function linePromo(item) {
     }
   }
 
+  // Map this cart line to the validator entries that cover its slice of
+  // quantity, in cart order. For BOGO/1+1 the validator typically returns
+  // separate entries per occurrence (e.g. one at full price, one at €4) —
+  // averaging across cart lines hides which occurrence got the discount and
+  // ends up showing both pizzas at €13.50. Walking the entries in order and
+  // claiming this line's quantity range preserves the per-occurrence price.
+  const sameIdLines = items.value
+    .filter((it) => (it.menuItemId || it.id) === id)
+    .slice()
+    .sort((a, b) => Number(a.__renderIndex ?? 0) - Number(b.__renderIndex ?? 0))
+  // Match by __renderIndex (cart array position) rather than `id`, because
+  // the cart's `id`/`itemId` is the menu item's _id — when two cart lines
+  // share a menu item (e.g. two Hawaiians with different toppings) they
+  // collide on `id`, and findIndex would always return the first one,
+  // making both rows pick the same validator entry.
+  const myRenderIndex = Number(item.__renderIndex ?? NaN)
+  const myIdx = Number.isFinite(myRenderIndex)
+    ? sameIdLines.findIndex((it) => Number(it.__renderIndex ?? NaN) === myRenderIndex)
+    : -1
+
+  if (myIdx >= 0) {
+    let prevQty = 0
+    for (let i = 0; i < myIdx; i++) prevQty += Number(sameIdLines[i].quantity || 1)
+    const myQty = Math.max(1, Number(item.quantity || 1))
+
+    let cursor = 0
+    let myUpd = 0
+    let myOrig = 0
+    let touched = false
+    for (const entry of lines) {
+      const eQty = Math.max(1, Number(entry.quantity || 1))
+      const start = cursor
+      const end = cursor + eQty
+      const overlapStart = Math.max(start, prevQty)
+      const overlapEnd = Math.min(end, prevQty + myQty)
+      if (overlapStart < overlapEnd) {
+        const portion = (overlapEnd - overlapStart) / eQty
+        const entryUpd = Number(entry.updatedPrice || 0)
+        const entryOrig = Number(entry.originalPrice || 0) + Number(entry.optionsPrice || 0)
+        myUpd += entryUpd * portion
+        myOrig += entryOrig * portion
+        touched = true
+      }
+      cursor = end
+      if (cursor >= prevQty + myQty) break
+    }
+
+    if (touched) {
+      // Honor the cart's stored line total for the strikethrough but use the
+      // validator-derived updated price for the after-discount value.
+      const lineUpdated = Math.max(0, Number(myUpd.toFixed(2)))
+      const lineOriginal = cartLineTotal
+      const lineDiscount = Math.max(0, Number((lineOriginal - lineUpdated).toFixed(2)))
+      return {
+        hasAnyEffect: Math.abs(myOrig - myUpd) > 0.005 || lineDiscount > 0.005,
+        lineOriginal,
+        lineUpdated,
+        lineDiscount,
+        units: [],
+      }
+    }
+  }
+
+  // Fallback: validator entries don't align cleanly to cart lines (e.g. a
+  // single bundled entry covering the whole menuItemId). Apportion the
+  // menuItemId-level discount evenly by quantity share, same as before.
   const totalOrigForId = lines.reduce(
     (s, l) => s + Number(l.originalPrice || 0) + Number(l.optionsPrice || 0),
     0,
@@ -906,7 +972,6 @@ function linePromo(item) {
   const totalDiscountForId = Math.max(0, totalOrigForId - totalUpdForId)
   const hasAnyAffected = lines.some((l) => !!l.isAffected) || totalDiscountForId > 0.005
 
-  // Apportion the menuItemId-level discount across cart lines by quantity share
   const totalCartQtyForId = items.value.reduce(
     (s, it) => ((it.menuItemId || it.id) === id ? s + Number(it.quantity || 1) : s),
     0,
