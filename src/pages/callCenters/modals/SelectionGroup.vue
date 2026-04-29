@@ -37,20 +37,41 @@
         <div class="selection-status"></div>
       </div>
 
-      <div
-        v-for="n in group.max - group.addedItems.length"
-        :key="'ph-' + n"
-        class="selection-item placeholder"
-        @click="openSelectionItemModal(group)"
-      >
-        <div class="item-image cursor-pointer" style="color: #2d5016">➕</div>
-        <div class="item-content cursor-pointer">
-          <div class="item-label">{{ group.name }} {{ n }}</div>
-          <div class="item-name">Select Your {{ group.description }}</div>
-          <div class="item-description">Choose from options</div>
+      <template v-if="isProgressivePlaceholder">
+        <div
+          v-if="group.addedItems.length < group.max"
+          class="selection-item placeholder"
+          @click="openSelectionItemModal(group)"
+        >
+          <div class="item-image cursor-pointer" style="color: #2d5016">➕</div>
+          <div class="item-content cursor-pointer">
+            <div class="item-label">
+              {{ group.addedItems.length === 0 ? `${group.name} 1` : `Add another ${group.name}` }}
+            </div>
+            <div class="item-name">
+              {{ group.addedItems.length === 0 ? `Select Your ${group.description}` : 'Click to add' }}
+            </div>
+            <div class="item-description">Choose from options</div>
+          </div>
+          <div class="selection-status"></div>
         </div>
-        <div class="selection-status"></div>
-      </div>
+      </template>
+      <template v-else>
+        <div
+          v-for="n in group.max - group.addedItems.length"
+          :key="'ph-' + n"
+          class="selection-item placeholder"
+          @click="openSelectionItemModal(group)"
+        >
+          <div class="item-image cursor-pointer" style="color: #2d5016">➕</div>
+          <div class="item-content cursor-pointer">
+            <div class="item-label">{{ group.name }} {{ n }}</div>
+            <div class="item-name">Select Your {{ group.description }}</div>
+            <div class="item-description">Choose from options</div>
+          </div>
+          <div class="selection-status"></div>
+        </div>
+      </template>
     </div>
     <OffersMenuItemsSelectionModal
       v-if="isItemSelectionModalVisible"
@@ -73,7 +94,10 @@ import { useMenuStore } from '@/stores/getMenu'
 const props = defineProps({
   group: Object,
   isEdit: Boolean,
+  offerName: { type: String, default: '' },
 })
+
+const isProgressivePlaceholder = computed(() => (props.offerName || '').trim().toLowerCase() === 'papa pairings')
 const emit = defineEmits(['update:selectedItems'])
 const menuStore = useMenuStore()
 const isItemSelectionModalVisible = ref(false)

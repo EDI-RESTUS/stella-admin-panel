@@ -53,7 +53,13 @@
             <p class="text-center text-gray-500">Loading offer details...</p>
           </div>
           <div v-else>
-            <SelectionGroup v-for="group in offer.selections" :key="group.title" :is-edit="isEdit" :group="group" />
+            <SelectionGroup
+              v-for="group in offer.selections"
+              :key="group.title"
+              :is-edit="isEdit"
+              :group="group"
+              :offer-name="offer.name"
+            />
           </div>
         </div>
       </div>
@@ -126,9 +132,14 @@ watch(showOfferModal, (val) => {
 onBeforeUnmount(() => {
   menuStore.setOffer(null)
 })
+const isPapaPairings = computed(() => (offer.value?.name || '').trim().toLowerCase() === 'papa pairings')
+
+const minBundleItems = computed(() => (isPapaPairings.value ? 2 : 0))
+
 const totalRequired = computed(() => {
   if (!offer.value) return 0
-  return offer.value.selections.reduce((total, group) => total + group.min, 0)
+  const sumOfMins = offer.value.selections.reduce((total, group) => total + group.min, 0)
+  return Math.max(sumOfMins, minBundleItems.value)
 })
 
 const totalSelected = computed(() => {
@@ -138,13 +149,11 @@ const totalSelected = computed(() => {
 
 // Disable if no items selected at all
 const hasAtLeastOneSelection = computed(() => {
-  return offer.value
-    ? offer.value.selections.filter((a) => a.isRequired).length
-      ? offer.value.selections
-          .filter((a) => a.isRequired)
-          .every((group) => group.addedItems && group.addedItems.length > 0)
-      : true
-    : false
+  if (!offer.value) return false
+  if (totalSelected.value < minBundleItems.value) return false
+  const requiredGroups = offer.value.selections.filter((a) => a.isRequired)
+  if (!requiredGroups.length) return true
+  return requiredGroups.every((group) => group.addedItems && group.addedItems.length > 0)
 })
 
 const { addOnPrice } = storeToRefs(menuStore)
