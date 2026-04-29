@@ -201,7 +201,7 @@
               </div>
 
               <!-- Payment button -->
-              <div class="pt-4">
+              <div class="pt-4 flex flex-col gap-2">
                 <button
                   id="confirmBtn"
                   :disabled="apiLoading || orderSubmitted || !selectedPayment"
@@ -210,6 +210,14 @@
                 >
                   <span v-if="!apiLoading" id="btnText">Payment</span>
                   <div v-if="apiLoading" id="loadingSpinner" class="loading-spinner animate-spin"></div>
+                </button>
+                <button
+                  v-if="canCancelExistingOrder"
+                  :disabled="apiLoading"
+                  class="btn !w-full !min-w-0 py-2 !text-lg !bg-red-600 hover:!bg-red-700 !text-white !border-red-600"
+                  @click="confirmCancelOrder()"
+                >
+                  Cancel Order
                 </button>
               </div>
             </div>
@@ -942,6 +950,26 @@ const editDifference = computed(() => {
 })
 function resetInter() {
   clearInterval(checkInterval.value)
+}
+
+// Cancel button is shown when the modal is reopened with an existing order
+// (e.g. after a failed Visa / Cash CC / SaferPay / Wallet redirect) and we're
+// not in the edit-order flow. The order needs to be explicitly cancelled before
+// abandoning, otherwise it stays open in the system.
+const canCancelExistingOrder = computed(
+  () => !!orderId.value && !orderStore.editOrder && !apiLoading.value && !orderSubmitted.value,
+)
+
+async function confirmCancelOrder() {
+  const proceed = await confirm({
+    title: 'Cancel order?',
+    message: 'This will cancel order ' + (orderId.value || '') + '. This cannot be undone.',
+    okText: 'Cancel Order',
+    cancelText: 'Keep Order',
+    size: 'small',
+  })
+  if (!proceed) return
+  await cancelOrder()
 }
 
 async function cancelOrder() {
