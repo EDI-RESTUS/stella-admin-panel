@@ -288,6 +288,7 @@
               <VaCheckbox v-model="formData.availableAtCC" label="Available at CC" />
               <VaCheckbox v-model="formData.availableAtWeb" label="Available at Web" />
               <VaCheckbox v-model="formData.affectOffers" label="Affect Offers" />
+              <VaCheckbox v-model="formData.isOffer" label="Is Offer" />
             </div>
           </section>
         </div>
@@ -487,6 +488,7 @@ const formData = ref({
   availableAtCC: false,
   availableAtWeb: false,
   affectOffers: false,
+  isOffer: false,
   minimumOrder: null,
   takeQuantity: null,
   payQuantity: null,
@@ -519,6 +521,7 @@ const resetForm = () => {
     availableAtCC: false,
     availableAtWeb: false,
     affectOffers: false,
+    isOffer: false,
     minimumOrder: null,
     takeQuantity: null,
     payQuantity: null,
@@ -630,6 +633,7 @@ function populateFormData(promotion) {
     availableAtCC: !!promotion.availableAtCC,
     availableAtWeb: !!promotion.availableAtWeb,
     affectOffers: !!promotion.availableWithOffers,
+    isOffer: !!promotion.isOffer,
     minimumOrder: promotion.minimumOrder ?? null,
     takeQuantity: promotion.takeQuantity || null,
     payQuantity: promotion.payQuantity || null,
@@ -779,6 +783,7 @@ const submit = async () => {
     availableAtCC: raw.availableAtCC,
     availableAtWeb: raw.availableAtWeb,
     availableWithOffers: raw.affectOffers,
+    isOffer: raw.isOffer,
     minimumOrder: raw.minimumOrder,
     promotionType: pType,
     affect: affectMap[raw.affect],
