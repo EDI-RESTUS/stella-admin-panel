@@ -271,7 +271,8 @@
               v-if="
                 !isCancelled(order, index) &&
                 ((index === 0 && ['kds', 'preparing'].includes(String(orderStatuses || '').toLowerCase())) ||
-                  order.orderFor === 'future')
+                  order.orderFor === 'future' ||
+                  isCoordEditable(order))
               "
               size="small"
               class="flex items-center gap-1 rounded-full text-white px-2 py-2 font-semibold text-xs cursor-pointer bg-green-600 hover:bg-green-700 transition-colors"
@@ -302,7 +303,8 @@
                 !isCancelled(order, index) &&
                 ((index === 0 &&
                   ['kds', 'preparing', 'onrack', 'in progress'].includes(String(orderStatuses || '').toLowerCase())) ||
-                  order.status === 'In Progress')
+                  order.status === 'In Progress' ||
+                  isCoordEditable(order))
               "
               size="small"
               class="flex items-center gap-1 rounded-full text-white px-3 py-2 font-semibold text-xs cursor-pointer bg-blue-600 hover:bg-blue-700 transition-colors"
@@ -313,7 +315,6 @@
             </span>
           </div>
 
-          <!-- Cancelled always wins (from liveStatus or order.status) -->
           <!-- SINGLE status chip: Cancelled > Coordinator > Stella -->
           <span
             v-if="isCancelled(order, index)"
@@ -324,15 +325,29 @@
           </span>
 
           <span
-            v-else-if="
-              index === 0 &&
-              order.orderFor !== 'future' &&
-              ['kds', 'preparing', 'onrack'].includes(String(orderStatuses || '').toLowerCase())
-            "
-            class="px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors bg-yellow-500 text-white capitalize"
+            v-else-if="liveCoordinatorChip(order, index)"
+            class="px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors"
+            :class="liveCoordinatorChip(order, index).cssClass"
           >
-            <Loader2 class="w-3.5 h-3.5 animate-spin-slow" />
-            {{ orderStatuses === 'onrack' ? 'On Rack' : orderStatuses }}
+            <component
+              :is="liveCoordinatorChip(order, index).icon"
+              class="w-3.5 h-3.5"
+              :class="liveCoordinatorChip(order, index).iconClass"
+            />
+            {{ liveCoordinatorChip(order, index).label }}
+          </span>
+
+          <span
+            v-else-if="coordinatorChip(order)"
+            class="px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors"
+            :class="coordinatorChip(order).cssClass"
+          >
+            <component
+              :is="coordinatorChip(order).icon"
+              class="w-3.5 h-3.5"
+              :class="coordinatorChip(order).iconClass"
+            />
+            {{ coordinatorChip(order).label }}
           </span>
 
           <span
@@ -372,7 +387,8 @@
                     orderStatuses === 'preparing' ||
                     orderStatuses === 'onrack' ||
                     orderStatuses === 'In Progress')) ||
-                order.orderFor === 'future',
+                order.orderFor === 'future' ||
+                (!isCancelled(order, index) && isCoordEditable(order)),
               'opacity-60 cursor-not-allowed':
                 (index !== 0 ||
                   isCancelled(order, index) ||
@@ -382,7 +398,8 @@
                     orderStatuses === 'onrack' ||
                     orderStatuses === 'In Progress'
                   )) &&
-                order.orderFor !== 'future',
+                order.orderFor !== 'future' &&
+                !(isCoordEditable(order) && !isCancelled(order, index)),
             }"
             @click="
               ((index === 0 &&
@@ -391,7 +408,8 @@
                   orderStatuses === 'preparing' ||
                   orderStatuses === 'onrack' ||
                   orderStatuses === 'In Progress')) ||
-                order.orderFor === 'future') &&
+                order.orderFor === 'future' ||
+                (!isCancelled(order, index) && isCoordEditable(order))) &&
                 toggleOfferSelection(order._id, idx)
             "
           >
@@ -405,7 +423,8 @@
                     orderStatuses === 'onrack' ||
                     orderStatuses === 'In Progress'
                   )) &&
-                order.orderFor !== 'future'
+                order.orderFor !== 'future' &&
+                !(isCoordEditable(order) && !isCancelled(order, index))
               "
               class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"
             >
@@ -479,16 +498,19 @@
               'hover:bg-gray-50 cursor-pointer':
                 (index === 0 &&
                   (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack')) ||
-                order.orderFor === 'future',
+                order.orderFor === 'future' ||
+                isCoordEditable(order),
               'opacity-60 cursor-not-allowed':
                 (index !== 0 ||
                   !(orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack')) &&
-                order.orderFor !== 'future',
+                order.orderFor !== 'future' &&
+                !isCoordEditable(order),
             }"
             @click="
               ((index === 0 &&
                 (orderStatuses === 'kds' || orderStatuses === 'preparing' || orderStatuses === 'onrack')) ||
-                order.orderFor === 'future') &&
+                order.orderFor === 'future' ||
+                isCoordEditable(order)) &&
                 toggleItemSelect(order._id, idx)
             "
           >
@@ -496,7 +518,8 @@
               v-if="
                 !orderStatuses &&
                 !(orderStatuses === 'kds' && orderStatuses === 'preparing' && orderStatuses === 'onrack') &&
-                order.orderFor !== 'future'
+                order.orderFor !== 'future' &&
+                !isCoordEditable(order)
               "
               class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400"
             >
@@ -583,7 +606,9 @@
               class="px-3 py-1 rounded-full bg-red-500 text-white font-semibold text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
               :disabled="
                 !hasSelectedForOrder(order._id) ||
-                (!['Completed', 'Cancelled'].includes(order.status) && order.orderFor !== 'future')
+                (!['Completed', 'Cancelled'].includes(order.status) &&
+                  order.orderFor !== 'future' &&
+                  !isCoordEditable(order))
               "
               @click="openConfirm('remove', order._id)"
             >
@@ -594,7 +619,9 @@
               class="px-3 py-1 rounded-full bg-yellow-400 text-xs text-white font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
               :disabled="
                 !hasSelectedForOrder(order._id) ||
-                (!['Completed', 'Cancelled'].includes(order.status) && order.orderFor !== 'future')
+                (!['Completed', 'Cancelled'].includes(order.status) &&
+                  order.orderFor !== 'future' &&
+                  !isCoordEditable(order))
               "
               @click="openConfirm('edit', order._id)"
             >
@@ -1806,11 +1833,82 @@ const isCancelled = (order, index) => {
       .toLowerCase()
 
   const hist = norm(order?.status)
+  const coordOrder = norm(order?.coordinatorStatus)
   const live = index === 0 ? norm(liveStatus.value) : ''
   const coord = index === 0 ? norm(orderStatuses?.value ?? orderStatuses) : ''
 
   const saysCancel = (s) => s.startsWith('cancel')
-  return [hist, live, coord].some(saysCancel)
+  return [hist, coordOrder, live, coord].some(saysCancel)
+}
+
+// Backend stores 'Received' (mapped from coordinator KDS/Received) — admin shows it as "KDS".
+// Edit allowed while: KDS/Received, Preparing, OnRack→Ready, Assigned→On the Way.
+// Frozen once Delivered/Completed/Cancelled.
+const isCoordEditable = (order) => {
+  const key = String(order?.coordinatorStatus || '')
+    .trim()
+    .toLowerCase()
+  return ['received', 'preparing', 'ready', 'on the way'].includes(key)
+}
+
+const inProgressChipBase = {
+  cssClass: 'bg-yellow-500 text-white',
+  icon: Loader2,
+  iconClass: 'animate-spin-slow',
+}
+
+// Live coordinator status (from GetOrderStatusByMobile) for the most recent order only.
+// This polls fresh, so it can be ahead of the per-order coordinatorStatus if the webhook lags.
+const liveCoordinatorChip = (order, index) => {
+  if (index !== 0 || order?.orderFor === 'future') return null
+  const key = String(orderStatuses?.value ?? orderStatuses ?? '')
+    .trim()
+    .toLowerCase()
+  if (!key) return null
+
+  switch (key) {
+    case 'kds':
+    case 'received':
+      return { ...inProgressChipBase, label: 'KDS' }
+    case 'preparing':
+      return { ...inProgressChipBase, label: 'Preparing' }
+    case 'onrack':
+    case 'ready':
+      return { ...inProgressChipBase, label: 'Ready' }
+    case 'assigned':
+    case 'delivery':
+    case 'on the way':
+      return { ...inProgressChipBase, label: 'On the Way' }
+    default:
+      return null
+  }
+}
+
+// Possible coordinatorStatus values from backend mapping (orders.coordinator.controller.ts):
+//   Received | Preparing | Ready | On the Way | Delivered | Completed | Cancelled
+const coordinatorChip = (order) => {
+  const raw = String(order?.coordinatorStatus || '').trim()
+  if (!raw) return null
+
+  const key = raw.toLowerCase()
+  if (key === 'cancelled') return null // handled by isCancelled branch
+
+  switch (key) {
+    case 'received':
+      return { ...inProgressChipBase, label: 'KDS' }
+    case 'preparing':
+      return { ...inProgressChipBase, label: 'Preparing' }
+    case 'ready':
+      return { ...inProgressChipBase, label: 'Ready' }
+    case 'on the way':
+      return { ...inProgressChipBase, label: 'On the Way' }
+    case 'delivered':
+      return { cssClass: 'bg-green-600 text-white', icon: CheckCircle, iconClass: '', label: 'Delivered' }
+    case 'completed':
+      return { cssClass: 'bg-green-600 text-white', icon: CheckCircle, iconClass: '', label: 'Completed' }
+    default:
+      return null
+  }
 }
 
 // -------------------- Stats / filters --------------------
