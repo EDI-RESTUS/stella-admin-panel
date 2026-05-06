@@ -47,6 +47,12 @@
           />
         </div>
       </div>
+      <div class="flex items-center mb-2">
+        <VaCheckbox
+          v-model="formData.isOfferOnly"
+          label="Offer-only (hide this category and its items from the customer menu)"
+        />
+      </div>
       <div
         v-if="formData.updating === '' || formData.updating === 'all'"
         class="flex-1 mb-2"
@@ -286,6 +292,7 @@ const formData = ref({
   wCode: '',
   areaId: [],
   isActive: true,
+  isOfferOnly: false,
   description: {} as Record<string, string>,
   sortOrder: 0,
   outletId: '',
