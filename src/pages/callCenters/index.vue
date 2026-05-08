@@ -499,15 +499,13 @@ watch(
   { deep: true },
 )
 
-// watch(
-//   () => orderStore.editOrder,
-//   (ord) => {
-//     if (ord && customerRef?.value?.fromEditOrder) {
-//       customerRef.value.fromEditOrder(ord)
-//     }
-//   },
-//   { immediate: true }
-// )
+watch(
+  () => orderStore.editOrder,
+  (ord) => {
+    if (ord) void restoreCustomerContext(ord)
+  },
+  { immediate: true },
+)
 
 watch(
   () => orderStore.offerItems,

@@ -109,6 +109,14 @@ export default {
       },
     },
     {
+      name: 'offerGiftRules',
+      displayName: 'menu.offerGiftRules',
+      visible: true,
+      meta: {
+        icon: 'group',
+      },
+    },
+    {
       name: 'stellaUsers',
       displayName: 'menu.stellaUsers',
       visible: true,

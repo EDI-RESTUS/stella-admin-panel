@@ -110,6 +110,12 @@ const routes: Array<RouteRecordRaw> = [
         meta: { roles: ['admin', 'super-admin', 'editor', 'caller-editor', 'supervisor'] },
       },
       {
+        name: 'offerGiftRules',
+        path: 'offerGiftRules',
+        component: () => import('../pages/offerGiftRules/index.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
         name: 'promotions',
         path: 'promotions',
         component: () => import('../pages/promotions/index.vue'),

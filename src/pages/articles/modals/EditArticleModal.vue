@@ -67,6 +67,12 @@
           max-height="300px"
         />
       </div>
+      <div class="flex items-center gap-x-10 mb-2">
+        <VaCheckbox
+          v-model="formData.isOfferOnly"
+          label="Offer-only (hidden from menu, used in offers/gifts)"
+        />
+      </div>
       <div class="flex-1">
         <div v-for="lang in supportedLanguages" :key="lang + 'desc'" class="mb-2">
           <VaTextarea
@@ -142,6 +148,7 @@ const formData = ref({
   price: 0,
   categories: [] as string[],
   isActive: true,
+  isOfferOnly: false,
   description: {} as Record<string, string>,
   allergenIds: [],
   imageUrl: '',

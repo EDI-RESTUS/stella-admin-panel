@@ -1195,7 +1195,7 @@ console.log({
   promoCodeRaw: promoCode.value,
   parsedCodes: codes,
 })
-  
+
   if (!codes.length) {
     showAlert('Please enter a promotion code.')
     return
@@ -1241,6 +1241,7 @@ console.log({
 
 function clearPromoCode() {
   promoCode.value = ''
+  appliedPromoCodes.value = []
   isPromoValid.value = false
   if (promotionRef.value) {
     promotionRef.value.clearSelection()
