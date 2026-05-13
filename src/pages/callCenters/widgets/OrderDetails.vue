@@ -176,6 +176,15 @@
               <div class="divide-y">
                 <div v-for="selectedArticle in item.items" :key="selectedArticle.itemName" class="mt-2 text-xs">
                   <p class="font-semibold text-gray-800 mt-1 flex items-center gap-2">
+                    <button
+                      v-if="selectedArticle._isOptional"
+                      type="button"
+                      title="Remove item"
+                      class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold leading-none shrink-0"
+                      @click.stop="removeOfferItem(item, selectedArticle)"
+                    >
+                      ×
+                    </button>
                     <span class="mb-1">{{ selectedArticle.itemName }}</span>
                   </p>
 
@@ -789,15 +798,21 @@ const offersItems = computed(() =>
     const subItems = []
 
     ;(item.selections || []).forEach((selection) => {
-      ;(selection.addedItems || []).forEach((addedItem) => {
+      ;(selection.addedItems || []).forEach((addedItem, addedIndex) => {
         ;(addedItem.selectedOptions || []).forEach((group) => {
           ;(group.selected || []).forEach((sel) => {
             subItems.push({ text: formattedLabel(sel), type: sel.type })
           })
         })
-      })
 
-      items.push(...(selection.addedItems || []))
+        // Enrich each rendered item with its parent slot's removability info
+        items.push({
+          ...addedItem,
+          _selectionId: selection._id,
+          _addedIndex: addedIndex,
+          _isOptional: !selection.isRequired,
+        })
+      })
     })
 
     const quantity = Number(item.quantity || 1)
@@ -1064,6 +1079,14 @@ const deleteItem = (item) => {
 const deleteOffer = (item) => {
   log('CART_OFFER_REMOVED', { itemId: item.id, offerName: item.name })
   orderStore.offerItems.splice(item.__storeIndex, 1)
+}
+
+const removeOfferItem = (offer, selectedArticle) => {
+  const storeOffer = orderStore.offerItems[offer.__storeIndex]
+  if (!storeOffer) return
+  const selection = (storeOffer.selections || []).find((s) => s._id === selectedArticle._selectionId)
+  if (!selection || !Array.isArray(selection.addedItems)) return
+  selection.addedItems.splice(selectedArticle._addedIndex, 1)
 }
 
 const duplicateOffer = (item) => {
