@@ -1490,6 +1490,7 @@ async function createOrder(force = false) {
       })()
 
       const payload = {
+        orderSource: 'CC',
         orderFor: orderFor.value,
         customerDetailId: props.customerDetailsId,
         orderType: props.orderType === 'takeaway' ? 'Takeaway' : 'Delivery',
