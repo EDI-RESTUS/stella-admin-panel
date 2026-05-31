@@ -337,7 +337,11 @@ watch(
   () => {
     if (!articlesOptionsGroups.value.length || selectedOptions.value.length > 1) return
     articlesOptionsGroups.value.forEach((group) => {
-      let defaults = Array.isArray(group.defaultOptions) ? group.defaultOptions : []
+      // Normalize defaultOptions: backend may return bare ID strings OR {id, inStock, ...} objects.
+      // (Backend commit 206deb5 switched non-populated paths to the object shape.)
+      let defaults = (Array.isArray(group.defaultOptions) ? group.defaultOptions : [])
+        .map((d) => (typeof d === 'string' ? d : d?.id || d?._id))
+        .filter(Boolean)
 
       if (fetchConfigurations.value.length) {
         const groupName = group.name?.toLowerCase() || ''

@@ -17,6 +17,15 @@
         class="selection-item selected"
         @click="openSelectionItemModal(group, true, item, index)"
       >
+        <button
+          v-if="!group.isRequired"
+          type="button"
+          class="remove-btn"
+          title="Remove selection"
+          @click.stop="toggleSelection(group, index)"
+        >
+          ×
+        </button>
         <div class="item-image"><img :src="item.imageUrl" /></div>
         <div class="item-content">
           <div class="item-name">{{ item.itemName }}</div>
@@ -423,5 +432,32 @@ if (!props.isEdit) {
 
 .selection-item.selected .selection-status::after {
   opacity: 1;
+}
+
+.remove-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: #dc2626;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.remove-btn:hover {
+  background: #b91c1c;
+  transform: scale(1.08);
 }
 </style>
