@@ -214,21 +214,27 @@ async function submit() {
             <VaInput v-model="surname" label="Surname" :rules="[validators.required]" placeholder="Surname" />
 
             <div class="flex gap-2 items-start min-w-0">
-              <VaSelect
-                v-model="phonePrefix"
-                label="Country"
-                :options="countryPrefixes"
-                value-by="value"
-                class="w-[120px] shrink-0"
-              />
-              <VaInput
-                :model-value="phoneLocal"
-                label="Phone"
-                class="flex-1 min-w-0"
-                :rules="[validators.required]"
-                placeholder="Phone number"
-                @update:modelValue="(v: string) => (phoneLocal = String(v || '').replace(/\D/g, ''))"
-              />
+              <!-- Wrap each control in a width-controlled div so Vuestic's own
+                   width styling can't override the sizing (keeps Country narrow). -->
+              <div class="w-[104px] shrink-0">
+                <VaSelect
+                  v-model="phonePrefix"
+                  label="Country"
+                  :options="countryPrefixes"
+                  value-by="value"
+                  class="w-full"
+                />
+              </div>
+              <div class="flex-1 min-w-0">
+                <VaInput
+                  :model-value="phoneLocal"
+                  label="Phone"
+                  class="w-full"
+                  :rules="[validators.required]"
+                  placeholder="Phone number"
+                  @update:modelValue="(v: string) => (phoneLocal = String(v || '').replace(/\D/g, ''))"
+                />
+              </div>
             </div>
 
             <VaInput
