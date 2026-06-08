@@ -21,8 +21,14 @@ const countryPrefixes = [
   { text: '+961 (LB)', value: '961' },
 ]
 
-// Pre-select the outlet currently chosen in the top navbar; the admin can change it.
-const outletId = ref<string>(servicesStore.selectedRest || '')
+// Outlet comes from login / the top navbar selection (servicesStore.selectedRest),
+// exactly like the rest of the admin panel — there is no per-form outlet picker.
+const outletId = computed(() => servicesStore.selectedRest || '')
+const outletName = computed(() => {
+  const found = (servicesStore.items as any[]).find((o) => o._id === outletId.value)
+  return found?.name || (servicesStore.restDetails as any)?.name || ''
+})
+
 const winmaxId = ref('')
 const firstName = ref('')
 const surname = ref('')
@@ -30,6 +36,7 @@ const phonePrefix = ref('357')
 const phoneLocal = ref('')
 const password = ref('')
 const officeNo = ref('')
+const officePhone = ref('')
 const saving = ref(false)
 
 // List of existing office customers for the selected outlet.
@@ -46,6 +53,7 @@ const columns = defineVaDataTableColumns([
   { label: 'Winmax ID', key: 'winmaxId', sortable: true },
   { label: 'Name', key: 'customerName', sortable: true },
   { label: 'Office No', key: 'officeNo', sortable: true },
+  { label: 'Office Phone', key: 'officePhone', sortable: false },
   { label: 'Phone', key: 'phone', sortable: false },
   { label: 'Balance', key: 'balance', sortable: false, thAlign: 'right' },
   { label: 'Active', key: 'isActive', sortable: false, thAlign: 'center' },
@@ -60,7 +68,7 @@ const filteredItems = computed(() => {
   const q = search.value.trim().toLowerCase()
   if (!q) return tableItems.value
   return tableItems.value.filter((c) =>
-    [c.customerName, c.officeNo, c.phone, String(c.winmaxId)].some((f) =>
+    [c.customerName, c.officeNo, c.officePhone, c.phone, String(c.winmaxId)].some((f) =>
       String(f || '')
         .toLowerCase()
         .includes(q),
@@ -117,11 +125,10 @@ onMounted(async () => {
       /* navbar usually loads these; ignore if it fails here */
     }
   }
-  if (!outletId.value && servicesStore.selectedRest) outletId.value = servicesStore.selectedRest
   refresh()
 })
 
-// Reload whenever the chosen outlet changes.
+// Reload whenever the chosen outlet (login / top navbar) changes.
 watch(outletId, () => refresh())
 
 const numberRule = (v: any) => /^[0-9]+$/.test(String(v ?? '').trim()) || 'Must be a number'
@@ -145,6 +152,7 @@ function resetForm() {
   phoneLocal.value = ''
   password.value = ''
   officeNo.value = ''
+  officePhone.value = ''
 }
 
 async function submit() {
@@ -160,6 +168,7 @@ async function submit() {
       phone,
       password: password.value,
       officeNo: officeNo.value.trim(),
+      officePhone: officePhone.value.trim(),
       outletId: outletId.value,
     })
     init({ message: data?.message || 'Office customer registered successfully', color: 'success' })
@@ -177,23 +186,24 @@ async function submit() {
   <div class="flex flex-col gap-4">
     <VaCard class="mt-4">
       <VaCardContent>
-        <h1 class="va-h5 mb-1">Register Office Customer</h1>
+        <h1 class="va-h5 mb-1">Register Employee</h1>
         <p class="text-sm text-slate-500 mb-4">
           Office customers log in with their <strong>Winmax ID</strong> and <strong>password</strong>. The phone number
           is for your reference only.
         </p>
 
         <VaForm ref="form" class="max-w-[680px]" @submit.prevent="submit">
+          <!-- Outlet is taken from login / the top navbar selection (like the rest of the panel). -->
+          <div
+            class="mb-4 flex items-center gap-2 text-sm rounded-md px-3 py-2"
+            :class="outletId ? 'bg-slate-50 text-slate-700' : 'bg-amber-50 text-amber-700'"
+          >
+            <VaIcon name="storefront" size="small" />
+            <span v-if="outletId"> Registering for outlet: <strong>{{ outletName || outletId }}</strong> </span>
+            <span v-else>Select an outlet from the top bar to register office customers.</span>
+          </div>
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <VaSelect
-              v-model="outletId"
-              label="Outlet"
-              :options="servicesStore.items"
-              text-by="name"
-              value-by="_id"
-              :rules="[validators.required]"
-              placeholder="Select outlet"
-            />
             <VaInput
               v-model="winmaxId"
               label="Winmax ID"
@@ -203,18 +213,18 @@ async function submit() {
             <VaInput v-model="firstName" label="Name" :rules="[validators.required]" placeholder="First name" />
             <VaInput v-model="surname" label="Surname" :rules="[validators.required]" placeholder="Surname" />
 
-            <div class="flex gap-2 items-end">
+            <div class="flex gap-2 items-start min-w-0">
               <VaSelect
                 v-model="phonePrefix"
                 label="Country"
                 :options="countryPrefixes"
                 value-by="value"
-                class="w-[130px] shrink-0"
+                class="w-[120px] shrink-0"
               />
               <VaInput
                 :model-value="phoneLocal"
                 label="Phone"
-                class="flex-1"
+                class="flex-1 min-w-0"
                 :rules="[validators.required]"
                 placeholder="Phone number"
                 @update:modelValue="(v: string) => (phoneLocal = String(v || '').replace(/\D/g, ''))"
@@ -229,6 +239,7 @@ async function submit() {
               placeholder="Min 6 characters"
             />
             <VaInput v-model="officeNo" label="Office No" :rules="[validators.required]" placeholder="Office number" />
+            <VaInput v-model="officePhone" label="Office Phone" placeholder="Office phone number" />
           </div>
 
           <div class="flex justify-end mt-6">
