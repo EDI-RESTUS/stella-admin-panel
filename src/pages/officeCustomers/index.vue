@@ -187,10 +187,7 @@ async function submit() {
     <VaCard class="mt-4">
       <VaCardContent>
         <h1 class="va-h5 mb-1">Register Employee</h1>
-        <p class="text-sm text-slate-500 mb-4">
-          Office customers log in with their <strong>Winmax ID</strong> and <strong>password</strong>. The phone number
-          is for your reference only.
-        </p>
+
 
         <VaForm ref="form" class="max-w-[680px]" @submit.prevent="submit">
           <!-- Outlet is taken from login / the top navbar selection (like the rest of the panel). -->
@@ -198,9 +195,7 @@ async function submit() {
             class="mb-4 flex items-center gap-2 text-sm rounded-md px-3 py-2"
             :class="outletId ? 'bg-slate-50 text-slate-700' : 'bg-amber-50 text-amber-700'"
           >
-            <VaIcon name="storefront" size="small" />
-            <span v-if="outletId"> Registering for outlet: <strong>{{ outletName || outletId }}</strong> </span>
-            <span v-else>Select an outlet from the top bar to register office customers.</span>
+
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
