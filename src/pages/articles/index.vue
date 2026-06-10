@@ -120,12 +120,17 @@ const userStore = useUsersStore()
 const fetchDeliveryZones = async () => {
   try {
     const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/deliveryZones/${serviceStore.selectedRest}`)
-    let zones = response.data.data
+    let zones = response.data.data || []
 
-    // Filter by user's allowed zones if applicable
+    // Filter by user's allowed zones IF the restriction is relevant to this
+    // outlet. allowedDeliveryZoneIds is a GLOBAL list while zones are per-outlet,
+    // so if none of this outlet's zones are in it the list is for other outlets —
+    // in that case show all zones (matching the Delivery Zones page), instead of
+    // hiding every zone.
     const allowed = userStore.userDetails?.allowedDeliveryZoneIds
     if (allowed && allowed.length > 0) {
-      zones = zones.filter((zone) => allowed.includes(zone._id) || allowed.includes(zone.id))
+      const filtered = zones.filter((zone) => allowed.includes(zone._id) || allowed.includes(zone.id))
+      if (filtered.length > 0) zones = filtered
     }
 
     deliveryZones.value = zones.sort((a, b) => Number(a.serviceZoneId) - Number(b.serviceZoneId))
