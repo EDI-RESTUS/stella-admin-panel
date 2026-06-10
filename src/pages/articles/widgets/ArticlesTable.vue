@@ -134,6 +134,62 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
     stockUpdating.value.delete(key)
   }
 }
+// Current stock quantity for a zone ('' = untracked / unlimited).
+const zoneQuantity = (rowData: any, zoneId: string): number | string => {
+  const z = (rowData.inStockByZones || []).find((x: any) => x.deliveryZoneId === zoneId)
+  const q = z?.quantity
+  return q === null || q === undefined ? '' : q
+}
+
+// Set/clear the OPTIONAL per-zone stock quantity. Empty = untracked (null).
+// Setting a number also syncs inStock (0 => out of stock, >0 => in stock).
+const setZoneQuantity = async (rowData: any, zoneId: string, raw: string) => {
+  const key = `${rowData._id}_${zoneId}`
+  stockUpdating.value.add(key)
+  try {
+    const url = import.meta.env.VITE_API_BASE_URL
+    const trimmed = String(raw ?? '').trim()
+    const quantity = trimmed === '' ? null : Math.max(0, Math.floor(Number(trimmed) || 0))
+
+    const currentZones = Array.isArray(rowData.inStockByZones) ? [...rowData.inStockByZones] : []
+    const idx = currentZones.findIndex((z: any) => z.deliveryZoneId === zoneId)
+    let inStock: boolean
+    if (idx >= 0) {
+      inStock = quantity === null ? currentZones[idx].inStock !== false : quantity > 0
+      currentZones[idx] = { ...currentZones[idx], quantity, inStock }
+    } else {
+      inStock = quantity === null ? true : quantity > 0
+      currentZones.push({ deliveryZoneId: zoneId, inStock, quantity })
+    }
+
+    await axios.patch(`${url}/menuItems/${rowData._id}`, {
+      inStockByZones: currentZones,
+      outletId: serviceStore.selectedRest,
+    })
+    rowData.inStockByZones = currentZones
+
+    // Keep the in-stock checkbox tracking in sync.
+    if (!rowSelectedZones[rowData._id]) rowSelectedZones[rowData._id] = []
+    if (inStock) {
+      if (!rowSelectedZones[rowData._id].includes(zoneId)) rowSelectedZones[rowData._id].push(zoneId)
+    } else {
+      rowSelectedZones[rowData._id] = rowSelectedZones[rowData._id].filter((id) => id !== zoneId)
+    }
+
+    const zone = props.deliveryZones.find((z: any) => z._id === zoneId)
+    const zoneName = zone ? zone.name : zoneId
+    init({
+      message: `${zoneName}: stock ${quantity === null ? 'untracked' : quantity}`,
+      color: 'success',
+    })
+  } catch (err) {
+    init({ message: 'Failed to update zone quantity', color: 'danger' })
+    console.error('[ArticlesTable] Quantity update failed:', err)
+  } finally {
+    stockUpdating.value.delete(key)
+  }
+}
+
 const onImportClick = () => {
   emits('importArticle')
 }
@@ -1081,6 +1137,17 @@ const tryEdit = (cb: () => void) => {
                         @change="(e) => toggleZoneStock(rowData, zone._id, e.target.checked)"
                       />
                       <span class="truncate text-slate-700">{{ zone.name }}</span>
+                      <!-- OPTIONAL stock quantity (blank = unlimited/untracked) -->
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="∞"
+                        title="Stock quantity (leave blank for unlimited)"
+                        class="ml-auto w-12 px-1 py-0.5 text-xs border border-slate-200 rounded text-center flex-shrink-0"
+                        :value="zoneQuantity(rowData, zone._id)"
+                        @click.stop
+                        @change="(e) => setZoneQuantity(rowData, zone._id, (e.target as HTMLInputElement).value)"
+                      />
                     </label>
                   </div>
                 </div>
