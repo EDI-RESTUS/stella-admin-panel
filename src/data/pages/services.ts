@@ -1,7 +1,9 @@
 import api from '../../services/api'
 import axios from 'axios'
 export const getServices = async () => {
-  const { data } = await axios.get(api.allServices())
+  // The /outlets endpoint defaults to limit=20, but the outlet selector and the
+  // outlets list need EVERY outlet — fetch all (same approach as areas/menuCategories).
+  const { data } = await axios.get(api.allServices(), { params: { limit: 100000 } })
   return {
     data: data,
   }
