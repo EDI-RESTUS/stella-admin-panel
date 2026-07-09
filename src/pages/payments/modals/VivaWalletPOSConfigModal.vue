@@ -22,6 +22,16 @@
         <div class="grid grid-cols-2 gap-3 mb-3">
           <VaInput v-model="mappingForm.name" label="Name" placeholder="e.g. Kiosk YF_021B Viva POS" />
           <VaInput v-model="mappingForm.deviceGuid" label="Device GUID" placeholder="e.g. YF_021B" />
+          <VaSelect
+            v-model="mappingForm.deliveryZoneId"
+            :options="deliveryZoneOptions"
+            label="Delivery Zone"
+            text-by="label"
+            value-by="value"
+            placeholder="Select Zone"
+            searchable
+            clearable
+          />
           <VaInput v-model="mappingForm.apiUrl" label="API URL" placeholder="https://demo-api.vivapayments.com" />
           <VaInput v-model="mappingForm.accountsUrl" label="Accounts URL" placeholder="Optional" />
           <VaInput v-model="mappingForm.clientId" label="Client ID" placeholder="POS APIs Client ID" />
@@ -44,6 +54,7 @@
             <tr class="text-left bg-gray-100">
               <th class="p-2 border">Name</th>
               <th class="p-2 border">Device GUID</th>
+              <th class="p-2 border">Delivery Zone</th>
               <th class="p-2 border">API URL</th>
               <th class="p-2 border">Client ID</th>
               <th class="p-2 border">Terminal ID</th>
@@ -70,6 +81,19 @@
                   class="border rounded px-1 py-0.5 w-full text-sm"
                 />
                 <span v-else>{{ mapping.deviceGuid }}</span>
+              </td>
+              <td class="p-2 border">
+                <VaSelect
+                  v-if="mapping._editing"
+                  v-model="mapping._editData.deliveryZoneId"
+                  :options="deliveryZoneOptions"
+                  text-by="label"
+                  value-by="value"
+                  size="small"
+                  class="w-full"
+                  clearable
+                />
+                <span v-else>{{ zoneLabel(mapping.deliveryZoneId) }}</span>
               </td>
               <td class="p-2 border">
                 <div v-if="mapping._editing" class="space-y-1">
@@ -199,6 +223,7 @@ const paymentTypeIdText = computed(() => String(props.paymentTypeId || '').trim(
 const mappingForm = ref({
   name: '',
   deviceGuid: '',
+  deliveryZoneId: '',
   apiUrl: 'https://demo-api.vivapayments.com',
   accountsUrl: '',
   clientId: '',
@@ -207,6 +232,33 @@ const mappingForm = ref({
   cashRegisterId: '',
   currencyCode: 978,
 })
+
+const deliveryZones = ref<any[]>([])
+
+const fetchDeliveryZones = async () => {
+  if (!props.outletId) return
+  try {
+    const res = await axios.get(`${BASE_URL}/deliveryZones/${props.outletId}`)
+    deliveryZones.value = res.data?.data || []
+  } catch (e: any) {
+    init({ message: e.response?.data?.message || 'Failed to load delivery zones', color: 'danger' })
+  }
+}
+
+// delivery zone can come back as a populated object or a plain id string
+const resolveId = (val: any): string => (val && typeof val === 'object' ? val._id : val) || ''
+
+const deliveryZoneOptions = computed(() =>
+  [...deliveryZones.value]
+    .sort((a, b) => Number(a.serviceZoneId) - Number(b.serviceZoneId))
+    .map((z) => ({ label: `${z.serviceZoneId || '?'} - ${z.name}`, value: z._id })),
+)
+
+const zoneLabel = (val: any) => {
+  const id = resolveId(val)
+  if (!id) return '-'
+  return deliveryZoneOptions.value.find((z) => z.value === id)?.label || id
+}
 
 const redactSecret = (value?: string) => {
   const text = String(value || '')
@@ -290,12 +342,14 @@ const createMapping = async () => {
       paymentTypeId: paymentTypeIdText.value,
       deviceGuid: String(mappingForm.value.deviceGuid).trim(),
       name: String(mappingForm.value.name).trim(),
+      deliveryZoneId: mappingForm.value.deliveryZoneId || null,
       config: buildConfig(mappingForm.value),
     })
     init({ message: 'VivaWalletPOS mapping created', color: 'success' })
     mappingForm.value = {
       name: '',
       deviceGuid: '',
+      deliveryZoneId: '',
       apiUrl: mappingForm.value.apiUrl || 'https://demo-api.vivapayments.com',
       accountsUrl: '',
       clientId: '',
@@ -316,6 +370,7 @@ const startEditMapping = (mapping: any) => {
   mapping._editData = {
     name: mapping.name || '',
     deviceGuid: mapping.deviceGuid || '',
+    deliveryZoneId: resolveId(mapping.deliveryZoneId) || '',
     apiUrl: mapping.config?.API_URL || '',
     accountsUrl: mapping.config?.ACCOUNTS_URL || '',
     clientId: mapping.config?.CLIENT_ID || '',
@@ -353,6 +408,7 @@ const saveMapping = async (mapping: any) => {
     await axios.patch(`${BASE_URL}/vivawalletpos/terminals/${mapping._id}`, {
       name: String(mapping._editData.name).trim(),
       deviceGuid: String(mapping._editData.deviceGuid).trim(),
+      deliveryZoneId: mapping._editData.deliveryZoneId || null,
       config: buildConfig(mapping._editData),
     })
     init({ message: 'VivaWalletPOS mapping updated', color: 'success' })
@@ -398,6 +454,7 @@ const deleteMapping = async (mapping: any) => {
 
 onMounted(() => {
   fetchMappings()
+  fetchDeliveryZones()
 })
 </script>
 
