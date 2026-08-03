@@ -729,6 +729,69 @@
           </template>
         </VaCardContent>
       </VaCard>
+
+      <!-- SMS / OTP Settings -->
+      <VaCard class="mt-6">
+        <VaCardContent>
+          <h2 class="font-bold text-base mb-4">SMS / OTP Settings</h2>
+
+          <div class="flex flex-col w-full">
+            <VaSwitch
+              v-model="restaurantData.smsSettings.enabled"
+              label="Use this outlet's own SMS account"
+              left-label
+              size="small"
+            />
+            <div class="text-sm mt-2 opacity-70">
+              When off, verification codes are sent using the platform's default SMS account.
+            </div>
+
+            <div v-if="restaurantData.smsSettings.enabled" class="grid grid-cols-2 md:grid-cols-4 gap-4 w-full mt-4">
+              <VaInput
+                v-model="restaurantData.smsSettings.username"
+                label="SMS Username"
+                name="smsUsername"
+                placeholder="Username"
+                :rules="[validators.required]"
+              />
+              <VaInput
+                v-model="restaurantData.smsSettings.password"
+                label="SMS Password"
+                name="smsPassword"
+                placeholder="Password"
+                type="password"
+                :rules="[validators.required]"
+              />
+              <VaInput
+                v-model="restaurantData.smsSettings.senderId"
+                label="Sender ID"
+                name="smsSenderId"
+                placeholder="e.g. CLIENTB"
+                helper-text="Shown as the SMS sender. Max 11 characters."
+                :rules="[validators.required]"
+              />
+              <VaInput
+                v-model="restaurantData.smsSettings.baseUrl"
+                label="Gateway URL"
+                name="smsBaseUrl"
+                placeholder="Leave blank for the default"
+                helper-text="Optional. Leave blank to use the default InstantSMS host."
+              />
+            </div>
+
+            <div v-if="restaurantData.smsSettings.enabled" class="w-full mt-4">
+              <VaInput
+                v-model="restaurantData.smsSettings.otpTemplate"
+                label="OTP Message Template"
+                name="smsOtpTemplate"
+                placeholder="Your {{ '{{brand}}' }} code is {{ '{{otp}}' }}"
+                helper-text="Optional. Use {{ '{{otp}}' }} for the code and {{ '{{brand}}' }} for the outlet name. Leave blank for the default wording."
+                class="w-full"
+              />
+            </div>
+          </div>
+        </VaCardContent>
+      </VaCard>
     </VaForm>
     <VaSkeletonGroup v-else>
       <VaCard>
@@ -896,6 +959,17 @@ export default {
           password: '',
           terminal: '',
           failureAlertPhonesRaw: '',
+        },
+        // Strings default to '' rather than null: removeNulls() drops null keys
+        // and empty objects, which would make the whole subdoc vanish from the
+        // payload and blur "never configured" with "deliberately cleared".
+        smsSettings: {
+          enabled: false,
+          username: '',
+          password: '',
+          senderId: '',
+          baseUrl: '',
+          otpTemplate: '',
         },
         openingTimes: {
           selected: '',
@@ -1356,6 +1430,18 @@ export default {
             // Ensure emailSettings and template defaults exist
             if (!res.emailSettings) res.emailSettings = {}
             if (!res.emailSettings.templates) res.emailSettings.templates = {}
+            // Outlets saved before smsSettings existed have no such key, and
+            // `this.restaurantData = res` below replaces the defaults wholesale
+            // — without this the v-models in the SMS card would throw.
+            res.smsSettings = {
+              enabled: false,
+              username: '',
+              password: '',
+              senderId: '',
+              baseUrl: '',
+              otpTemplate: '',
+              ...(res.smsSettings || {}),
+            }
             const tplDefaults = {
               registrationConfirmation: { subject: '', html: '' },
               orderConfirmation: { subject: '', html: '' },
@@ -1423,6 +1509,16 @@ export default {
             .map((p) => p.trim())
             .filter(Boolean),
           failureAlertPhonesRaw: undefined,
+        },
+        // Keys enumerated explicitly rather than spread: the backend $set
+        // replaces the whole subdocument, so a key omitted here is erased.
+        smsSettings: {
+          enabled: !!this.restaurantData.smsSettings?.enabled,
+          username: this.restaurantData.smsSettings?.username || '',
+          password: this.restaurantData.smsSettings?.password || '',
+          senderId: this.restaurantData.smsSettings?.senderId || '',
+          baseUrl: this.restaurantData.smsSettings?.baseUrl || '',
+          otpTemplate: this.restaurantData.smsSettings?.otpTemplate || '',
         },
         restusConfig: {
           operatingMode: this.restaurantData.operatingMode || '',
