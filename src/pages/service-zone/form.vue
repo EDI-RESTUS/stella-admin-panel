@@ -798,6 +798,56 @@
           </div>
         </VaCardContent>
       </VaCard>
+
+      <!-- Loyalty Settings -->
+      <VaCard class="mt-6">
+        <VaCardContent>
+          <h2 class="font-bold text-base mb-4">Loyalty Settings</h2>
+
+          <div class="flex flex-col w-full">
+            <VaSwitch
+              v-model="restaurantData.loyaltySettings.enabled"
+              label="Enable loyalty program for this outlet"
+              left-label
+              size="small"
+            />
+            <div class="text-sm mt-2 opacity-70">
+              When on, registered customers earn points on their orders — either as soon as the order is sent to the
+              POS, or when the delivery system confirms delivery.
+            </div>
+
+            <div
+              v-if="restaurantData.loyaltySettings.enabled"
+              class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full mt-4"
+            >
+              <VaInput
+                v-model="restaurantData.loyaltySettings.pointsPerEuro"
+                label="Points per €"
+                name="loyaltyPointsPerEuro"
+                type="number"
+                min="0"
+                step="0.5"
+              />
+              <VaSelect
+                v-model="restaurantData.loyaltySettings.allocationTrigger"
+                label="Points Allocation"
+                :options="loyaltyTriggerOptions"
+                value-by="value"
+                text-by="text"
+              />
+              <VaInput
+                v-model="restaurantData.loyaltySettings.welcomePoints"
+                label="Welcome Points"
+                name="loyaltyWelcomePoints"
+                type="number"
+                min="0"
+                step="1"
+                helper-text="One-time bonus granted on registration."
+              />
+            </div>
+          </div>
+        </VaCardContent>
+      </VaCard>
     </VaForm>
     <VaSkeletonGroup v-else>
       <VaCard>
@@ -851,6 +901,10 @@ export default {
       { text: 'view Only', value: 'viewOnly' },
       { text: 'Online Ordering', value: 'onlineOrdering' },
     ])
+    const loyaltyTriggerOptions = [
+      { text: 'On order (Winmax dispatch)', value: 'order' },
+      { text: 'On delivery (delivery-system callback)', value: 'delivered' },
+    ]
     const serviceStore = useServiceStore()
     const selectedType = ref(null)
     const selectedTypeMode = ref(null)
@@ -910,6 +964,7 @@ export default {
       validators,
       addNewOption,
       languages,
+      loyaltyTriggerOptions,
     }
   },
   data() {
@@ -976,6 +1031,12 @@ export default {
           senderId: '',
           baseUrl: '',
           otpTemplate: '',
+        },
+        loyaltySettings: {
+          enabled: false,
+          pointsPerEuro: 1,
+          allocationTrigger: 'order',
+          welcomePoints: 0,
         },
         openingTimes: {
           selected: '',
@@ -1460,6 +1521,13 @@ export default {
               otpTemplate: '',
               ...(res.smsSettings || {}),
             }
+            res.loyaltySettings = {
+              enabled: false,
+              pointsPerEuro: 1,
+              allocationTrigger: 'order',
+              welcomePoints: 0,
+              ...(res.loyaltySettings || {}),
+            }
             const tplDefaults = {
               registrationConfirmation: { subject: '', html: '' },
               orderConfirmation: { subject: '', html: '' },
@@ -1530,6 +1598,13 @@ export default {
         },
         // Keys enumerated explicitly rather than spread: the backend $set
         // replaces the whole subdocument, so a key omitted here is erased.
+        loyaltySettings: {
+          enabled: !!this.restaurantData.loyaltySettings?.enabled,
+          pointsPerEuro: Math.max(0, Number(this.restaurantData.loyaltySettings?.pointsPerEuro) || 0),
+          allocationTrigger:
+            this.restaurantData.loyaltySettings?.allocationTrigger === 'delivered' ? 'delivered' : 'order',
+          welcomePoints: Math.max(0, Math.floor(Number(this.restaurantData.loyaltySettings?.welcomePoints) || 0)),
+        },
         smsSettings: {
           enabled: !!this.restaurantData.smsSettings?.enabled,
           username: this.restaurantData.smsSettings?.username || '',

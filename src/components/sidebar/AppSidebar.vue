@@ -201,7 +201,10 @@
               Members
             </RouterLink>
 
+            <!-- Global all-outlets settings — super-admin only; outlet managers
+                 use the Loyalty section in their outlet configuration instead. -->
             <RouterLink
+              v-if="userRole === 'super-admin'"
               :class="[
                 'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
                 $route.name === 'loyaltySettings'
