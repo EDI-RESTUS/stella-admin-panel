@@ -8,12 +8,9 @@ const { init } = useToast()
 const servicesStore = useServiceStore()
 const url = import.meta.env.VITE_API_BASE_URL
 
-// Outlet filter — defaults to the navbar-selected outlet, with an "All outlets" option.
-const outletId = ref<string>('')
-const outletOptions = computed(() => [
-  { text: 'All outlets', value: '' },
-  ...(servicesStore.items as any[]).map((o) => ({ text: o.name, value: o._id })),
-])
+// Outlet comes from the top-navbar selection (servicesStore.selectedRest),
+// exactly like the rest of the admin panel — no per-page outlet picker.
+const outletId = computed(() => servicesStore.selectedRest || '')
 
 const members = ref<any[]>([])
 const loading = ref(false)
@@ -78,9 +75,7 @@ onMounted(async () => {
       /* navbar usually loads these; ignore if it fails here */
     }
   }
-  outletId.value = servicesStore.selectedRest || ''
-  // The outletId watcher fires when selectedRest is set; load directly otherwise.
-  if (!outletId.value) loadMembers()
+  loadMembers()
 })
 
 /* ---------------- Ledger history modal ---------------- */
@@ -141,14 +136,6 @@ watch(historyPage, loadHistory)
             <p class="text-sm text-slate-500 mt-1">Registered customers (with an account password) and their points.</p>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
-            <VaSelect
-              v-model="outletId"
-              :options="outletOptions"
-              value-by="value"
-              text-by="text"
-              class="w-56"
-              size="small"
-            />
             <VaInput v-model="search" placeholder="Search name, phone, email" clearable size="small">
               <template #prependInner>
                 <VaIcon name="search" color="secondary" />
