@@ -186,6 +186,7 @@
                   label="Password"
                   placeholder="Password"
                   type="password"
+                  autocomplete="new-password"
                 />
                 <VaInput
                   v-model="restaurantData.winmaxConfig.terminal"
@@ -752,14 +753,19 @@
                 label="SMS Username"
                 name="smsUsername"
                 placeholder="Username"
+                autocomplete="off"
                 :rules="[validators.required]"
               />
+              <!-- autocomplete="new-password" is required: without it the
+                   browser silently overwrites this field with the admin's own
+                   saved login password, and the wrong value gets saved. -->
               <VaInput
                 v-model="restaurantData.smsSettings.password"
                 label="SMS Password"
                 name="smsPassword"
                 placeholder="Password"
                 type="password"
+                autocomplete="new-password"
                 :rules="[validators.required]"
               />
               <VaInput
@@ -1430,6 +1436,18 @@ export default {
             // Ensure emailSettings and template defaults exist
             if (!res.emailSettings) res.emailSettings = {}
             if (!res.emailSettings.templates) res.emailSettings.templates = {}
+            // Outlets without winmaxConfig (e.g. dev DBs, where the prod-to-dev
+            // clone strips POS credentials) would otherwise crash the template at
+            // restaurantData.winmaxConfig.company when pos === 'winmax', leaving
+            // the whole Configuration section blank.
+            res.winmaxConfig = {
+              company: '',
+              user: '',
+              password: '',
+              terminal: '',
+              failureAlertPhones: [],
+              ...(res.winmaxConfig || {}),
+            }
             // Outlets saved before smsSettings existed have no such key, and
             // `this.restaurantData = res` below replaces the defaults wholesale
             // — without this the v-models in the SMS card would throw.

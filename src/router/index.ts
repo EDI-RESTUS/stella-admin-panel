@@ -66,6 +66,18 @@ const routes: Array<RouteRecordRaw> = [
         meta: { roles: ['admin', 'super-admin'] },
       },
       {
+        name: 'loyaltySettings',
+        path: 'loyalty/settings',
+        component: () => import('../pages/loyalty/settings.vue'),
+        meta: { roles: ['admin', 'super-admin'] },
+      },
+      {
+        name: 'loyaltyMembers',
+        path: 'loyalty/members',
+        component: () => import('../pages/loyalty/members.vue'),
+        meta: { roles: ['admin', 'super-admin'] },
+      },
+      {
         name: 'deliveryZone',
         path: 'deliveryZone',
         component: () => import('../pages/deliveryZone/index.vue'),

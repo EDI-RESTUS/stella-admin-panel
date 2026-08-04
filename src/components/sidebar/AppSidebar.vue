@@ -188,21 +188,31 @@
 
         <Transition name="fade">
           <div v-if="loyaltyOpen" class="flex flex-col gap-y-1">
-            <span
-              class="flex items-center py-1 rounded-lg mr-2 pl-2 -ml-2 text-slate-400 cursor-not-allowed"
-              title="Coming Soon"
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'loyaltyMembers'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/loyalty/members"
             >
               <VaIcon name="mso-account_circle" class="mr-2" />
               Members
-            </span>
+            </RouterLink>
 
-            <span
-              class="flex items-center py-1 rounded-lg mr-2 pl-2 -ml-2 text-slate-400 cursor-not-allowed"
-              title="Coming Soon"
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'loyaltySettings'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/loyalty/settings"
             >
               <VaIcon name="redeem" class="mr-2" />
               Settings
-            </span>
+            </RouterLink>
           </div>
         </Transition>
       </div>
