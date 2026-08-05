@@ -799,6 +799,51 @@
         </VaCardContent>
       </VaCard>
 
+      <!-- Captcha (Cloudflare Turnstile) Settings -->
+      <VaCard class="mt-6">
+        <VaCardContent>
+          <h2 class="font-bold text-base mb-4">Captcha (Cloudflare Turnstile) Settings</h2>
+
+          <div class="flex flex-col w-full">
+            <VaSwitch
+              v-model="restaurantData.turnstileSettings.enabled"
+              label="Use this outlet's own Turnstile widget"
+              left-label
+              size="small"
+            />
+            <div class="text-sm mt-2 opacity-70">
+              When off, OTP captcha tokens are verified against the platform's default Turnstile widget.
+              The site key here must match the one built into this outlet's website.
+            </div>
+
+            <div v-if="restaurantData.turnstileSettings.enabled" class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mt-4">
+              <VaInput
+                v-model="restaurantData.turnstileSettings.siteKey"
+                label="Turnstile Site Key"
+                name="turnstileSiteKey"
+                placeholder="0x4AAAAAA..."
+                autocomplete="off"
+                helper-text="Public key — for reference; the website bundle carries its own copy."
+                :rules="[validators.required]"
+              />
+              <!-- autocomplete="new-password" is required: without it the
+                   browser silently overwrites this field with the admin's own
+                   saved login password, and the wrong value gets saved. -->
+              <VaInput
+                v-model="restaurantData.turnstileSettings.secretKey"
+                label="Turnstile Secret Key"
+                name="turnstileSecretKey"
+                placeholder="Secret key"
+                type="password"
+                autocomplete="new-password"
+                helper-text="From the same widget as the site key (Cloudflare dashboard → Turnstile)."
+                :rules="[validators.required]"
+              />
+            </div>
+          </div>
+        </VaCardContent>
+      </VaCard>
+
       <!-- Loyalty Settings -->
       <VaCard class="mt-6">
         <VaCardContent>
@@ -1031,6 +1076,11 @@ export default {
           senderId: '',
           baseUrl: '',
           otpTemplate: '',
+        },
+        turnstileSettings: {
+          enabled: false,
+          siteKey: '',
+          secretKey: '',
         },
         loyaltySettings: {
           enabled: false,
@@ -1521,6 +1571,12 @@ export default {
               otpTemplate: '',
               ...(res.smsSettings || {}),
             }
+            res.turnstileSettings = {
+              enabled: false,
+              siteKey: '',
+              secretKey: '',
+              ...(res.turnstileSettings || {}),
+            }
             res.loyaltySettings = {
               enabled: false,
               pointsPerEuro: 1,
@@ -1612,6 +1668,11 @@ export default {
           senderId: this.restaurantData.smsSettings?.senderId || '',
           baseUrl: this.restaurantData.smsSettings?.baseUrl || '',
           otpTemplate: this.restaurantData.smsSettings?.otpTemplate || '',
+        },
+        turnstileSettings: {
+          enabled: !!this.restaurantData.turnstileSettings?.enabled,
+          siteKey: this.restaurantData.turnstileSettings?.siteKey || '',
+          secretKey: this.restaurantData.turnstileSettings?.secretKey || '',
         },
         restusConfig: {
           operatingMode: this.restaurantData.operatingMode || '',
