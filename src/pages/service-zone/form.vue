@@ -186,6 +186,7 @@
                   label="Password"
                   placeholder="Password"
                   type="password"
+                  autocomplete="new-password"
                 />
                 <VaInput
                   v-model="restaurantData.winmaxConfig.terminal"
@@ -752,14 +753,19 @@
                 label="SMS Username"
                 name="smsUsername"
                 placeholder="Username"
+                autocomplete="off"
                 :rules="[validators.required]"
               />
+              <!-- autocomplete="new-password" is required: without it the
+                   browser silently overwrites this field with the admin's own
+                   saved login password, and the wrong value gets saved. -->
               <VaInput
                 v-model="restaurantData.smsSettings.password"
                 label="SMS Password"
                 name="smsPassword"
                 placeholder="Password"
                 type="password"
+                autocomplete="new-password"
                 :rules="[validators.required]"
               />
               <VaInput
@@ -787,6 +793,101 @@
                 placeholder="Your {{ '{{brand}}' }} code is {{ '{{otp}}' }}"
                 helper-text="Optional. Use {{ '{{otp}}' }} for the code and {{ '{{brand}}' }} for the outlet name. Leave blank for the default wording."
                 class="w-full"
+              />
+            </div>
+          </div>
+        </VaCardContent>
+      </VaCard>
+
+      <!-- Captcha (Cloudflare Turnstile) Settings -->
+      <VaCard class="mt-6">
+        <VaCardContent>
+          <h2 class="font-bold text-base mb-4">Captcha (Cloudflare Turnstile) Settings</h2>
+
+          <div class="flex flex-col w-full">
+            <VaSwitch
+              v-model="restaurantData.turnstileSettings.enabled"
+              label="Use this outlet's own Turnstile widget"
+              left-label
+              size="small"
+            />
+            <div class="text-sm mt-2 opacity-70">
+              When off, OTP captcha tokens are verified against the platform's default Turnstile widget.
+              The site key here must match the one built into this outlet's website.
+            </div>
+
+            <div v-if="restaurantData.turnstileSettings.enabled" class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mt-4">
+              <VaInput
+                v-model="restaurantData.turnstileSettings.siteKey"
+                label="Turnstile Site Key"
+                name="turnstileSiteKey"
+                placeholder="0x4AAAAAA..."
+                autocomplete="off"
+                helper-text="Public key — for reference; the website bundle carries its own copy."
+                :rules="[validators.required]"
+              />
+              <!-- autocomplete="new-password" is required: without it the
+                   browser silently overwrites this field with the admin's own
+                   saved login password, and the wrong value gets saved. -->
+              <VaInput
+                v-model="restaurantData.turnstileSettings.secretKey"
+                label="Turnstile Secret Key"
+                name="turnstileSecretKey"
+                placeholder="Secret key"
+                type="password"
+                autocomplete="new-password"
+                helper-text="From the same widget as the site key (Cloudflare dashboard → Turnstile)."
+                :rules="[validators.required]"
+              />
+            </div>
+          </div>
+        </VaCardContent>
+      </VaCard>
+
+      <!-- Loyalty Settings -->
+      <VaCard class="mt-6">
+        <VaCardContent>
+          <h2 class="font-bold text-base mb-4">Loyalty Settings</h2>
+
+          <div class="flex flex-col w-full">
+            <VaSwitch
+              v-model="restaurantData.loyaltySettings.enabled"
+              label="Enable loyalty program for this outlet"
+              left-label
+              size="small"
+            />
+            <div class="text-sm mt-2 opacity-70">
+              When on, registered customers earn points on their orders — either as soon as the order is sent to the
+              POS, or when the delivery system confirms delivery.
+            </div>
+
+            <div
+              v-if="restaurantData.loyaltySettings.enabled"
+              class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full mt-4"
+            >
+              <VaInput
+                v-model="restaurantData.loyaltySettings.pointsPerEuro"
+                label="Points per €"
+                name="loyaltyPointsPerEuro"
+                type="number"
+                min="0"
+                step="0.5"
+              />
+              <VaSelect
+                v-model="restaurantData.loyaltySettings.allocationTrigger"
+                label="Points Allocation"
+                :options="loyaltyTriggerOptions"
+                value-by="value"
+                text-by="text"
+              />
+              <VaInput
+                v-model="restaurantData.loyaltySettings.welcomePoints"
+                label="Welcome Points"
+                name="loyaltyWelcomePoints"
+                type="number"
+                min="0"
+                step="1"
+                helper-text="One-time bonus granted on registration."
               />
             </div>
           </div>
@@ -845,6 +946,10 @@ export default {
       { text: 'view Only', value: 'viewOnly' },
       { text: 'Online Ordering', value: 'onlineOrdering' },
     ])
+    const loyaltyTriggerOptions = [
+      { text: 'On order (Winmax dispatch)', value: 'order' },
+      { text: 'On delivery (delivery-system callback)', value: 'delivered' },
+    ]
     const serviceStore = useServiceStore()
     const selectedType = ref(null)
     const selectedTypeMode = ref(null)
@@ -904,6 +1009,7 @@ export default {
       validators,
       addNewOption,
       languages,
+      loyaltyTriggerOptions,
     }
   },
   data() {
@@ -970,6 +1076,17 @@ export default {
           senderId: '',
           baseUrl: '',
           otpTemplate: '',
+        },
+        turnstileSettings: {
+          enabled: false,
+          siteKey: '',
+          secretKey: '',
+        },
+        loyaltySettings: {
+          enabled: false,
+          pointsPerEuro: 1,
+          allocationTrigger: 'order',
+          welcomePoints: 0,
         },
         openingTimes: {
           selected: '',
@@ -1430,6 +1547,18 @@ export default {
             // Ensure emailSettings and template defaults exist
             if (!res.emailSettings) res.emailSettings = {}
             if (!res.emailSettings.templates) res.emailSettings.templates = {}
+            // Outlets without winmaxConfig (e.g. dev DBs, where the prod-to-dev
+            // clone strips POS credentials) would otherwise crash the template at
+            // restaurantData.winmaxConfig.company when pos === 'winmax', leaving
+            // the whole Configuration section blank.
+            res.winmaxConfig = {
+              company: '',
+              user: '',
+              password: '',
+              terminal: '',
+              failureAlertPhones: [],
+              ...(res.winmaxConfig || {}),
+            }
             // Outlets saved before smsSettings existed have no such key, and
             // `this.restaurantData = res` below replaces the defaults wholesale
             // — without this the v-models in the SMS card would throw.
@@ -1441,6 +1570,19 @@ export default {
               baseUrl: '',
               otpTemplate: '',
               ...(res.smsSettings || {}),
+            }
+            res.turnstileSettings = {
+              enabled: false,
+              siteKey: '',
+              secretKey: '',
+              ...(res.turnstileSettings || {}),
+            }
+            res.loyaltySettings = {
+              enabled: false,
+              pointsPerEuro: 1,
+              allocationTrigger: 'order',
+              welcomePoints: 0,
+              ...(res.loyaltySettings || {}),
             }
             const tplDefaults = {
               registrationConfirmation: { subject: '', html: '' },
@@ -1512,6 +1654,13 @@ export default {
         },
         // Keys enumerated explicitly rather than spread: the backend $set
         // replaces the whole subdocument, so a key omitted here is erased.
+        loyaltySettings: {
+          enabled: !!this.restaurantData.loyaltySettings?.enabled,
+          pointsPerEuro: Math.max(0, Number(this.restaurantData.loyaltySettings?.pointsPerEuro) || 0),
+          allocationTrigger:
+            this.restaurantData.loyaltySettings?.allocationTrigger === 'delivered' ? 'delivered' : 'order',
+          welcomePoints: Math.max(0, Math.floor(Number(this.restaurantData.loyaltySettings?.welcomePoints) || 0)),
+        },
         smsSettings: {
           enabled: !!this.restaurantData.smsSettings?.enabled,
           username: this.restaurantData.smsSettings?.username || '',
@@ -1519,6 +1668,11 @@ export default {
           senderId: this.restaurantData.smsSettings?.senderId || '',
           baseUrl: this.restaurantData.smsSettings?.baseUrl || '',
           otpTemplate: this.restaurantData.smsSettings?.otpTemplate || '',
+        },
+        turnstileSettings: {
+          enabled: !!this.restaurantData.turnstileSettings?.enabled,
+          siteKey: this.restaurantData.turnstileSettings?.siteKey || '',
+          secretKey: this.restaurantData.turnstileSettings?.secretKey || '',
         },
         restusConfig: {
           operatingMode: this.restaurantData.operatingMode || '',

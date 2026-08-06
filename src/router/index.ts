@@ -66,6 +66,20 @@ const routes: Array<RouteRecordRaw> = [
         meta: { roles: ['admin', 'super-admin'] },
       },
       {
+        // Global all-outlets settings table — super-admin only. Outlet managers
+        // configure their own outlet's loyalty in the outlet form instead.
+        name: 'loyaltySettings',
+        path: 'loyalty/settings',
+        component: () => import('../pages/loyalty/settings.vue'),
+        meta: { roles: ['super-admin'] },
+      },
+      {
+        name: 'loyaltyMembers',
+        path: 'loyalty/members',
+        component: () => import('../pages/loyalty/members.vue'),
+        meta: { roles: ['admin', 'super-admin'] },
+      },
+      {
         name: 'deliveryZone',
         path: 'deliveryZone',
         component: () => import('../pages/deliveryZone/index.vue'),
