@@ -235,6 +235,7 @@ function onEdited() {
               v-model="winmaxId"
               class="xl:col-span-3"
               label="Employee ID"
+              autocomplete="off"
               required-mark
               :rules="[validators.required, numberRule]"
               placeholder="e.g. 100001"
@@ -243,6 +244,7 @@ function onEdited() {
               v-model="firstName"
               class="xl:col-span-3"
               label="Name"
+              autocomplete="off"
               required-mark
               :rules="[validators.required]"
               placeholder="First name"
@@ -251,6 +253,7 @@ function onEdited() {
               v-model="surname"
               class="xl:col-span-3"
               label="Surname"
+              autocomplete="off"
               required-mark
               :rules="[validators.required]"
               placeholder="Surname"
@@ -262,6 +265,7 @@ function onEdited() {
                 class="xl:col-span-3"
                 :type="isPasswordVisible.value ? 'text' : 'password'"
                 label="Password"
+                autocomplete="new-password"
                 required-mark
                 :rules="[validators.required, minPwd]"
                 placeholder="Min 6 characters (temporary)"
@@ -283,6 +287,7 @@ function onEdited() {
               v-model="email"
               class="md:col-span-2 xl:col-span-6"
               label="Email"
+              autocomplete="off"
               required-mark
               type="email"
               :rules="[validators.required, validators.email]"
@@ -292,12 +297,14 @@ function onEdited() {
               v-model="officeNo"
               class="xl:col-span-3"
               label="Office No"
+              autocomplete="off"
               placeholder="Office number (optional)"
             />
             <VaInput
               v-model="officePhone"
               class="xl:col-span-3"
               label="Office Phone"
+              autocomplete="off"
               placeholder="Office phone number (optional)"
             />
           </div>
@@ -437,6 +444,7 @@ function onEdited() {
           v-model="resetPassword"
           :type="isResetPwdVisible.value ? 'text' : 'password'"
           label="New temporary password"
+          autocomplete="new-password"
           required-mark
           :rules="[validators.required, minPwd]"
           placeholder="Min 6 characters"
