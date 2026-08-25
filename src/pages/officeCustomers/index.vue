@@ -218,20 +218,16 @@ function onEdited() {
   <div class="flex flex-col gap-4">
     <VaCard class="mt-4">
       <VaCardContent>
-        <h1 class="va-h5 mb-1">Register Employee</h1>
+        <h1 class="va-h5 mb-4">Register Employee</h1>
 
-        <VaForm ref="form" class="max-w-[680px]" @submit.prevent="submit">
-          <!-- Outlet is taken from login / the top navbar selection (like the rest of the panel). -->
-          <div
-            class="mb-4 flex items-center gap-2 text-sm rounded-md px-3 py-2"
-            :class="outletId ? 'bg-slate-50 text-slate-700' : 'bg-amber-50 text-amber-700'"
-          >
-
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <VaForm ref="form" @submit.prevent="submit">
+          <!-- Compact responsive grid: two rows on wide screens (email gets the
+               widest cell — the only value that needs the room), two columns on
+               tablets, single column on mobile. -->
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4">
             <VaInput
               v-model="winmaxId"
+              class="xl:col-span-2"
               label="Employee ID"
               required-mark
               :rules="[validators.required, numberRule]"
@@ -239,6 +235,7 @@ function onEdited() {
             />
             <VaInput
               v-model="firstName"
+              class="xl:col-span-3"
               label="Name"
               required-mark
               :rules="[validators.required]"
@@ -246,6 +243,7 @@ function onEdited() {
             />
             <VaInput
               v-model="surname"
+              class="xl:col-span-3"
               label="Surname"
               required-mark
               :rules="[validators.required]"
@@ -253,6 +251,7 @@ function onEdited() {
             />
             <VaInput
               v-model="email"
+              class="md:col-span-2 xl:col-span-4"
               label="Email"
               required-mark
               type="email"
@@ -263,11 +262,12 @@ function onEdited() {
             <VaValue v-slot="isPasswordVisible" :default-value="false">
               <VaInput
                 v-model="password"
+                class="xl:col-span-4"
                 :type="isPasswordVisible.value ? 'text' : 'password'"
                 label="Password"
                 required-mark
                 :rules="[validators.required, minPwd]"
-                placeholder="Min 6 characters"
+                placeholder="Min 6 characters (temporary)"
                 messages="Temporary — the employee sets their own password at first login."
                 @clickAppendInner="isPasswordVisible.value = !isPasswordVisible.value"
               >
@@ -282,11 +282,21 @@ function onEdited() {
               </VaInput>
             </VaValue>
 
-            <VaInput v-model="officeNo" label="Office No" placeholder="Office number (optional)" />
-            <VaInput v-model="officePhone" label="Office Phone" placeholder="Office phone number (optional)" />
+            <VaInput
+              v-model="officeNo"
+              class="xl:col-span-4"
+              label="Office No"
+              placeholder="Office number (optional)"
+            />
+            <VaInput
+              v-model="officePhone"
+              class="xl:col-span-4"
+              label="Office Phone"
+              placeholder="Office phone number (optional)"
+            />
           </div>
 
-          <div class="flex justify-end mt-6">
+          <div class="flex justify-end mt-4">
             <VaButton :disabled="!canSave || saving" :loading="saving" @click="submit">Register</VaButton>
           </div>
         </VaForm>
