@@ -47,7 +47,8 @@
           />
         </div>
       </div>
-      <div class="flex items-center mb-2">
+      <div class="flex items-center gap-6 mb-2 flex-wrap">
+        <VaCheckbox v-model="formData.isActive" label="Active (visible on the customer menu)" />
         <VaCheckbox
           v-model="formData.isOfferOnly"
           label="Offer-only (hide this category and its items from the customer menu)"
