@@ -31,6 +31,18 @@
               <VaIcon name="headset_mic" class="mr-2" />
               Call Center
             </RouterLink>
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'scheduledOrders'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/scheduledOrders"
+            >
+              <VaIcon name="schedule" class="mr-2" />
+              Scheduled Orders
+            </RouterLink>
           </div>
         </Transition>
       </div>
