@@ -221,13 +221,14 @@ function onEdited() {
         <h1 class="va-h5 mb-4">Register Employee</h1>
 
         <VaForm ref="form" @submit.prevent="submit">
-          <!-- Compact responsive grid: two rows on wide screens (email gets the
-               widest cell — the only value that needs the room), two columns on
-               tablets, single column on mobile. -->
+          <!-- Compact responsive grid, laid out like the design mockup:
+               row 1 = Employee ID / Name / Surname / Password,
+               row 2 = Email (the widest cell) / Office No / Office Phone.
+               Collapses to two columns on tablets, one on mobile. -->
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4">
             <VaInput
               v-model="winmaxId"
-              class="xl:col-span-2"
+              class="xl:col-span-3"
               label="Employee ID"
               required-mark
               :rules="[validators.required, numberRule]"
@@ -249,20 +250,11 @@ function onEdited() {
               :rules="[validators.required]"
               placeholder="Surname"
             />
-            <VaInput
-              v-model="email"
-              class="md:col-span-2 xl:col-span-4"
-              label="Email"
-              required-mark
-              type="email"
-              :rules="[validators.required, validators.email]"
-              placeholder="name@company.com"
-            />
 
             <VaValue v-slot="isPasswordVisible" :default-value="false">
               <VaInput
                 v-model="password"
-                class="xl:col-span-4"
+                class="xl:col-span-3"
                 :type="isPasswordVisible.value ? 'text' : 'password'"
                 label="Password"
                 required-mark
@@ -283,14 +275,23 @@ function onEdited() {
             </VaValue>
 
             <VaInput
+              v-model="email"
+              class="md:col-span-2 xl:col-span-6"
+              label="Email"
+              required-mark
+              type="email"
+              :rules="[validators.required, validators.email]"
+              placeholder="name@company.com"
+            />
+            <VaInput
               v-model="officeNo"
-              class="xl:col-span-4"
+              class="xl:col-span-3"
               label="Office No"
               placeholder="Office number (optional)"
             />
             <VaInput
               v-model="officePhone"
-              class="xl:col-span-4"
+              class="xl:col-span-3"
               label="Office Phone"
               placeholder="Office phone number (optional)"
             />
