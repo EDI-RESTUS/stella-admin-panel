@@ -24,7 +24,6 @@ const columns = defineVaDataTableColumns([
   { label: 'Customer', key: 'customerName', sortable: false },
   { label: 'Phone', key: 'customerPhoneNo', sortable: false },
   { label: 'Type', key: 'orderType', sortable: false },
-  { label: 'Zone', key: 'deliveryZoneName', sortable: false },
   { label: 'Total', key: 'total', sortable: false, thAlign: 'right' },
   { label: 'Payment', key: 'paymentMode', sortable: false },
   { label: 'POS', key: 'pos', sortable: false, thAlign: 'center' },
@@ -169,9 +168,6 @@ async function saveSchedule() {
           </template>
           <template #cell(orderType)="{ rowData }">
             {{ rowData.orderType || '—' }}
-          </template>
-          <template #cell(deliveryZoneName)="{ rowData }">
-            {{ rowData.deliveryZoneName || '—' }}
           </template>
           <template #cell(total)="{ rowData }">
             <div class="text-right tabular-nums">€{{ Number(rowData.total || 0).toFixed(2) }}</div>
