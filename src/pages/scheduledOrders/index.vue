@@ -27,8 +27,8 @@ const columns = defineVaDataTableColumns([
   { label: 'Zone', key: 'deliveryZoneName', sortable: false },
   { label: 'Total', key: 'total', sortable: false, thAlign: 'right' },
   { label: 'Payment', key: 'paymentMode', sortable: false },
-  { label: 'Status', key: 'status', sortable: false, thAlign: 'center' },
   { label: 'POS', key: 'pos', sortable: false, thAlign: 'center' },
+  { label: 'Actions', key: 'actions', sortable: false, thAlign: 'center' },
 ])
 
 // The endpoint returns rows ascending by scheduled time (orderDateTime).
@@ -43,11 +43,7 @@ function formatDateTime(v: string | undefined) {
   )
 }
 
-function statusColor(status: string) {
-  if (status === 'Completed') return 'success'
-  if (status === 'Cancelled') return 'danger'
-  return 'warning' // In Progress
-}
+const isSent = (o: any) => !!(o?.isSaveWinmax || o?.orderDispatchToWinmaxTime)
 
 async function loadOrders() {
   if (!outletId.value) {
@@ -85,6 +81,52 @@ onMounted(async () => {
   }
   loadOrders()
 })
+
+/* ---------------- View modal ---------------- */
+const viewOrder = ref<any>(null)
+
+/* ---------------- Edit (reschedule) modal ---------------- */
+const editOrder = ref<any>(null)
+const editDateTime = ref('') // datetime-local value
+const editSaving = ref(false)
+
+// "2026-08-25T14:30" in the browser's local time, for <input type="datetime-local">
+function toLocalInputValue(v: string | undefined) {
+  const d = v ? new Date(v) : new Date()
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function openEdit(order: any) {
+  editOrder.value = order
+  editDateTime.value = toLocalInputValue(order.orderDateTime)
+}
+
+async function saveSchedule() {
+  if (!editOrder.value || !editDateTime.value) return
+  const newDate = new Date(editDateTime.value)
+  if (isNaN(newDate.getTime())) {
+    init({ message: 'Please pick a valid date and time', color: 'danger' })
+    return
+  }
+  editSaving.value = true
+  try {
+    await axios.patch(`${url}/orders/${editOrder.value._id}/schedule`, {
+      orderDateTime: newDate.toISOString(),
+    })
+    init({ message: 'Order rescheduled', color: 'success' })
+    editOrder.value = null
+    loadOrders()
+  } catch (err: any) {
+    init({
+      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to reschedule the order',
+      color: 'danger',
+    })
+  } finally {
+    editSaving.value = false
+  }
+}
 </script>
 
 <template>
@@ -137,19 +179,27 @@ onMounted(async () => {
           <template #cell(paymentMode)="{ rowData }">
             {{ rowData.paymentMode || '—' }}
           </template>
-          <template #cell(status)="{ rowData }">
-            <div class="flex justify-center">
-              <VaBadge :text="rowData.status || '—'" :color="statusColor(rowData.status)" />
-            </div>
-          </template>
           <template #cell(pos)="{ rowData }">
             <div class="flex justify-center">
               <VaBadge
-                v-if="rowData.isSaveWinmax || rowData.orderDispatchToWinmaxTime"
+                v-if="isSent(rowData)"
                 :text="`Sent ${rowData.orderDispatchToWinmaxTime ? formatDateTime(rowData.orderDispatchToWinmaxTime) : ''}`.trim()"
                 color="success"
               />
               <VaBadge v-else text="Scheduled" color="info" />
+            </div>
+          </template>
+          <template #cell(actions)="{ rowData }">
+            <div class="flex justify-center gap-1">
+              <VaButton preset="plain" size="small" icon="visibility" title="View order" @click="viewOrder = rowData" />
+              <VaButton
+                preset="plain"
+                size="small"
+                icon="edit"
+                :title="isSent(rowData) ? 'Already sent to the POS — cannot reschedule' : 'Change scheduled time'"
+                :disabled="isSent(rowData)"
+                @click="openEdit(rowData)"
+              />
             </div>
           </template>
           <template #bodyAppend>
@@ -166,5 +216,101 @@ onMounted(async () => {
         </div>
       </VaCardContent>
     </VaCard>
+
+    <!-- View order -->
+    <VaModal
+      :model-value="!!viewOrder"
+      size="medium"
+      :mobile-fullscreen="false"
+      hide-default-actions
+      close-button
+      @update:modelValue="viewOrder = null"
+    >
+      <template #header>
+        <h2 class="va-h6 mb-2">
+          Order — {{ formatDateTime(viewOrder?.orderDateTime) }}
+        </h2>
+      </template>
+
+      <div v-if="viewOrder" class="flex flex-col gap-2 text-sm">
+        <div class="grid grid-cols-2 gap-x-6 gap-y-1">
+          <div><span class="text-slate-500">Customer:</span> {{ viewOrder.customerName || '—' }}
+            <span v-if="viewOrder.customerWinmaxId" class="text-slate-500">({{ viewOrder.customerWinmaxId }})</span>
+          </div>
+          <div><span class="text-slate-500">Phone:</span> {{ viewOrder.customerPhoneNo || '—' }}</div>
+          <div><span class="text-slate-500">Type:</span> {{ viewOrder.orderType || '—' }}</div>
+          <div><span class="text-slate-500">Zone:</span> {{ viewOrder.deliveryZoneName || '—' }}</div>
+          <div><span class="text-slate-500">Payment:</span> {{ viewOrder.paymentMode || '—' }}</div>
+          <div>
+            <span class="text-slate-500">POS:</span>
+            {{ isSent(viewOrder) ? `Sent ${formatDateTime(viewOrder.orderDispatchToWinmaxTime)}` : 'Scheduled' }}
+          </div>
+        </div>
+
+        <div class="mt-3 border rounded-lg divide-y">
+          <div
+            v-for="(item, i) in viewOrder.menuItems || []"
+            :key="i"
+            class="flex justify-between items-start px-3 py-2"
+          >
+            <div>
+              <span class="font-semibold">{{ item.quantity || 1 }}×</span> {{ item.name }}
+              <div v-if="item.options?.length" class="text-xs text-slate-500 pl-5">
+                <div v-for="(opt, j) in item.options" :key="j">
+                  {{ opt.quantity > 1 ? `${opt.quantity}× ` : '' }}{{ opt.name }}
+                </div>
+              </div>
+            </div>
+            <div class="tabular-nums whitespace-nowrap pl-4">
+              €{{ Number(item.price || 0).toFixed(2) }}
+            </div>
+          </div>
+          <div v-if="!(viewOrder.menuItems || []).length" class="px-3 py-2 text-slate-500">No items.</div>
+        </div>
+
+        <div v-if="viewOrder.orderNotes" class="text-slate-600">
+          <span class="text-slate-500">Notes:</span> {{ viewOrder.orderNotes }}
+        </div>
+
+        <div class="flex justify-between font-semibold mt-1">
+          <span v-if="Number(viewOrder.deliveryFee || 0) > 0" class="text-slate-500 font-normal">
+            Delivery fee €{{ Number(viewOrder.deliveryFee).toFixed(2) }}
+          </span>
+          <span class="ml-auto">Total €{{ Number(viewOrder.total || 0).toFixed(2) }}</span>
+        </div>
+      </div>
+    </VaModal>
+
+    <!-- Edit (reschedule) -->
+    <VaModal
+      :model-value="!!editOrder"
+      size="small"
+      :mobile-fullscreen="false"
+      hide-default-actions
+      close-button
+      @update:modelValue="editOrder = null"
+    >
+      <template #header>
+        <h2 class="va-h6 mb-2">Reschedule order</h2>
+      </template>
+
+      <p class="mb-3 text-sm text-slate-600">
+        {{ editOrder?.customerName || 'Customer' }} — currently scheduled for
+        <strong>{{ formatDateTime(editOrder?.orderDateTime) }}</strong>
+      </p>
+      <label class="text-sm font-semibold text-slate-700 block mb-1">New date &amp; time</label>
+      <input
+        v-model="editDateTime"
+        type="datetime-local"
+        class="w-full border rounded-lg px-3 py-2"
+      />
+
+      <template #footer>
+        <div class="flex justify-end gap-2 mt-4">
+          <VaButton preset="secondary" @click="editOrder = null">Cancel</VaButton>
+          <VaButton :loading="editSaving" @click="saveSchedule">Save</VaButton>
+        </div>
+      </template>
+    </VaModal>
   </div>
 </template>
