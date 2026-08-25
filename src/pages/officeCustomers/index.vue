@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import axios from 'axios'
 import { useForm, useToast, defineVaDataTableColumns } from 'vuestic-ui'
 import { validators } from '@/services/utils'
 import { useServiceStore } from '@/stores/services'
 import EditOfficeCustomerModal from './modals/EditOfficeCustomerModal.vue'
 
-const { validate } = useForm('form')
+const { validate, resetValidation } = useForm('form')
 const { init } = useToast()
 const servicesStore = useServiceStore()
 
@@ -113,6 +113,8 @@ function refresh() {
 }
 
 onMounted(async () => {
+  // Belt-and-braces: never show validation errors on a pristine form.
+  void nextTick(() => resetValidation())
   if (!servicesStore.items.length) {
     try {
       await servicesStore.getAll()
@@ -147,6 +149,9 @@ function resetForm() {
   password.value = ''
   officeNo.value = ''
   officePhone.value = ''
+  // Emptying the values re-triggers every field's `required` rule — clear the
+  // validation state on the next tick so a fresh form never shows errors.
+  void nextTick(() => resetValidation())
 }
 
 async function submit() {
