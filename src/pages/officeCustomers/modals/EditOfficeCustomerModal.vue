@@ -37,6 +37,14 @@
         />
         <VaInput v-model="formData.officeNo" label="Office No" placeholder="Office number (optional)" />
         <VaInput v-model="formData.officePhone" label="Office Phone" placeholder="Office phone number (optional)" />
+        <VaInput
+          v-model="formData.creditLimit"
+          label="Credit Limit (€)"
+          type="number"
+          min="0"
+          placeholder="e.g. 100 — empty = no site-side limit"
+          messages="Mirrors the Winmax credit limit; checkout blocks orders beyond limit + balance."
+        />
         <div class="flex items-center">
           <VaSwitch v-model="formData.isActive" label="Active" size="small" />
         </div>
@@ -76,6 +84,7 @@ const formData = ref({
   email: props.customer.email || '',
   officeNo: props.customer.officeNo || '',
   officePhone: props.customer.officePhone || '',
+  creditLimit: props.customer.creditLimit ?? ('' as any),
   isActive: props.customer.isActive !== false,
 })
 
@@ -91,6 +100,11 @@ async function submit() {
       officeNo: formData.value.officeNo.trim(),
       officePhone: formData.value.officePhone.trim(),
       isActive: formData.value.isActive,
+      // empty input -> null = no site-side limit; otherwise a number >= 0
+      creditLimit:
+        formData.value.creditLimit === '' || formData.value.creditLimit === null
+          ? null
+          : Number(formData.value.creditLimit),
     })
     init({ message: data?.message || 'Employee updated', color: 'success' })
     emits('saved')

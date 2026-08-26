@@ -40,7 +40,7 @@ const resetLoading = ref(false)
 
 // Winmax balances, loaded separately so the table renders immediately and a slow
 // or unavailable Winmax never blocks the list. Keyed by winmaxId.
-const balances = ref<Record<string, number | null>>({})
+const balances = ref<Record<string, { balance: number | null; creditLimit: number | null; remaining: number | null }>>({})
 const balancesLoading = ref(false)
 
 const columns = defineVaDataTableColumns([
@@ -49,7 +49,7 @@ const columns = defineVaDataTableColumns([
   { label: 'Email', key: 'email', sortable: true },
   { label: 'Office No', key: 'officeNo', sortable: true },
   { label: 'Office Phone', key: 'officePhone', sortable: false },
-  { label: 'Balance', key: 'balance', sortable: false, thAlign: 'right' },
+  { label: 'Credit', key: 'balance', sortable: false, thAlign: 'right' },
   { label: 'Status', key: 'isActive', sortable: false, thAlign: 'center' },
   { label: 'Actions', key: 'actions', sortable: false, thAlign: 'center' },
 ])
@@ -57,6 +57,22 @@ const columns = defineVaDataTableColumns([
 function formatBalance(v: number | null | undefined) {
   if (v === null || v === undefined) return '—'
   return `€${Number(v).toFixed(2)}`
+}
+
+// "€94.00 / €100" when a limit is set (remaining of limit), else the raw
+// Winmax balance; "—" while unknown.
+function formatCredit(row?: { balance: number | null; creditLimit: number | null; remaining: number | null }) {
+  if (!row) return '—'
+  if (row.creditLimit !== null && row.remaining !== null) {
+    return `${formatBalance(row.remaining)} / €${row.creditLimit}`
+  }
+  return formatBalance(row.balance)
+}
+
+function creditIsLow(row?: { creditLimit: number | null; remaining: number | null; balance: number | null }) {
+  if (!row) return false
+  if (row.remaining !== null) return row.remaining <= 0
+  return (row.balance ?? 0) < 0
 }
 
 const filteredItems = computed(() => {
@@ -95,8 +111,14 @@ async function getBalances() {
   balancesLoading.value = true
   try {
     const { data } = await axios.get(`${url}/customers/office/balances`, { params: { outletId: outletId.value } })
-    const map: Record<string, number | null> = {}
-    for (const b of data?.data || []) map[String(b.winmaxId)] = b.balance
+    const map: Record<string, { balance: number | null; creditLimit: number | null; remaining: number | null }> = {}
+    for (const b of data?.data || []) {
+      map[String(b.winmaxId)] = {
+        balance: b.balance ?? null,
+        creditLimit: b.creditLimit ?? null,
+        remaining: b.remaining ?? null,
+      }
+    }
     balances.value = map
   } catch {
     // Balances are best-effort; never block the list on a Winmax hiccup.
@@ -357,11 +379,12 @@ function onEdited() {
               <span v-if="balancesLoading" class="text-slate-400">…</span>
               <span
                 v-else
+                :title="`Winmax balance: ${formatBalance(balances[String(rowData.winmaxId)]?.balance)}`"
                 :class="
-                  (balances[String(rowData.winmaxId)] ?? 0) < 0 ? 'text-red-600 font-semibold' : 'text-slate-800'
+                  creditIsLow(balances[String(rowData.winmaxId)]) ? 'text-red-600 font-semibold' : 'text-slate-800'
                 "
               >
-                {{ formatBalance(balances[String(rowData.winmaxId)]) }}
+                {{ formatCredit(balances[String(rowData.winmaxId)]) }}
               </span>
             </div>
           </template>
