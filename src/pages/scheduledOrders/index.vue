@@ -27,7 +27,6 @@ const columns = defineVaDataTableColumns([
   { label: 'Items', key: 'items', sortable: false },
   { label: 'Total', key: 'total', sortable: false, thAlign: 'right' },
   { label: 'Payment', key: 'paymentMode', sortable: false },
-  { label: 'POS', key: 'pos', sortable: false, thAlign: 'center' },
   { label: 'Actions', key: 'actions', sortable: false, thAlign: 'center' },
 ])
 
@@ -195,7 +194,7 @@ async function saveSchedule() {
           <div>
             <h1 class="va-h5">Scheduled Orders</h1>
             <p class="text-sm text-slate-500 mt-1">
-              Future orders from today onward, earliest first. "Sent" means the order has already gone to the POS.
+              Future orders from today onward, earliest first.
             </p>
           </div>
           <VaButton preset="secondary" size="small" icon="refresh" :loading="loading" @click="loadOrders">
@@ -261,16 +260,6 @@ async function saveSchedule() {
           <template #cell(paymentMode)="{ rowData }">
             {{ rowData.paymentMode || '—' }}
           </template>
-          <template #cell(pos)="{ rowData }">
-            <div class="flex justify-center">
-              <VaBadge
-                v-if="isSent(rowData)"
-                :text="`Sent ${rowData.orderDispatchToWinmaxTime ? formatDateTime(rowData.orderDispatchToWinmaxTime) : ''}`.trim()"
-                color="success"
-              />
-              <VaBadge v-else text="Scheduled" color="info" />
-            </div>
-          </template>
           <template #cell(actions)="{ rowData }">
             <div class="flex justify-center gap-1">
               <VaButton preset="plain" size="small" icon="visibility" title="View order" @click="viewOrder = rowData" />
@@ -323,10 +312,6 @@ async function saveSchedule() {
           <div><span class="text-slate-500">Type:</span> {{ viewOrder.orderType || '—' }}</div>
           <div><span class="text-slate-500">Zone:</span> {{ viewOrder.deliveryZoneName || '—' }}</div>
           <div><span class="text-slate-500">Payment:</span> {{ viewOrder.paymentMode || '—' }}</div>
-          <div>
-            <span class="text-slate-500">POS:</span>
-            {{ isSent(viewOrder) ? `Sent ${formatDateTime(viewOrder.orderDispatchToWinmaxTime)}` : 'Scheduled' }}
-          </div>
         </div>
 
         <div class="mt-3 border rounded-lg divide-y">
