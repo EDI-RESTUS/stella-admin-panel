@@ -24,6 +24,7 @@ const columns = defineVaDataTableColumns([
   { label: 'Customer', key: 'customerName', sortable: false },
   { label: 'Phone', key: 'customerPhoneNo', sortable: false },
   { label: 'Type', key: 'orderType', sortable: false },
+  { label: 'Items', key: 'items', sortable: false },
   { label: 'Total', key: 'total', sortable: false, thAlign: 'right' },
   { label: 'Payment', key: 'paymentMode', sortable: false },
   { label: 'POS', key: 'pos', sortable: false, thAlign: 'center' },
@@ -43,6 +44,64 @@ function formatDateTime(v: string | undefined) {
 }
 
 const isSent = (o: any) => !!(o?.isSaveWinmax || o?.orderDispatchToWinmaxTime)
+
+// One flat {qty, name} list per order, combining plain lines and offer items
+// (names are hydrated server-side by /orders/scheduled).
+function orderItemLines(o: any): Array<{ qty: number; name: string }> {
+  const lines: Array<{ qty: number; name: string }> = []
+  for (const it of o?.menuItems || []) {
+    lines.push({ qty: Number(it?.quantity) || 1, name: it?.name || '(item)' })
+  }
+  for (const offer of o?.offerDetails || []) {
+    for (const it of offer?.offerItems || []) {
+      lines.push({ qty: Number(it?.quantity) || 1, name: it?.name || '(item)' })
+    }
+  }
+  return lines
+}
+
+const itemsSummary = (o: any) =>
+  orderItemLines(o)
+    .map((l) => `${l.qty}× ${l.name}`)
+    .join(', ')
+
+// Kitchen prep view: total quantity per item across the loaded scheduled
+// orders, for today and tomorrow. Computed from the fetched page (limit 50 —
+// plenty at office-lunch volume; the table below shows the same rows anyway).
+const localDateKey = (v: string | Date) => {
+  const d = new Date(v)
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+const dayTotals = computed(() => {
+  const now = new Date()
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+  const days = [
+    { label: 'TODAY', key: localDateKey(now), date: now },
+    { label: 'TOMORROW', key: localDateKey(tomorrow), date: tomorrow },
+  ]
+  return days
+    .map((day) => {
+      const totals = new Map<string, number>()
+      let orderCount = 0
+      for (const o of orders.value) {
+        if (localDateKey(o?.orderDateTime) !== day.key) continue
+        orderCount++
+        for (const line of orderItemLines(o)) {
+          totals.set(line.name, (totals.get(line.name) || 0) + line.qty)
+        }
+      }
+      return {
+        label: day.label,
+        dateText: day.date.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }),
+        orderCount,
+        items: [...totals.entries()].map(([name, qty]) => ({ name, qty })),
+      }
+    })
+    .filter((d) => d.items.length > 0)
+})
 
 async function loadOrders() {
   if (!outletId.value) {
@@ -144,6 +203,25 @@ async function saveSchedule() {
           </VaButton>
         </div>
 
+        <!-- Kitchen prep totals: what's been pre-ordered for today / tomorrow -->
+        <div v-if="dayTotals.length" class="flex flex-col gap-2 mb-4">
+          <div
+            v-for="day in dayTotals"
+            :key="day.label"
+            class="rounded-lg border px-3 py-2 bg-[var(--va-background-element)]"
+          >
+            <span class="font-semibold text-sm mr-2">
+              {{ day.label }} ({{ day.dateText }}) — {{ day.orderCount }} order{{ day.orderCount === 1 ? '' : 's' }}:
+            </span>
+            <span class="text-sm">
+              <template v-for="(item, i) in day.items" :key="item.name">
+                <span v-if="i > 0" class="text-slate-400"> · </span>
+                <span class="tabular-nums font-semibold">{{ item.qty }}×</span> {{ item.name }}
+              </template>
+            </span>
+          </div>
+        </div>
+
         <VaDataTable
           :columns="columns"
           :items="orders"
@@ -168,6 +246,14 @@ async function saveSchedule() {
           </template>
           <template #cell(orderType)="{ rowData }">
             {{ rowData.orderType || '—' }}
+          </template>
+          <template #cell(items)="{ rowData }">
+            <span
+              class="block max-w-[280px] truncate text-sm"
+              :title="itemsSummary(rowData)"
+            >
+              {{ itemsSummary(rowData) || '—' }}
+            </span>
           </template>
           <template #cell(total)="{ rowData }">
             <div class="text-right tabular-nums">€{{ Number(rowData.total || 0).toFixed(2) }}</div>
