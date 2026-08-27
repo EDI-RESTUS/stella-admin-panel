@@ -43,6 +43,13 @@ const resetLoading = ref(false)
 const balances = ref<Record<string, { balance: number | null; creditLimit: number | null; remaining: number | null }>>({})
 const balancesLoading = ref(false)
 
+// Transaction-history modal (the entity's Winmax current-account statement),
+// opened by clicking a row's Credit cell. txRows null after load = Winmax
+// unreachable (the backend fails open).
+const txTarget = ref<any>(null)
+const txLoading = ref(false)
+const txRows = ref<any[] | null>(null)
+
 const columns = defineVaDataTableColumns([
   { label: 'Employee ID', key: 'winmaxId', sortable: true },
   { label: 'Name', key: 'customerName', sortable: true },
@@ -239,6 +246,38 @@ function onEdited() {
   editTarget.value = null
   refresh()
 }
+
+async function openTransactions(row: any) {
+  txTarget.value = row
+  txRows.value = null
+  txLoading.value = true
+  try {
+    const { data } = await axios.get(`${url}/customers/office/${row.id}/transactions`)
+    txRows.value = data?.data?.transactions ?? null
+  } catch {
+    txRows.value = null // shown as "unavailable"
+  } finally {
+    txLoading.value = false
+  }
+}
+
+function formatTxDate(iso: string | null | undefined) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatTxAmount(v: number | null | undefined) {
+  if (v === null || v === undefined || Number(v) === 0) return '—'
+  return `€${Number(v).toFixed(2)}`
+}
 </script>
 
 <template>
@@ -379,10 +418,12 @@ function onEdited() {
               <span v-if="balancesLoading" class="text-slate-400">…</span>
               <span
                 v-else
-                :title="`Winmax balance: ${formatBalance(balances[String(rowData.winmaxId)]?.balance)}`"
+                class="cursor-pointer underline decoration-dotted underline-offset-2"
+                :title="`Winmax balance: ${formatBalance(balances[String(rowData.winmaxId)]?.balance)} — click for transactions`"
                 :class="
                   creditIsLow(balances[String(rowData.winmaxId)]) ? 'text-red-600 font-semibold' : 'text-slate-800'
                 "
+                @click="openTransactions(rowData)"
               >
                 {{ formatCredit(balances[String(rowData.winmaxId)]) }}
               </span>
@@ -424,6 +465,52 @@ function onEdited() {
     </VaCard>
 
     <EditOfficeCustomerModal v-if="editTarget" :customer="editTarget" @cancel="editTarget = null" @saved="onEdited" />
+
+    <VaModal
+      :model-value="!!txTarget"
+      size="medium"
+      :mobile-fullscreen="false"
+      hide-default-actions
+      close-button
+      @update:modelValue="txTarget = null"
+    >
+      <template #header>
+        <h1 class="va-h6 mb-2">
+          Transactions — {{ txTarget?.customerName }} (Employee ID {{ txTarget?.winmaxId }})
+        </h1>
+      </template>
+      <div v-if="txLoading" class="flex justify-center py-8">
+        <VaProgressCircle indeterminate />
+      </div>
+      <p v-else-if="!txRows" class="text-slate-500 py-4">
+        Transaction history is unavailable right now (Winmax unreachable).
+      </p>
+      <p v-else-if="txRows.length === 0" class="text-slate-500 py-4">No transactions yet.</p>
+      <div v-else class="overflow-auto" style="max-height: 60vh">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-slate-500 border-b border-slate-200">
+              <th class="py-2 pr-3 font-medium">Date</th>
+              <th class="py-2 pr-3 font-medium">Document</th>
+              <th class="py-2 pr-3 font-medium text-right">Debit</th>
+              <th class="py-2 pr-3 font-medium text-right">Credit</th>
+              <th class="py-2 font-medium text-right">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(t, i) in txRows" :key="i" class="border-b border-slate-100">
+              <td class="py-1.5 pr-3 whitespace-nowrap">{{ formatTxDate(t.date) }}</td>
+              <td class="py-1.5 pr-3">{{ [t.documentType, t.documentNumber].filter(Boolean).join(' ') || '—' }}</td>
+              <td class="py-1.5 pr-3 text-right tabular-nums text-red-600">{{ formatTxAmount(t.debit) }}</td>
+              <td class="py-1.5 pr-3 text-right tabular-nums text-green-700">{{ formatTxAmount(t.credit) }}</td>
+              <td class="py-1.5 text-right tabular-nums text-slate-600">
+                {{ t.balance !== null && t.balance !== undefined ? `€${Number(t.balance).toFixed(2)}` : '—' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </VaModal>
 
     <VaModal
       :model-value="!!resendTarget"
