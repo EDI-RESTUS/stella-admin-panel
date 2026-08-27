@@ -66,11 +66,12 @@ function formatBalance(v: number | null | undefined) {
   return `€${Number(v).toFixed(2)}`
 }
 
-// "€94.00 / €100" when a limit is set (remaining of limit), else the raw
-// Winmax balance; "—" while unknown.
+// "€94.00 / €100" when a real limit is set (remaining of limit — remaining is
+// the prepaid balance alone when positive). A limit of 0/unset = UNLIMITED
+// (Winmax convention): show the raw balance. "—" while unknown.
 function formatCredit(row?: { balance: number | null; creditLimit: number | null; remaining: number | null }) {
   if (!row) return '—'
-  if (row.creditLimit !== null && row.remaining !== null) {
+  if (row.creditLimit !== null && row.creditLimit !== 0 && row.remaining !== null) {
     return `${formatBalance(row.remaining)} / €${row.creditLimit}`
   }
   return formatBalance(row.balance)
@@ -78,6 +79,9 @@ function formatCredit(row?: { balance: number | null; creditLimit: number | null
 
 function creditIsLow(row?: { creditLimit: number | null; remaining: number | null; balance: number | null }) {
   if (!row) return false
+  // Unlimited accounts never red out — a negative balance is just normal
+  // post-paid debt there, not "out of credit".
+  if (row.creditLimit === null || row.creditLimit === 0) return false
   if (row.remaining !== null) return row.remaining <= 0
   return (row.balance ?? 0) < 0
 }
