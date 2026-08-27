@@ -142,6 +142,90 @@ onMounted(async () => {
 /* ---------------- View modal ---------------- */
 const viewOrder = ref<any>(null)
 
+/* ---------------- Cancel order ---------------- */
+const cancelTarget = ref<any>(null)
+const cancelling = ref(false)
+
+async function confirmCancel() {
+  if (!cancelTarget.value) return
+  cancelling.value = true
+  try {
+    await axios.put(`${url}/orders/${cancelTarget.value._id}/cancel`)
+    init({ message: 'Order cancelled', color: 'success' })
+    cancelTarget.value = null
+    loadOrders()
+  } catch (err: any) {
+    init({ message: err?.response?.data?.message || 'Failed to cancel the order', color: 'danger' })
+  } finally {
+    cancelling.value = false
+  }
+}
+
+/* ---------------- Edit items modal ---------------- */
+// Quantity editing per plain menu line, applied as the order-edits service's
+// composite patch: decreases -> quantity-aware deletes, increases -> adds
+// (same options), exactly like the Call Center's edit flow. Offer bundles are
+// shown read-only. Only for orders not yet sent to the POS.
+const itemsOrder = ref<any>(null)
+const itemsLines = ref<Array<{ menuItem: string; name: string; original: number; qty: number; options: any[] }>>([])
+const itemsSaving = ref(false)
+
+function openEditItems(order: any) {
+  itemsOrder.value = order
+  itemsLines.value = (order.menuItems || []).map((mi: any) => ({
+    menuItem: String(mi.menuItem),
+    name: mi.name || '(item)',
+    original: Number(mi.quantity) || 1,
+    qty: Number(mi.quantity) || 1,
+    options: (mi.options || []).map((o: any) => ({ option: o.option, quantity: o.quantity })),
+  }))
+}
+
+const itemsAllZero = computed(
+  () => itemsLines.value.length > 0 && itemsLines.value.every((l) => l.qty <= 0),
+)
+const itemsChanged = computed(() => itemsLines.value.some((l) => l.qty !== l.original))
+
+async function saveItems() {
+  const order = itemsOrder.value
+  if (!order || !itemsChanged.value) return
+
+  // Everything removed (and no offers left) -> that's a cancellation.
+  if (itemsAllZero.value && !(order.offerDetails || []).length) {
+    itemsOrder.value = null
+    cancelTarget.value = order
+    return
+  }
+
+  const deletes: any[] = []
+  const adds: any[] = []
+  for (const l of itemsLines.value) {
+    const diff = l.qty - l.original
+    if (diff < 0) deletes.push({ menuItem: l.menuItem, quantity: -diff, options: l.options })
+    if (diff > 0) adds.push({ menuItem: l.menuItem, quantity: diff, options: l.options })
+  }
+
+  itemsSaving.value = true
+  try {
+    const { data } = await axios.post(`${url}/order-edits/${order._id}/apply`, {
+      action: 'delete',
+      menuItems: deletes,
+      additions: { menuItems: adds },
+    })
+    if (data?.status === 'Failed') {
+      init({ message: data?.message || 'Failed to update the order', color: 'danger' })
+    } else {
+      init({ message: 'Order updated', color: 'success' })
+      itemsOrder.value = null
+      loadOrders()
+    }
+  } catch (err: any) {
+    init({ message: err?.response?.data?.message || 'Failed to update the order', color: 'danger' })
+  } finally {
+    itemsSaving.value = false
+  }
+}
+
 /* ---------------- Edit (reschedule) modal ---------------- */
 const editOrder = ref<any>(null)
 const editDateTime = ref('') // datetime-local value
@@ -266,10 +350,27 @@ async function saveSchedule() {
               <VaButton
                 preset="plain"
                 size="small"
+                icon="edit_note"
+                :title="isSent(rowData) ? 'Already sent to the POS — cannot edit items' : 'Edit items'"
+                :disabled="isSent(rowData)"
+                @click="openEditItems(rowData)"
+              />
+              <VaButton
+                preset="plain"
+                size="small"
                 icon="edit"
                 :title="isSent(rowData) ? 'Already sent to the POS — cannot reschedule' : 'Change scheduled time'"
                 :disabled="isSent(rowData)"
                 @click="openEdit(rowData)"
+              />
+              <VaButton
+                preset="plain"
+                size="small"
+                icon="cancel"
+                color="danger"
+                :title="isSent(rowData) ? 'Already sent to the POS — cancel it from the POS' : 'Cancel order'"
+                :disabled="isSent(rowData)"
+                @click="cancelTarget = rowData"
               />
             </div>
           </template>
@@ -403,6 +504,80 @@ async function saveSchedule() {
         <div class="flex justify-end gap-2 mt-4">
           <VaButton preset="secondary" @click="editOrder = null">Cancel</VaButton>
           <VaButton :loading="editSaving" @click="saveSchedule">Save</VaButton>
+        </div>
+      </template>
+    </VaModal>
+
+    <!-- Edit items -->
+    <VaModal
+      :model-value="!!itemsOrder"
+      size="medium"
+      :mobile-fullscreen="false"
+      hide-default-actions
+      close-button
+      @update:modelValue="itemsOrder = null"
+    >
+      <template #header>
+        <h2 class="va-h6 mb-2">
+          Edit items — {{ itemsOrder?.customerName }} · {{ formatDateTime(itemsOrder?.orderDateTime) }}
+        </h2>
+      </template>
+
+      <div v-if="itemsOrder" class="flex flex-col gap-2 text-sm">
+        <div class="border rounded-lg divide-y">
+          <div
+            v-for="(line, i) in itemsLines"
+            :key="i"
+            class="flex items-center justify-between px-3 py-2 gap-3"
+            :class="line.qty === 0 ? 'opacity-50' : ''"
+          >
+            <span :class="line.qty === 0 ? 'line-through' : ''">{{ line.name }}</span>
+            <div class="flex items-center gap-1">
+              <VaButton preset="plain" size="small" icon="remove" :disabled="line.qty <= 0" @click="line.qty--" />
+              <span class="w-8 text-center tabular-nums font-semibold">{{ line.qty }}</span>
+              <VaButton preset="plain" size="small" icon="add" @click="line.qty++" />
+            </div>
+          </div>
+          <div v-if="!itemsLines.length" class="px-3 py-2 text-slate-500">No plain items on this order.</div>
+        </div>
+
+        <div v-if="(itemsOrder.offerDetails || []).length" class="text-slate-500 text-xs">
+          Offer bundles ({{ itemsOrder.offerDetails.length }}) can't be edited here — cancel the order instead if they're wrong.
+        </div>
+        <div v-if="itemsAllZero && !(itemsOrder.offerDetails || []).length" class="text-red-600 text-xs font-semibold">
+          Removing every item cancels the order — you'll be asked to confirm.
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2 mt-4">
+          <VaButton preset="secondary" @click="itemsOrder = null">Close</VaButton>
+          <VaButton :loading="itemsSaving" :disabled="!itemsChanged" @click="saveItems">Save changes</VaButton>
+        </div>
+      </template>
+    </VaModal>
+
+    <!-- Cancel confirmation -->
+    <VaModal
+      :model-value="!!cancelTarget"
+      size="small"
+      :mobile-fullscreen="false"
+      hide-default-actions
+      close-button
+      @update:modelValue="cancelTarget = null"
+    >
+      <template #header>
+        <h2 class="va-h6 mb-2">Cancel order?</h2>
+      </template>
+      <p class="text-sm text-slate-600">
+        {{ cancelTarget?.customerName }} — {{ formatDateTime(cancelTarget?.orderDateTime) }},
+        total €{{ Number(cancelTarget?.total || 0).toFixed(2) }}.
+        This cancels the scheduled order and restores any reserved stock.
+      </p>
+      <template #footer>
+        <div class="flex justify-end gap-2 mt-4">
+          <VaButton preset="secondary" @click="cancelTarget = null">Keep order</VaButton>
+          <VaButton color="danger" :loading="cancelling" @click="confirmCancel">Cancel order</VaButton>
         </div>
       </template>
     </VaModal>
