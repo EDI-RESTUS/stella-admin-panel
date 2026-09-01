@@ -205,6 +205,24 @@
                   helper-text="Comma-separated phone numbers in international format. An SMS is sent to these numbers when an order fails to reach Winmax."
                 />
               </div>
+              <div v-if="restaurantData.pos == 'winmax'" class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4">
+                <VaSelect
+                  v-model="restaurantData.posSalesMode"
+                  label="Winmax Sales Mode"
+                  :options="posSalesModes"
+                  :track-by="(option) => option.value"
+                  :value-by="(option) => option.value"
+                  helper-text="Table orders: every order gets a POS table and is sent as kitchen requests (restaurants, default). Sales documents: each paid order is posted as one closed sales document — no tables (retail POS handhelds)."
+                />
+                <VaInput
+                  v-if="restaurantData.posSalesMode === 'document'"
+                  v-model="restaurantData.posSaleDocumentTypeCode"
+                  label="Default Sales Document Type"
+                  name="posSaleDocumentTypeCode"
+                  placeholder="e.g. IR"
+                  helper-text="Winmax document type code used for sales (Invoice/Receipt). A delivery zone (shop) can override it with its own type."
+                />
+              </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mt-4">
@@ -812,11 +830,14 @@
               size="small"
             />
             <div class="text-sm mt-2 opacity-70">
-              When off, OTP captcha tokens are verified against the platform's default Turnstile widget.
-              The site key here must match the one built into this outlet's website.
+              When off, OTP captcha tokens are verified against the platform's default Turnstile widget. The site key
+              here must match the one built into this outlet's website.
             </div>
 
-            <div v-if="restaurantData.turnstileSettings.enabled" class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mt-4">
+            <div
+              v-if="restaurantData.turnstileSettings.enabled"
+              class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mt-4"
+            >
               <VaInput
                 v-model="restaurantData.turnstileSettings.siteKey"
                 label="Turnstile Site Key"
@@ -946,6 +967,12 @@ export default {
       { text: 'view Only', value: 'viewOnly' },
       { text: 'Online Ordering', value: 'onlineOrdering' },
     ])
+    // How paid orders reach Winmax (outlet.posSalesMode) — "table" is the
+    // historical kitchen flow every outlet uses unless switched.
+    const posSalesModes = [
+      { text: 'Table orders (kitchen requests)', value: 'table' },
+      { text: 'Sales documents (retail POS, no tables)', value: 'document' },
+    ]
     const loyaltyTriggerOptions = [
       { text: 'On order (Winmax dispatch)', value: 'order' },
       { text: 'On delivery (delivery-system callback)', value: 'delivered' },
@@ -1010,6 +1037,7 @@ export default {
       addNewOption,
       languages,
       loyaltyTriggerOptions,
+      posSalesModes,
     }
   },
   data() {
@@ -1066,6 +1094,10 @@ export default {
           terminal: '',
           failureAlertPhonesRaw: '',
         },
+        // Retail POS: top-level on purpose (winmaxConfig is replaced wholesale
+        // on save, a key inside it would be lost by other forms).
+        posSalesMode: 'table',
+        posSaleDocumentTypeCode: '',
         // Strings default to '' rather than null: removeNulls() drops null keys
         // and empty objects, which would make the whole subdoc vanish from the
         // payload and blur "never configured" with "deliberately cleared".
@@ -1559,6 +1591,10 @@ export default {
               failureAlertPhones: [],
               ...(res.winmaxConfig || {}),
             }
+            // Outlets saved before the retail POS fields existed have no key;
+            // absent means the historical table flow.
+            res.posSalesMode = res.posSalesMode === 'document' ? 'document' : 'table'
+            res.posSaleDocumentTypeCode = res.posSaleDocumentTypeCode || ''
             // Outlets saved before smsSettings existed have no such key, and
             // `this.restaurantData = res` below replaces the defaults wholesale
             // — without this the v-models in the SMS card would throw.
@@ -1642,6 +1678,8 @@ export default {
         pos: this.restaurantData.pos || '',
         operatingMode: this.restaurantData.operatingMode,
         orderTimeLimit: this.restaurantData.orderTimeLimit,
+        posSalesMode: this.restaurantData.posSalesMode === 'document' ? 'document' : 'table',
+        posSaleDocumentTypeCode: (this.restaurantData.posSaleDocumentTypeCode || '').trim(),
         winmaxConfig: {
           ...this.restaurantData.winmaxConfig,
           terminal: this.restaurantData.winmaxConfig.terminal || null,

@@ -30,6 +30,14 @@
           type="number"
         />
       </div>
+      <div class="grid grid-cols-1 gap-4 mt-4">
+        <VaInput
+          v-model="formData.posSaleDocumentTypeCode"
+          label="Sales Document Type (retail POS)"
+          placeholder="e.g. IR4"
+          helper-text="Only for outlets in 'Sales documents' mode: the Winmax document type this shop's sales are posted as. Empty = the outlet's default."
+        />
+      </div>
       <div class="grid grid-cols-2 gap-4 mt-4">
         <VaInput
           v-model="formData.deliveryPromiseTime"
@@ -111,6 +119,7 @@ const formData = ref({
   ccToTable: '',
   webFromTable: '',
   webToTable: '',
+  posSaleDocumentTypeCode: '',
   outletId: '',
   isActive: true,
 })
