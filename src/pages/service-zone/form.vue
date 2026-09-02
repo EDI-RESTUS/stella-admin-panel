@@ -223,6 +223,18 @@
                   helper-text="Winmax document type code used for sales (Invoice/Receipt). A delivery zone (shop) can override it with its own type."
                 />
               </div>
+              <div v-if="restaurantData.pos == 'winmax' && restaurantData.posSalesMode === 'document'" class="w-full mt-4">
+                <VaSwitch
+                  v-model="restaurantData.posQuickMenuOffers"
+                  label="POS quick-menu offers"
+                  left-label
+                  size="small"
+                />
+                <div class="va-text-secondary text-xs mt-1">
+                  Show the Offers quick menu in the Stella POS app. Offers act as browsing shortcuts: their items are
+                  sold as normal articles at catalogue prices (offer price stays 0).
+                </div>
+              </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mt-4">
@@ -1098,6 +1110,7 @@ export default {
         // on save, a key inside it would be lost by other forms).
         posSalesMode: 'table',
         posSaleDocumentTypeCode: '',
+        posQuickMenuOffers: false,
         // Strings default to '' rather than null: removeNulls() drops null keys
         // and empty objects, which would make the whole subdoc vanish from the
         // payload and blur "never configured" with "deliberately cleared".
@@ -1595,6 +1608,7 @@ export default {
             // absent means the historical table flow.
             res.posSalesMode = res.posSalesMode === 'document' ? 'document' : 'table'
             res.posSaleDocumentTypeCode = res.posSaleDocumentTypeCode || ''
+            res.posQuickMenuOffers = res.posQuickMenuOffers === true
             // Outlets saved before smsSettings existed have no such key, and
             // `this.restaurantData = res` below replaces the defaults wholesale
             // — without this the v-models in the SMS card would throw.
@@ -1680,6 +1694,7 @@ export default {
         orderTimeLimit: this.restaurantData.orderTimeLimit,
         posSalesMode: this.restaurantData.posSalesMode === 'document' ? 'document' : 'table',
         posSaleDocumentTypeCode: (this.restaurantData.posSaleDocumentTypeCode || '').trim(),
+        posQuickMenuOffers: this.restaurantData.posQuickMenuOffers === true,
         winmaxConfig: {
           ...this.restaurantData.winmaxConfig,
           terminal: this.restaurantData.winmaxConfig.terminal || null,

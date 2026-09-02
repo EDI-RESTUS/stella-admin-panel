@@ -31,7 +31,7 @@
             <div class="grid grid-cols-2 gap-4">
               <VaInput
                 v-model="formData.price"
-                :rules="[validators.required]"
+                :rules="[validators.requiredNumber]"
                 required-mark
                 label="Price"
                 placeholder="Enter price"
