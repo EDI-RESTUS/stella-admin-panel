@@ -664,7 +664,7 @@
       <VaCard>
         <VaCardContent>
           <div class="flex-col justify-start items-start gap-4 inline-flex w-full">
-            <div class="flex gap-8 flex-col sm:flex-row sm:items-center w-full">
+            <div class="flex gap-8 flex-col sm:flex-row sm:flex-wrap sm:items-center w-full">
               <VaColorInput
                 v-model="restaurantData.primaryColor"
                 label="Primary Color"
@@ -686,13 +686,17 @@
               <VaColorInput v-model="restaurantData.textColor" label="Text Color" placeholder="#000" class="w-28" />
               <VaColorInput v-model="restaurantData.headerColor" label="Header Color" placeholder="#000" class="w-28" />
               <VaColorInput v-model="restaurantData.footerColor" label="Footer Color" placeholder="#000" class="w-28" />
-              <div class="flex items-center gap-4">
+              <!-- Same VaSwitch label-squeeze as the Options row: never let the
+                   labels shrink, and let the trio wrap under the colour inputs
+                   instead of being crushed at the end of the row. -->
+              <div class="flex flex-wrap items-center gap-4 shrink-0">
                 <VaSwitch
                   v-model="restaurantData.hideHeader"
                   :true-value="true"
                   label="Hide Header"
                   left-label
                   size="small"
+                  class="whitespace-nowrap"
                 />
                 <VaSwitch
                   v-model="restaurantData.hideLogo"
@@ -700,6 +704,7 @@
                   label="Hide Logo"
                   left-label
                   size="small"
+                  class="whitespace-nowrap"
                 />
                 <VaSwitch
                   v-model="restaurantData.hideDetails"
@@ -707,6 +712,7 @@
                   label="Hide Outlet details"
                   left-label
                   size="small"
+                  class="whitespace-nowrap"
                 />
               </div>
             </div>
