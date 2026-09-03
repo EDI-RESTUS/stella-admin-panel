@@ -223,7 +223,10 @@
                   helper-text="Winmax document type code used for sales (Invoice/Receipt). A delivery zone (shop) can override it with its own type."
                 />
               </div>
-              <div v-if="restaurantData.pos == 'winmax' && restaurantData.posSalesMode === 'document'" class="w-full mt-4">
+              <div
+                v-if="restaurantData.pos == 'winmax' && restaurantData.posSalesMode === 'document'"
+                class="w-full mt-4"
+              >
                 <VaSwitch
                   v-model="restaurantData.posQuickMenuOffers"
                   label="POS quick-menu offers"
@@ -234,6 +237,96 @@
                   Show the Offers quick menu in the Stella POS app. Offers act as browsing shortcuts: their items are
                   sold as normal articles at catalogue prices (offer price stays 0).
                 </div>
+              </div>
+
+              <!-- Winmax retail loyalty: hourly sweep of the outlet's own Winmax
+                   database (till sales earn points) + points mirrored to the
+                   entity's current account as credit/redeem documents. All
+                   top-level outlet fields (winmaxConfig is replaced wholesale on
+                   save). Off = the outlet is untouched. -->
+              <div v-if="restaurantData.pos == 'winmax'" class="w-full mt-6">
+                <VaSwitch
+                  v-model="restaurantData.winmaxRetailLoyalty"
+                  label="Winmax retail loyalty"
+                  left-label
+                  size="small"
+                  class="whitespace-nowrap"
+                />
+                <div class="va-text-secondary text-xs mt-1">
+                  Every hour, read paid sales rung on the Winmax tills from this outlet's Winmax database, award loyalty
+                  points to the matching Stella customers (entity code = customer code) and mirror the points to the
+                  entity's current account as credit. The earn rate itself is set under Loyalty → Settings.
+                </div>
+              </div>
+              <div
+                v-if="restaurantData.pos == 'winmax' && restaurantData.winmaxRetailLoyalty"
+                class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4"
+              >
+                <VaInput
+                  v-model="restaurantData.winmaxSqlDatabase"
+                  label="Winmax Database"
+                  name="winmaxSqlDatabase"
+                  placeholder="e.g. Winmax4_Test"
+                  helper-text="This outlet's own database on the Winmax SQL server (letters, digits, underscore)."
+                />
+                <VaInput
+                  v-model="restaurantData.winmaxRetailLoyaltyDocTypesRaw"
+                  label="Sale Document Types"
+                  name="winmaxRetailLoyaltyDocTypes"
+                  placeholder="e.g. IR, IRE"
+                  helper-text="Comma-separated Winmax document type codes that count as till sales (each branch has its own Invoice/Receipt type)."
+                />
+                <VaInput
+                  v-model="restaurantData.winmaxRetailLoyaltyExcludeTerminalsRaw"
+                  label="Exclude Terminals"
+                  name="winmaxRetailLoyaltyExcludeTerminals"
+                  placeholder="e.g. 2089"
+                  helper-text="Comma-separated Winmax terminal codes whose documents are ignored: the terminal(s) Stella sends orders on, so a Stella order pulled back from Winmax never earns twice."
+                />
+                <VaInput
+                  v-model="restaurantData.winmaxRetailLoyaltyPaymentTypeId"
+                  label="Current-account Payment Type ID"
+                  name="winmaxRetailLoyaltyPaymentTypeId"
+                  type="number"
+                  placeholder="e.g. 4"
+                  helper-text="The Winmax payment type customers use to pay with their credit (e.g. 'Credit'). Amounts paid with it don't earn points. 0 = none."
+                />
+                <VaInput
+                  v-model="restaurantData.winmaxRetailLoyaltyCreditDocType"
+                  label="Credit Document Type"
+                  name="winmaxRetailLoyaltyCreditDocType"
+                  placeholder="e.g. CN"
+                  helper-text="Document type posted for every earn (a credit note with one line and no payment). Empty = points are not mirrored to Winmax."
+                />
+                <VaInput
+                  v-model="restaurantData.winmaxRetailLoyaltyCreditArticleCode"
+                  label="Credit Article"
+                  name="winmaxRetailLoyaltyCreditArticleCode"
+                  placeholder="e.g. POINTS"
+                  helper-text="The article on the credit note's single line. Must be tax-exempt (0% VAT) or Winmax adds VAT on top of the points' value."
+                />
+                <VaInput
+                  v-model="restaurantData.winmaxRetailLoyaltyRedeemDocType"
+                  label="Redeem Document Type"
+                  name="winmaxRetailLoyaltyRedeemDocType"
+                  placeholder="e.g. DBN"
+                  helper-text="Document type posted when points are redeemed in Stella, and the type the tills use to redeem — the sweep books those in Stella."
+                />
+                <VaInput
+                  v-model="restaurantData.winmaxRetailLoyaltyRedeemArticleCode"
+                  label="Redeem Article"
+                  name="winmaxRetailLoyaltyRedeemArticleCode"
+                  placeholder="e.g. REDEEM"
+                  helper-text="The article on the redeem document's single line. Tax-exempt as well."
+                />
+                <VaInput
+                  v-model="restaurantData.winmaxRetailLoyaltyPointsPerCreditEuro"
+                  label="Points per €1 of Credit"
+                  name="winmaxRetailLoyaltyPointsPerCreditEuro"
+                  type="number"
+                  placeholder="50"
+                  helper-text="Value of the points on the Winmax entity: 50 = 50 points are €1 of credit. Keep equal to the website's redemption rate."
+                />
               </div>
             </div>
 
@@ -492,6 +585,10 @@
               <VaInput v-model="restaurantData.DeliveryNotes" label="Delivery Notes" class="w-full" />
             </div>
 
+            <!-- Switch labels must never wrap: VaSwitch gives the label a fixed
+                 line box, so a wrapped second line paints over the first. The
+                 long "Use Kiosk Wallee Terminals" label also gets a 2-column
+                 cell so it fits on the row's second line. -->
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 gap-4 w-full mt-4">
               <div class="w-full">
                 <VaSwitch
@@ -500,6 +597,7 @@
                   label="Guest Users"
                   left-label
                   size="small"
+                  class="whitespace-nowrap"
                 />
               </div>
 
@@ -510,6 +608,7 @@
                   label="Guest Checkout"
                   left-label
                   size="small"
+                  class="whitespace-nowrap"
                 />
               </div>
 
@@ -520,24 +619,40 @@
                   label="Repeat Last Order"
                   left-label
                   size="small"
+                  class="whitespace-nowrap"
                 />
               </div>
 
               <div class="w-full">
-                <VaSwitch v-model="restaurantData.tabs" :true-value="true" label="Tabs" left-label size="small" />
+                <VaSwitch
+                  v-model="restaurantData.tabs"
+                  :true-value="true"
+                  label="Tabs"
+                  left-label
+                  size="small"
+                  class="whitespace-nowrap"
+                />
               </div>
 
               <div class="w-full">
-                <VaSwitch v-model="restaurantData.tips" :true-value="true" label="Tips" left-label size="small" />
+                <VaSwitch
+                  v-model="restaurantData.tips"
+                  :true-value="true"
+                  label="Tips"
+                  left-label
+                  size="small"
+                  class="whitespace-nowrap"
+                />
               </div>
 
-              <div class="w-full">
+              <div class="w-full sm:col-span-2 md:col-span-2">
                 <VaSwitch
                   v-model="restaurantData.useKioskWalleeTerminals"
                   :true-value="true"
                   label="Use Kiosk Wallee Terminals"
                   left-label
                   size="small"
+                  class="whitespace-nowrap"
                 />
               </div>
             </div>
@@ -1111,6 +1226,18 @@ export default {
         posSalesMode: 'table',
         posSaleDocumentTypeCode: '',
         posQuickMenuOffers: false,
+        // Winmax retail loyalty sweep (top-level for the same reason). The
+        // *Raw fields are the comma-separated inputs; arrays are built on save.
+        winmaxRetailLoyalty: false,
+        winmaxSqlDatabase: '',
+        winmaxRetailLoyaltyDocTypesRaw: 'IR',
+        winmaxRetailLoyaltyExcludeTerminalsRaw: '',
+        winmaxRetailLoyaltyPaymentTypeId: 0,
+        winmaxRetailLoyaltyCreditDocType: '',
+        winmaxRetailLoyaltyCreditArticleCode: '',
+        winmaxRetailLoyaltyRedeemDocType: '',
+        winmaxRetailLoyaltyRedeemArticleCode: '',
+        winmaxRetailLoyaltyPointsPerCreditEuro: 50,
         // Strings default to '' rather than null: removeNulls() drops null keys
         // and empty objects, which would make the whole subdoc vanish from the
         // payload and blur "never configured" with "deliberately cleared".
@@ -1609,6 +1736,18 @@ export default {
             res.posSalesMode = res.posSalesMode === 'document' ? 'document' : 'table'
             res.posSaleDocumentTypeCode = res.posSaleDocumentTypeCode || ''
             res.posQuickMenuOffers = res.posQuickMenuOffers === true
+            // Winmax retail loyalty: outlets saved before these fields existed
+            // have no keys; arrays become the comma-separated inputs.
+            res.winmaxRetailLoyalty = res.winmaxRetailLoyalty === true
+            res.winmaxSqlDatabase = res.winmaxSqlDatabase || ''
+            res.winmaxRetailLoyaltyDocTypesRaw = (res.winmaxRetailLoyaltyDocTypes ?? ['IR']).join(', ')
+            res.winmaxRetailLoyaltyExcludeTerminalsRaw = (res.winmaxRetailLoyaltyExcludeTerminals ?? []).join(', ')
+            res.winmaxRetailLoyaltyPaymentTypeId = Number(res.winmaxRetailLoyaltyPaymentTypeId) || 0
+            res.winmaxRetailLoyaltyCreditDocType = res.winmaxRetailLoyaltyCreditDocType || ''
+            res.winmaxRetailLoyaltyCreditArticleCode = res.winmaxRetailLoyaltyCreditArticleCode || ''
+            res.winmaxRetailLoyaltyRedeemDocType = res.winmaxRetailLoyaltyRedeemDocType || ''
+            res.winmaxRetailLoyaltyRedeemArticleCode = res.winmaxRetailLoyaltyRedeemArticleCode || ''
+            res.winmaxRetailLoyaltyPointsPerCreditEuro = Number(res.winmaxRetailLoyaltyPointsPerCreditEuro) || 50
             // Outlets saved before smsSettings existed have no such key, and
             // `this.restaurantData = res` below replaces the defaults wholesale
             // — without this the v-models in the SMS card would throw.
@@ -1695,6 +1834,28 @@ export default {
         posSalesMode: this.restaurantData.posSalesMode === 'document' ? 'document' : 'table',
         posSaleDocumentTypeCode: (this.restaurantData.posSaleDocumentTypeCode || '').trim(),
         posQuickMenuOffers: this.restaurantData.posQuickMenuOffers === true,
+        // Winmax retail loyalty (comma-separated inputs -> arrays; codes upper-cased)
+        winmaxRetailLoyalty: this.restaurantData.winmaxRetailLoyalty === true,
+        winmaxSqlDatabase: (this.restaurantData.winmaxSqlDatabase || '').trim(),
+        winmaxRetailLoyaltyDocTypes: (this.restaurantData.winmaxRetailLoyaltyDocTypesRaw || '')
+          .split(',')
+          .map((s) => s.trim().toUpperCase())
+          .filter(Boolean),
+        winmaxRetailLoyaltyExcludeTerminals: (this.restaurantData.winmaxRetailLoyaltyExcludeTerminalsRaw || '')
+          .split(',')
+          .map((s) => Number(s.trim()))
+          .filter((n) => Number.isInteger(n) && n > 0),
+        winmaxRetailLoyaltyPaymentTypeId: Number(this.restaurantData.winmaxRetailLoyaltyPaymentTypeId) || 0,
+        winmaxRetailLoyaltyCreditDocType: (this.restaurantData.winmaxRetailLoyaltyCreditDocType || '')
+          .trim()
+          .toUpperCase(),
+        winmaxRetailLoyaltyCreditArticleCode: (this.restaurantData.winmaxRetailLoyaltyCreditArticleCode || '').trim(),
+        winmaxRetailLoyaltyRedeemDocType: (this.restaurantData.winmaxRetailLoyaltyRedeemDocType || '')
+          .trim()
+          .toUpperCase(),
+        winmaxRetailLoyaltyRedeemArticleCode: (this.restaurantData.winmaxRetailLoyaltyRedeemArticleCode || '').trim(),
+        winmaxRetailLoyaltyPointsPerCreditEuro:
+          Number(this.restaurantData.winmaxRetailLoyaltyPointsPerCreditEuro) || 50,
         winmaxConfig: {
           ...this.restaurantData.winmaxConfig,
           terminal: this.restaurantData.winmaxConfig.terminal || null,
