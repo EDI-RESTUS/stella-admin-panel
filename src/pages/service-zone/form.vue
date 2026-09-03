@@ -238,6 +238,64 @@
                   sold as normal articles at catalogue prices (offer price stays 0).
                 </div>
               </div>
+              <!-- Stella POS receipt: printed by the handheld itself right after
+                   payment (no Winmax read-back). Header can be pulled from the
+                   Winmax service zone's DocumentsHeader with the sync button. -->
+              <div
+                v-if="restaurantData.pos == 'winmax' && restaurantData.posSalesMode === 'document'"
+                class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4"
+              >
+                <div class="w-full">
+                  <VaTextarea
+                    v-model="restaurantData.posReceiptHeader"
+                    label="POS receipt header"
+                    name="posReceiptHeader"
+                    :min-rows="3"
+                    :max-rows="6"
+                    class="w-full"
+                    placeholder="Legal name&#10;Address&#10;VAT number"
+                  />
+                  <div class="flex items-center gap-3 mt-2">
+                    <VaButton
+                      preset="secondary"
+                      size="small"
+                      icon="sync"
+                      :loading="syncingReceiptHeader"
+                      :disabled="!restaurantId"
+                      @click="syncReceiptHeaderFromWinmax"
+                    >
+                      Sync from Winmax
+                    </VaButton>
+                    <span class="va-text-secondary text-xs">
+                      Printed centred at the top of the receipt, one line per row. Sync reads the Winmax service zone
+                      matching the saved sales document type{{ restaurantId ? '' : ' (save the outlet first)' }}.
+                    </span>
+                  </div>
+                </div>
+                <div class="w-full">
+                  <VaTextarea
+                    v-model="restaurantData.posReceiptFooter"
+                    label="POS receipt footer"
+                    name="posReceiptFooter"
+                    :min-rows="2"
+                    :max-rows="4"
+                    class="w-full"
+                    placeholder="Website, returns policy…"
+                  />
+                  <VaInput
+                    v-model="restaurantData.posReceiptVatPercent"
+                    label="POS receipt VAT %"
+                    name="posReceiptVatPercent"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="19"
+                    class="w-full mt-3"
+                    helper-text="Prints Net / VAT lines at this rate; leave empty to print none."
+                  />
+                </div>
+              </div>
 
               <!-- Winmax retail loyalty: hourly sweep of the outlet's own Winmax
                    database (till sales earn points) + points mirrored to the
@@ -1176,6 +1234,7 @@ export default {
   data() {
     return {
       isProgrammaticNavigation: false,
+      syncingReceiptHeader: false,
       restaurantData: {
         name: '',
         description: '',
@@ -1232,6 +1291,10 @@ export default {
         posSalesMode: 'table',
         posSaleDocumentTypeCode: '',
         posQuickMenuOffers: false,
+        // Stella POS receipt (printed by the handheld; '' / '' / '' = none)
+        posReceiptHeader: '',
+        posReceiptFooter: '',
+        posReceiptVatPercent: '',
         // Winmax retail loyalty sweep (top-level for the same reason). The
         // *Raw fields are the comma-separated inputs; arrays are built on save.
         winmaxRetailLoyalty: false,
@@ -1475,6 +1538,46 @@ export default {
     this.fetchRestaurantDetails()
   },
   methods: {
+    /**
+     * Stella POS receipt header ← Winmax: reads the service zone whose
+     * POSSaleDocumentTypeCode matches the outlet's SAVED sales document type
+     * (GET /winmax/pos-receipt-context, fresh=1 skips the server's 10-minute
+     * cache) and drops its DocumentsHeader lines into the textarea. Winmax
+     * has no footer and only a list of VAT rates, so those stay manual.
+     */
+    async syncReceiptHeaderFromWinmax() {
+      if (!this.restaurantId || this.syncingReceiptHeader) return
+      this.syncingReceiptHeader = true
+      try {
+        const url = import.meta.env.VITE_API_BASE_URL
+        const res = await axios.get(`${url}/winmax/pos-receipt-context`, {
+          params: { outletId: this.restaurantId, fresh: 1 },
+        })
+        const ctx = res.data?.data || {}
+        const lines = Array.isArray(ctx.documentsHeader) ? ctx.documentsHeader.filter(Boolean) : []
+        if (!ctx.documentMode) {
+          this.init({
+            message: 'Save the outlet with "Sales documents" mode and a sales document type first.',
+            color: 'warning',
+          })
+        } else if (!lines.length) {
+          this.init({
+            message: `No Winmax service zone matches sales document type "${ctx.documentTypeCode || '?'}" — check the Winmax settings and document type, then save and retry.`,
+            color: 'warning',
+          })
+        } else {
+          this.restaurantData.posReceiptHeader = lines.join('\n')
+          this.init({
+            message: `Header loaded from Winmax zone "${ctx.designation || ctx.serviceZoneCode}" (${ctx.documentTypeCode}). Save to keep it.`,
+            color: 'success',
+          })
+        }
+      } catch (e) {
+        this.init({ message: e?.response?.data?.message || e?.message || 'Winmax sync failed', color: 'danger' })
+      } finally {
+        this.syncingReceiptHeader = false
+      }
+    },
     // addNewOption(newOption) {
     //   this.types = [...this.types, newOption]
     // },
@@ -1742,6 +1845,10 @@ export default {
             res.posSalesMode = res.posSalesMode === 'document' ? 'document' : 'table'
             res.posSaleDocumentTypeCode = res.posSaleDocumentTypeCode || ''
             res.posQuickMenuOffers = res.posQuickMenuOffers === true
+            res.posReceiptHeader = res.posReceiptHeader || ''
+            res.posReceiptFooter = res.posReceiptFooter || ''
+            res.posReceiptVatPercent =
+              res.posReceiptVatPercent === null || res.posReceiptVatPercent === undefined ? '' : String(res.posReceiptVatPercent)
             // Winmax retail loyalty: outlets saved before these fields existed
             // have no keys; arrays become the comma-separated inputs.
             res.winmaxRetailLoyalty = res.winmaxRetailLoyalty === true
@@ -1840,6 +1947,14 @@ export default {
         posSalesMode: this.restaurantData.posSalesMode === 'document' ? 'document' : 'table',
         posSaleDocumentTypeCode: (this.restaurantData.posSaleDocumentTypeCode || '').trim(),
         posQuickMenuOffers: this.restaurantData.posQuickMenuOffers === true,
+        // Stella POS receipt: '' clears the header/footer; VAT '' -> null (no VAT block)
+        posReceiptHeader: String(this.restaurantData.posReceiptHeader || '').trim(),
+        posReceiptFooter: String(this.restaurantData.posReceiptFooter || '').trim(),
+        posReceiptVatPercent:
+          String(this.restaurantData.posReceiptVatPercent ?? '').trim() === '' ||
+          !Number.isFinite(Number(this.restaurantData.posReceiptVatPercent))
+            ? null
+            : Number(this.restaurantData.posReceiptVatPercent),
         // Winmax retail loyalty (comma-separated inputs -> arrays; codes upper-cased)
         winmaxRetailLoyalty: this.restaurantData.winmaxRetailLoyalty === true,
         winmaxSqlDatabase: (this.restaurantData.winmaxSqlDatabase || '').trim(),
