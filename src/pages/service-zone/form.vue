@@ -1539,21 +1539,34 @@ export default {
   },
   methods: {
     /**
-     * Stella POS receipt header ← Winmax: reads the service zone whose
-     * POSSaleDocumentTypeCode matches the outlet's SAVED sales document type
-     * (GET /winmax/pos-receipt-context, fresh=1 skips the server's 10-minute
-     * cache) and drops its DocumentsHeader lines into the textarea. Winmax
-     * has no footer and only a list of VAT rates, so those stay manual.
+     * Stella POS receipt header ← Winmax: reads the Winmax service zone whose
+     * POSSaleDocumentTypeCode matches the SAVED sales document type and drops
+     * its DocumentsHeader lines into the textarea (GET /winmax/pos-receipt-context,
+     * fresh=1 skips the server's 10-minute cache). The SHOP's document type is
+     * preferred: on DEMO2 the outlet default "IR" is the warehouse zone, while
+     * the delivery zone (shop) POW! PLATEIA carries "IR4" with the real shop
+     * header. Winmax has no footer and only a list of VAT rates — manual.
      */
     async syncReceiptHeaderFromWinmax() {
       if (!this.restaurantId || this.syncingReceiptHeader) return
       this.syncingReceiptHeader = true
       try {
         const url = import.meta.env.VITE_API_BASE_URL
+        // Shops (delivery zones) with their own sales document type, if any.
+        let shopZones = []
+        try {
+          const z = await axios.get(`${url}/deliveryZones/${this.restaurantId}`)
+          const list = Array.isArray(z.data) ? z.data : z.data?.data || []
+          shopZones = list.filter((dz) => dz && !dz.isDeleted && String(dz.posSaleDocumentTypeCode || '').trim())
+        } catch {
+          shopZones = []
+        }
+        const shop = shopZones[0]
         const res = await axios.get(`${url}/winmax/pos-receipt-context`, {
-          params: { outletId: this.restaurantId, fresh: 1 },
+          params: { outletId: this.restaurantId, fresh: 1, ...(shop ? { deliveryZoneId: shop._id } : {}) },
         })
         const ctx = res.data?.data || {}
+        const others = shopZones.slice(1).map((dz) => `${dz.name} (${dz.posSaleDocumentTypeCode})`)
         const lines = Array.isArray(ctx.documentsHeader) ? ctx.documentsHeader.filter(Boolean) : []
         if (!ctx.documentMode) {
           this.init({
@@ -1568,8 +1581,13 @@ export default {
         } else {
           this.restaurantData.posReceiptHeader = lines.join('\n')
           this.init({
-            message: `Header loaded from Winmax zone "${ctx.designation || ctx.serviceZoneCode}" (${ctx.documentTypeCode}). Save to keep it.`,
+            message:
+              `Header loaded from Winmax zone "${ctx.designation || ctx.serviceZoneCode}" (${ctx.documentTypeCode})` +
+              (shop ? ` via shop "${shop.name}"` : ' via the outlet default document type') +
+              (others.length ? `. Other shops not used: ${others.join(', ')}` : '') +
+              '. Save to keep it.',
             color: 'success',
+            duration: 8000,
           })
         }
       } catch (e) {
