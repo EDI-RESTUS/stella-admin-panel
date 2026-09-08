@@ -34,7 +34,14 @@
             v-for="e in paymentOptions.find((a) => a.paymentMethodName === formData.paymentGateway)?.inputConfig || []"
             :key="e.label"
           >
-            <VaInput v-model="e.value" :type="e.type" :rules="e.required ? [validators.required] : []">
+            <!-- placeholder/hint come from GET /payments-config (optional per field; PBT uses them for the stage/production hosts) -->
+            <VaInput
+              v-model="e.value"
+              :type="e.type"
+              :placeholder="e.placeholder || ''"
+              :messages="e.hint ? [e.hint] : []"
+              :rules="e.required ? [validators.required] : []"
+            >
               <template #label>
                 <span>
                   {{ e.label }}
