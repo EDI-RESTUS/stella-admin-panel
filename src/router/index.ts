@@ -154,6 +154,12 @@ const routes: Array<RouteRecordRaw> = [
         meta: { roles: ['caller', 'admin', 'super-admin', 'caller-editor', 'supervisor'] },
       },
       {
+        name: 'scheduledOrders',
+        path: 'scheduledOrders',
+        component: () => import('../pages/scheduledOrders/index.vue'),
+        meta: { roles: ['caller', 'admin', 'super-admin', 'caller-editor', 'supervisor'] },
+      },
+      {
         name: 'callCenterLogs',
         path: 'callCenterLogs',
         component: () => import('../pages/callCenterLogs/index.vue'),

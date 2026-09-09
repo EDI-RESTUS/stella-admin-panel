@@ -474,14 +474,22 @@ const onButtonCategoryDelete = async (payload) => {
         </template>
 
         <!-- ACTIVE -->
+        <!-- Minimal payload on purpose (same pattern as ArticlesTable): echoing
+             the whole row sent subCategories back and could 409 on the backend's
+             duplicate-code check, silently reverting the switch on refetch. -->
         <template #cell(isActive)="{ rowData }">
           <div class="flex justify-center items-center">
             <label class="relative inline-block w-9 h-5 cursor-pointer">
               <input
-                v-model="rowData.isActive"
+                :checked="rowData.isActive"
                 type="checkbox"
                 class="sr-only"
-                @change="emits('updateCategory', { ...rowData })"
+                @change="
+                  (e) => {
+                    rowData.isActive = (e.target as HTMLInputElement).checked
+                    emits('updateCategory', { _id: rowData._id, isActive: rowData.isActive })
+                  }
+                "
               />
               <span
                 class="block rounded-full h-5 w-9 transition-colors duration-300 ease-in-out"

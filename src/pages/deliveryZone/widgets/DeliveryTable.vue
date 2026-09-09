@@ -40,6 +40,7 @@ const columns = defineVaDataTableColumns([
   { label: 'Delivery Promise Time', key: 'deliveryPromiseTime' },
   { label: 'Takeaway Promise Time', key: 'takeawayPromiseTime' },
   { label: 'Terminal Number', key: 'terminalNumber' },
+  { label: 'Sales Doc Type', key: 'posSaleDocumentTypeCode', sortable: false },
   { label: 'CC From - To', key: 'ccFromTable' },
   { label: 'Web From - To', key: 'webFromTable' },
   { label: 'Active', key: 'isActive', sortable: false },
@@ -68,6 +69,9 @@ async function updateData(rowData) {
     isDeleted: rowData.isDeleted,
     deliveryCharge: rowData.deliveryCharge,
     terminalNumber: rowData.terminalNumber,
+    // Retail POS (outlet in "Sales documents" mode): this shop's Winmax sales
+    // document type, e.g. IR4. Empty = the outlet's default.
+    posSaleDocumentTypeCode: (rowData.posSaleDocumentTypeCode || '').trim(),
     futureOrderPromiseTime: rowData.futureOrderPromiseTime,
     deliveryPromiseTime: rowData.deliveryPromiseTime,
     takeawayPromiseTime: rowData.takeawayPromiseTime,
@@ -181,7 +185,9 @@ const items = toRef(props, 'items')
     <div class="flex items-center justify-between mb-4">
       <h1 class="page-title">Delivery Zones</h1>
       <div class="flex gap-2">
-        <VaButton v-if="!isSupervisor" size="small" color="primary" @click="emits('openModal')">Add Delivery Zone</VaButton>
+        <VaButton v-if="!isSupervisor" size="small" color="primary" @click="emits('openModal')"
+          >Add Delivery Zone</VaButton
+        >
       </div>
     </div>
     <VaDataTable
@@ -341,6 +347,28 @@ const items = toRef(props, 'items')
             class="w-1/2 p-1 border rounded"
             type="number"
             @change="updateData(rowData)"
+          />
+        </div>
+      </template>
+      <template #cell(posSaleDocumentTypeCode)="{ rowData }">
+        <div class="table-cell-content">
+          <div
+            v-if="!rowData.editPosSaleDocumentTypeCode"
+            :class="{ 'cursor-pointer': !isSupervisor }"
+            title="Winmax sales document type for this shop (retail POS outlets in 'Sales documents' mode), e.g. IR4. Empty = outlet default."
+            @click="tryEdit(() => (rowData.editPosSaleDocumentTypeCode = true))"
+          >
+            <span v-if="rowData.posSaleDocumentTypeCode">{{ rowData.posSaleDocumentTypeCode }}</span>
+            <span v-else class="text-gray-400">default</span>
+          </div>
+          <input
+            v-else
+            v-model="rowData.posSaleDocumentTypeCode"
+            class="w-[80px] p-1 border rounded"
+            type="text"
+            placeholder="e.g. IR4"
+            @blur="updateData(rowData), (rowData.editPosSaleDocumentTypeCode = false)"
+            @keyup.enter="updateData(rowData), (rowData.editPosSaleDocumentTypeCode = false)"
           />
         </div>
       </template>

@@ -9,6 +9,9 @@ export const validators = {
     return pattern.test(v) || 'Please enter a valid email address'
   },
   required: (v: any) => !!v || 'This field is required',
+  // Number required — unlike `required`, accepts 0 (e.g. free offers).
+  requiredNumber: (v: any) =>
+    (v !== null && v !== undefined && v !== '' && !Number.isNaN(Number(v))) || 'This field is required',
 }
 
 export function removeNulls(obj) {

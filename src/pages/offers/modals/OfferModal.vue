@@ -31,7 +31,7 @@
             <div class="grid grid-cols-2 gap-4">
               <VaInput
                 v-model="formData.price"
-                :rules="[validators.required]"
+                :rules="[validators.requiredNumber]"
                 required-mark
                 label="Price"
                 placeholder="Enter price"
@@ -86,6 +86,17 @@
             label="Order Type"
             :options="['takeaway', 'delivery', 'dine-in']"
           />
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <VaSelect
+            v-model="formData.status"
+            label="Status"
+            :options="['draft', 'active', 'paused', 'expired']"
+          />
+          <div class="va-text-secondary text-xs self-end pb-2">
+            Only <b>active</b> offers are shown to customers and on the POS.
+          </div>
         </div>
 
         <div class="flex flex-col gap-2">
@@ -199,6 +210,7 @@ const formData = ref({
   orderType: [] as string[],
   selections: [] as any[],
   isActive: true,
+  status: 'draft',
 })
 
 const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -256,6 +268,7 @@ watch(
         orderType: Array.isArray(val.orderType) ? val.orderType : [],
         selections: val.selections || [],
         isActive: val.isActive ?? true,
+        status: val.status || 'draft',
       }
       selectionsJson.value = JSON.stringify(val.selections || [], null, 2)
       return
@@ -285,6 +298,7 @@ watch(
         orderType: Array.isArray(data.orderType) ? data.orderType : [],
         selections: data.selections || [],
         isActive: data.isActive ?? true,
+        status: data.status || 'draft',
       }
 
       selectionsJson.value = JSON.stringify(data.selections || [], null, 2)

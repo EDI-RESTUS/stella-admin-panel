@@ -35,6 +35,34 @@
         </Transition>
       </div>
 
+      <!-- Scheduled Orders -->
+      <div v-if="userRole !== 'editor'" class="flex flex-col gap-y-1 mb-2">
+        <span
+          class="flex items-center justify-between font-bold text-slate-800 uppercase tracking-wide text-xs cursor-pointer py-1 rounded-lg hover:bg-slate-50 transition -ml-2 mr-2 pl-2 pr-2"
+          @click="scheduledOrdersOpen = !scheduledOrdersOpen"
+        >
+          Scheduled Orders
+          <VaIcon :name="scheduledOrdersOpen ? 'expand_less' : 'expand_more'" />
+        </span>
+
+        <Transition name="fade">
+          <div v-if="scheduledOrdersOpen" class="flex flex-col gap-y-1">
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'scheduledOrders'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/scheduledOrders"
+            >
+              <VaIcon name="schedule" class="mr-2" />
+              Scheduled Orders
+            </RouterLink>
+          </div>
+        </Transition>
+      </div>
+
       <!-- Menu -->
       <div v-if="userRole !== 'caller'" class="flex flex-col gap-y-1 mb-2">
         <span
@@ -444,6 +472,7 @@ export default defineComponent({
 
     // Collapsible states
     const callCenterOpen = ref(true)
+    const scheduledOrdersOpen = ref(true)
     const menuOpen = ref(true)
     const loyaltyOpen = ref(false)
     const configOpen = ref(true)
@@ -456,6 +485,7 @@ export default defineComponent({
       color,
       servicesStore,
       callCenterOpen,
+      scheduledOrdersOpen,
       menuOpen,
       loyaltyOpen,
       configOpen,

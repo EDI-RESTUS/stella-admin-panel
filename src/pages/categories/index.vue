@@ -71,8 +71,8 @@ const updateCategory = (payload) => {
 }
 
 const updateCategoryDirectly = (payload) => {
-  const data = payload
-  data.outletId = serviceStore.selectedRest
+  const data = { ...payload, outletId: serviceStore.selectedRest }
+  delete data._id // it's in the URL; never part of the update body
   const url: any = import.meta.env.VITE_API_BASE_URL
   axios
     .patch(`${url}/menuCategories/${payload._id}`, data)
@@ -81,8 +81,13 @@ const updateCategoryDirectly = (payload) => {
       init({ message: "You've successfully updated", color: 'success' })
     })
     .catch((err) => {
+      // Refetch reverts the optimistic switch; the toast must survive any
+      // error shape (network failures have no response body at all).
       getCategories(serviceStore.selectedRest)
-      init({ message: err.response.data.error, color: 'danger' })
+      init({
+        message: err?.response?.data?.error || err?.response?.data?.message || 'Failed to update category',
+        color: 'danger',
+      })
     })
 }
 

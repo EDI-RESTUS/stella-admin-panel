@@ -1,39 +1,25 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import axios from 'axios'
 import { useForm, useToast, defineVaDataTableColumns } from 'vuestic-ui'
 import { validators } from '@/services/utils'
 import { useServiceStore } from '@/stores/services'
+import EditOfficeCustomerModal from './modals/EditOfficeCustomerModal.vue'
 
-const { validate } = useForm('form')
+const { validate, resetValidation } = useForm('form')
 const { init } = useToast()
 const servicesStore = useServiceStore()
 
 const url = import.meta.env.VITE_API_BASE_URL
 
-const countryPrefixes = [
-  { text: '+357 (CY)', value: '357' },
-  { text: '+30 (GR)', value: '30' },
-  { text: '+44 (UK)', value: '44' },
-  { text: '+1 (US)', value: '1' },
-  { text: '+7 (RU)', value: '7' },
-  { text: '+971 (AE)', value: '971' },
-  { text: '+961 (LB)', value: '961' },
-]
-
 // Outlet comes from login / the top navbar selection (servicesStore.selectedRest),
 // exactly like the rest of the admin panel — there is no per-form outlet picker.
 const outletId = computed(() => servicesStore.selectedRest || '')
-const outletName = computed(() => {
-  const found = (servicesStore.items as any[]).find((o) => o._id === outletId.value)
-  return found?.name || (servicesStore.restDetails as any)?.name || ''
-})
 
 const winmaxId = ref('')
 const firstName = ref('')
 const surname = ref('')
-const phonePrefix = ref('357')
-const phoneLocal = ref('')
+const email = ref('')
 const password = ref('')
 const officeNo = ref('')
 const officePhone = ref('')
@@ -44,19 +30,35 @@ const tableItems = ref<any[]>([])
 const loadingList = ref(false)
 const search = ref('')
 
+// Row-action state.
+const editTarget = ref<any>(null)
+const resendTarget = ref<any>(null)
+const resendLoading = ref(false)
+const resetTarget = ref<any>(null)
+const resetPassword = ref('')
+const resetLoading = ref(false)
+
 // Winmax balances, loaded separately so the table renders immediately and a slow
 // or unavailable Winmax never blocks the list. Keyed by winmaxId.
-const balances = ref<Record<string, number | null>>({})
+const balances = ref<Record<string, { balance: number | null; creditLimit: number | null; remaining: number | null }>>({})
 const balancesLoading = ref(false)
 
+// Transaction-history modal (the entity's Winmax current-account statement),
+// opened by clicking a row's Credit cell. txRows null after load = Winmax
+// unreachable (the backend fails open).
+const txTarget = ref<any>(null)
+const txLoading = ref(false)
+const txRows = ref<any[] | null>(null)
+
 const columns = defineVaDataTableColumns([
-  { label: 'Winmax ID', key: 'winmaxId', sortable: true },
+  { label: 'Employee ID', key: 'winmaxId', sortable: true },
   { label: 'Name', key: 'customerName', sortable: true },
+  { label: 'Email', key: 'email', sortable: true },
   { label: 'Office No', key: 'officeNo', sortable: true },
   { label: 'Office Phone', key: 'officePhone', sortable: false },
-  { label: 'Phone', key: 'phone', sortable: false },
-  { label: 'Balance', key: 'balance', sortable: false, thAlign: 'right' },
-  { label: 'Active', key: 'isActive', sortable: false, thAlign: 'center' },
+  { label: 'Credit', key: 'balance', sortable: false, thAlign: 'right' },
+  { label: 'Status', key: 'isActive', sortable: false, thAlign: 'center' },
+  { label: 'Actions', key: 'actions', sortable: false, thAlign: 'center' },
 ])
 
 function formatBalance(v: number | null | undefined) {
@@ -64,11 +66,31 @@ function formatBalance(v: number | null | undefined) {
   return `€${Number(v).toFixed(2)}`
 }
 
+// "€94.00 / €100" when a real limit is set (remaining of limit — remaining is
+// the prepaid balance alone when positive). A limit of 0/unset = UNLIMITED
+// (Winmax convention): show the raw balance. "—" while unknown.
+function formatCredit(row?: { balance: number | null; creditLimit: number | null; remaining: number | null }) {
+  if (!row) return '—'
+  if (row.creditLimit !== null && row.creditLimit !== 0 && row.remaining !== null) {
+    return `${formatBalance(row.remaining)} / €${row.creditLimit}`
+  }
+  return formatBalance(row.balance)
+}
+
+function creditIsLow(row?: { creditLimit: number | null; remaining: number | null; balance: number | null }) {
+  if (!row) return false
+  // Unlimited accounts never red out — a negative balance is just normal
+  // post-paid debt there, not "out of credit".
+  if (row.creditLimit === null || row.creditLimit === 0) return false
+  if (row.remaining !== null) return row.remaining <= 0
+  return (row.balance ?? 0) < 0
+}
+
 const filteredItems = computed(() => {
   const q = search.value.trim().toLowerCase()
   if (!q) return tableItems.value
   return tableItems.value.filter((c) =>
-    [c.customerName, c.officeNo, c.officePhone, c.phone, String(c.winmaxId)].some((f) =>
+    [c.customerName, c.email, c.officeNo, c.officePhone, c.phone, String(c.winmaxId)].some((f) =>
       String(f || '')
         .toLowerCase()
         .includes(q),
@@ -100,8 +122,14 @@ async function getBalances() {
   balancesLoading.value = true
   try {
     const { data } = await axios.get(`${url}/customers/office/balances`, { params: { outletId: outletId.value } })
-    const map: Record<string, number | null> = {}
-    for (const b of data?.data || []) map[String(b.winmaxId)] = b.balance
+    const map: Record<string, { balance: number | null; creditLimit: number | null; remaining: number | null }> = {}
+    for (const b of data?.data || []) {
+      map[String(b.winmaxId)] = {
+        balance: b.balance ?? null,
+        creditLimit: b.creditLimit ?? null,
+        remaining: b.remaining ?? null,
+      }
+    }
     balances.value = map
   } catch {
     // Balances are best-effort; never block the list on a Winmax hiccup.
@@ -118,6 +146,8 @@ function refresh() {
 }
 
 onMounted(async () => {
+  // Belt-and-braces: never show validation errors on a pristine form.
+  void nextTick(() => resetValidation())
   if (!servicesStore.items.length) {
     try {
       await servicesStore.getAll()
@@ -140,45 +170,117 @@ const canSave = computed(
     /^[0-9]+$/.test(String(winmaxId.value).trim()) &&
     !!firstName.value.trim() &&
     !!surname.value.trim() &&
-    !!phoneLocal.value.trim() &&
-    String(password.value).length >= 6 &&
-    !!officeNo.value.trim(),
+    validators.email(email.value.trim()) === true &&
+    String(password.value).length >= 6,
 )
 
 function resetForm() {
   winmaxId.value = ''
   firstName.value = ''
   surname.value = ''
-  phoneLocal.value = ''
+  email.value = ''
   password.value = ''
   officeNo.value = ''
   officePhone.value = ''
+  // Emptying the values re-triggers every field's `required` rule — clear the
+  // validation state on the next tick so a fresh form never shows errors.
+  void nextTick(() => resetValidation())
 }
 
 async function submit() {
   if (!validate() || !canSave.value) return
   saving.value = true
-  // Canonical 00<cc><number> form (the backend re-normalizes anyway).
-  const phone = '00' + (phonePrefix.value + phoneLocal.value).replace(/\D+/g, '')
   try {
     const { data } = await axios.post(`${url}/customers/office`, {
       winmaxId: String(winmaxId.value).trim(),
       name: firstName.value.trim(),
       surname: surname.value.trim(),
-      phone,
+      email: email.value.trim(),
       password: password.value,
       officeNo: officeNo.value.trim(),
       officePhone: officePhone.value.trim(),
       outletId: outletId.value,
     })
-    init({ message: data?.message || 'Office customer registered successfully', color: 'success' })
+    init({ message: data?.message || 'Employee registered — welcome email sent', color: 'success' })
     resetForm()
     refresh()
   } catch (err: any) {
-    init({ message: err?.response?.data?.message || 'Failed to register office customer', color: 'danger' })
+    init({ message: err?.response?.data?.message || 'Failed to register employee', color: 'danger' })
   } finally {
     saving.value = false
   }
+}
+
+async function confirmResend() {
+  if (!resendTarget.value) return
+  resendLoading.value = true
+  try {
+    const { data } = await axios.post(`${url}/customers/office/${resendTarget.value.id}/resend-welcome`)
+    init({ message: data?.message || 'Welcome email sent', color: 'success' })
+    resendTarget.value = null
+  } catch (err: any) {
+    init({ message: err?.response?.data?.message || 'Failed to send the welcome email', color: 'danger' })
+  } finally {
+    resendLoading.value = false
+  }
+}
+
+async function confirmResetPassword() {
+  if (!resetTarget.value || String(resetPassword.value).length < 6) return
+  resetLoading.value = true
+  try {
+    const { data } = await axios.post(`${url}/customers/office/${resetTarget.value.id}/reset-password`, {
+      password: resetPassword.value,
+    })
+    init({
+      message: data?.message || 'Password reset — the employee will set a new one at next login',
+      color: 'success',
+    })
+    resetTarget.value = null
+    resetPassword.value = ''
+    refresh()
+  } catch (err: any) {
+    init({ message: err?.response?.data?.message || 'Failed to reset the password', color: 'danger' })
+  } finally {
+    resetLoading.value = false
+  }
+}
+
+function onEdited() {
+  editTarget.value = null
+  refresh()
+}
+
+async function openTransactions(row: any) {
+  txTarget.value = row
+  txRows.value = null
+  txLoading.value = true
+  try {
+    const { data } = await axios.get(`${url}/customers/office/${row.id}/transactions`)
+    txRows.value = data?.data?.transactions ?? null
+  } catch {
+    txRows.value = null // shown as "unavailable"
+  } finally {
+    txLoading.value = false
+  }
+}
+
+function formatTxDate(iso: string | null | undefined) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatTxAmount(v: number | null | undefined) {
+  if (v === null || v === undefined || Number(v) === 0) return '—'
+  return `€${Number(v).toFixed(2)}`
 }
 </script>
 
@@ -186,64 +288,93 @@ async function submit() {
   <div class="flex flex-col gap-4">
     <VaCard class="mt-4">
       <VaCardContent>
-        <h1 class="va-h5 mb-1">Register Employee</h1>
+        <h1 class="va-h5 mb-4">Register Employee</h1>
 
-
-        <VaForm ref="form" class="max-w-[680px]" @submit.prevent="submit">
-          <!-- Outlet is taken from login / the top navbar selection (like the rest of the panel). -->
-          <div
-            class="mb-4 flex items-center gap-2 text-sm rounded-md px-3 py-2"
-            :class="outletId ? 'bg-slate-50 text-slate-700' : 'bg-amber-50 text-amber-700'"
-          >
-
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <VaForm ref="form" @submit.prevent="submit">
+          <!-- Compact responsive grid, laid out like the design mockup:
+               row 1 = Employee ID / Name / Surname / Password,
+               row 2 = Email (the widest cell) / Office No / Office Phone.
+               Collapses to two columns on tablets, one on mobile. -->
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4">
             <VaInput
               v-model="winmaxId"
-              label="Winmax ID"
+              class="xl:col-span-3"
+              label="Employee ID"
+              autocomplete="off"
+              required-mark
               :rules="[validators.required, numberRule]"
-              placeholder="e.g. 12345"
+              placeholder="e.g. 100001"
             />
-            <VaInput v-model="firstName" label="Name" :rules="[validators.required]" placeholder="First name" />
-            <VaInput v-model="surname" label="Surname" :rules="[validators.required]" placeholder="Surname" />
+            <VaInput
+              v-model="firstName"
+              class="xl:col-span-3"
+              label="Name"
+              autocomplete="off"
+              required-mark
+              :rules="[validators.required]"
+              placeholder="First name"
+            />
+            <VaInput
+              v-model="surname"
+              class="xl:col-span-3"
+              label="Surname"
+              autocomplete="off"
+              required-mark
+              :rules="[validators.required]"
+              placeholder="Surname"
+            />
 
-            <div class="flex gap-2 items-start min-w-0">
-              <!-- Wrap each control in a width-controlled div so Vuestic's own
-                   width styling can't override the sizing (keeps Country narrow). -->
-              <div class="w-[104px] shrink-0">
-                <VaSelect
-                  v-model="phonePrefix"
-                  label="Country"
-                  :options="countryPrefixes"
-                  value-by="value"
-                  class="w-full"
-                />
-              </div>
-              <div class="flex-1 min-w-0">
-                <VaInput
-                  :model-value="phoneLocal"
-                  label="Phone"
-                  class="w-full"
-                  :rules="[validators.required]"
-                  placeholder="Phone number"
-                  @update:modelValue="(v: string) => (phoneLocal = String(v || '').replace(/\D/g, ''))"
-                />
-              </div>
-            </div>
+            <VaValue v-slot="isPasswordVisible" :default-value="false">
+              <VaInput
+                v-model="password"
+                class="xl:col-span-3"
+                :type="isPasswordVisible.value ? 'text' : 'password'"
+                label="Password"
+                autocomplete="new-password"
+                required-mark
+                :rules="[validators.required, minPwd]"
+                placeholder="Min 6 characters (temporary)"
+                messages="Temporary — the employee sets their own password at first login."
+                @clickAppendInner="isPasswordVisible.value = !isPasswordVisible.value"
+              >
+                <template #appendInner>
+                  <VaIcon
+                    class="cursor-pointer"
+                    :name="isPasswordVisible.value ? 'visibility_off' : 'visibility'"
+                    size="small"
+                    color="primary"
+                  />
+                </template>
+              </VaInput>
+            </VaValue>
 
             <VaInput
-              v-model="password"
-              label="Password"
-              type="password"
-              :rules="[validators.required, minPwd]"
-              placeholder="Min 6 characters"
+              v-model="email"
+              class="md:col-span-2 xl:col-span-6"
+              label="Email"
+              autocomplete="off"
+              required-mark
+              type="email"
+              :rules="[validators.required, validators.email]"
+              placeholder="name@company.com"
             />
-            <VaInput v-model="officeNo" label="Office No" :rules="[validators.required]" placeholder="Office number" />
-            <VaInput v-model="officePhone" label="Office Phone" placeholder="Office phone number" />
+            <VaInput
+              v-model="officeNo"
+              class="xl:col-span-3"
+              label="Office No"
+              autocomplete="off"
+              placeholder="Office number (optional)"
+            />
+            <VaInput
+              v-model="officePhone"
+              class="xl:col-span-3"
+              label="Office Phone"
+              autocomplete="off"
+              placeholder="Office phone number (optional)"
+            />
           </div>
 
-          <div class="flex justify-end mt-6">
+          <div class="flex justify-end mt-4">
             <VaButton :disabled="!canSave || saving" :loading="saving" @click="submit">Register</VaButton>
           </div>
         </VaForm>
@@ -255,7 +386,7 @@ async function submit() {
         <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <h1 class="va-h5">Office Customers</h1>
           <div class="flex items-center gap-2">
-            <VaInput v-model="search" placeholder="Search name, office, phone, ID" clearable size="small">
+            <VaInput v-model="search" placeholder="Search name, email, office, ID" clearable size="small">
               <template #prependInner>
                 <VaIcon name="search" color="secondary" />
               </template>
@@ -282,22 +413,50 @@ async function submit() {
           }"
           sticky-header
         >
+          <template #cell(email)="{ rowData }">
+            <span v-if="rowData.email">{{ rowData.email }}</span>
+            <VaBadge v-else text="No email" color="warning" />
+          </template>
           <template #cell(balance)="{ rowData }">
             <div class="text-right tabular-nums">
               <span v-if="balancesLoading" class="text-slate-400">…</span>
               <span
                 v-else
+                class="cursor-pointer underline decoration-dotted underline-offset-2"
+                :title="`Winmax balance: ${formatBalance(balances[String(rowData.winmaxId)]?.balance)} — click for transactions`"
                 :class="
-                  (balances[String(rowData.winmaxId)] ?? 0) < 0 ? 'text-red-600 font-semibold' : 'text-slate-800'
+                  creditIsLow(balances[String(rowData.winmaxId)]) ? 'text-red-600 font-semibold' : 'text-slate-800'
                 "
+                @click="openTransactions(rowData)"
               >
-                {{ formatBalance(balances[String(rowData.winmaxId)]) }}
+                {{ formatCredit(balances[String(rowData.winmaxId)]) }}
               </span>
             </div>
           </template>
           <template #cell(isActive)="{ rowData }">
-            <div class="flex justify-center">
+            <div class="flex justify-center items-center gap-1 flex-wrap">
               <VaBadge :text="rowData.isActive ? 'Active' : 'Inactive'" :color="rowData.isActive ? 'success' : 'danger'" />
+              <VaBadge v-if="rowData.mustChangePassword" text="Temp password" color="info" />
+            </div>
+          </template>
+          <template #cell(actions)="{ rowData }">
+            <div class="flex justify-center gap-1">
+              <VaButton preset="plain" size="small" icon="edit" title="Edit" @click="editTarget = rowData" />
+              <VaButton
+                preset="plain"
+                size="small"
+                icon="forward_to_inbox"
+                title="Re-send welcome email"
+                :disabled="!rowData.email"
+                @click="resendTarget = rowData"
+              />
+              <VaButton
+                preset="plain"
+                size="small"
+                icon="lock_reset"
+                title="Reset password"
+                @click="((resetTarget = rowData), (resetPassword = ''))"
+              />
             </div>
           </template>
           <template #bodyAppend>
@@ -308,5 +467,126 @@ async function submit() {
         </VaDataTable>
       </VaCardContent>
     </VaCard>
+
+    <EditOfficeCustomerModal v-if="editTarget" :customer="editTarget" @cancel="editTarget = null" @saved="onEdited" />
+
+    <VaModal
+      :model-value="!!txTarget"
+      size="medium"
+      :mobile-fullscreen="false"
+      hide-default-actions
+      close-button
+      @update:modelValue="txTarget = null"
+    >
+      <template #header>
+        <h1 class="va-h6 mb-2">
+          Transactions — {{ txTarget?.customerName }} (Employee ID {{ txTarget?.winmaxId }})
+        </h1>
+      </template>
+      <div v-if="txLoading" class="flex justify-center py-8">
+        <VaProgressCircle indeterminate />
+      </div>
+      <p v-else-if="!txRows" class="text-slate-500 py-4">
+        Transaction history is unavailable right now (Winmax unreachable).
+      </p>
+      <p v-else-if="txRows.length === 0" class="text-slate-500 py-4">No transactions yet.</p>
+      <div v-else class="overflow-auto" style="max-height: 60vh">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-slate-500 border-b border-slate-200">
+              <th class="py-2 pr-3 font-medium">Date</th>
+              <th class="py-2 pr-3 font-medium">Document</th>
+              <th class="py-2 pr-3 font-medium text-right">Debit</th>
+              <th class="py-2 pr-3 font-medium text-right">Credit</th>
+              <th class="py-2 font-medium text-right">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(t, i) in txRows" :key="i" class="border-b border-slate-100">
+              <td class="py-1.5 pr-3 whitespace-nowrap">{{ formatTxDate(t.date) }}</td>
+              <td class="py-1.5 pr-3">{{ [t.documentType, t.documentNumber].filter(Boolean).join(' ') || '—' }}</td>
+              <td class="py-1.5 pr-3 text-right tabular-nums text-red-600">{{ formatTxAmount(t.debit) }}</td>
+              <td class="py-1.5 pr-3 text-right tabular-nums text-green-700">{{ formatTxAmount(t.credit) }}</td>
+              <td class="py-1.5 text-right tabular-nums text-slate-600">
+                {{ t.balance !== null && t.balance !== undefined ? `€${Number(t.balance).toFixed(2)}` : '—' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </VaModal>
+
+    <VaModal
+      :model-value="!!resendTarget"
+      size="small"
+      :mobile-fullscreen="false"
+      hide-default-actions
+      close-button
+      @update:modelValue="resendTarget = null"
+    >
+      <template #header>
+        <h1 class="va-h6 mb-2">Re-send welcome email</h1>
+      </template>
+      <p>
+        Send the welcome email to <strong>{{ resendTarget?.email }}</strong> ({{ resendTarget?.customerName }})?
+      </p>
+      <template #footer>
+        <div class="flex justify-end gap-2 mt-4">
+          <VaButton preset="secondary" @click="resendTarget = null">Cancel</VaButton>
+          <VaButton :loading="resendLoading" @click="confirmResend">Send</VaButton>
+        </div>
+      </template>
+    </VaModal>
+
+    <VaModal
+      :model-value="!!resetTarget"
+      size="small"
+      :mobile-fullscreen="false"
+      hide-default-actions
+      close-button
+      @update:modelValue="((resetTarget = null), (resetPassword = ''))"
+    >
+      <template #header>
+        <h1 class="va-h6 mb-2">Reset password</h1>
+      </template>
+      <p class="mb-3">
+        Set a new temporary password for <strong>{{ resetTarget?.customerName }}</strong> (Employee ID
+        {{ resetTarget?.winmaxId }}). They will be asked to set their own password at next login.
+      </p>
+      <VaValue v-slot="isResetPwdVisible" :default-value="false">
+        <VaInput
+          v-model="resetPassword"
+          :type="isResetPwdVisible.value ? 'text' : 'password'"
+          label="New temporary password"
+          autocomplete="new-password"
+          required-mark
+          :rules="[validators.required, minPwd]"
+          placeholder="Min 6 characters"
+          class="w-full"
+          @clickAppendInner="isResetPwdVisible.value = !isResetPwdVisible.value"
+        >
+          <template #appendInner>
+            <VaIcon
+              class="cursor-pointer"
+              :name="isResetPwdVisible.value ? 'visibility_off' : 'visibility'"
+              size="small"
+              color="primary"
+            />
+          </template>
+        </VaInput>
+      </VaValue>
+      <template #footer>
+        <div class="flex justify-end gap-2 mt-4">
+          <VaButton preset="secondary" @click="((resetTarget = null), (resetPassword = ''))">Cancel</VaButton>
+          <VaButton
+            :disabled="String(resetPassword).length < 6"
+            :loading="resetLoading"
+            @click="confirmResetPassword"
+          >
+            Reset password
+          </VaButton>
+        </div>
+      </template>
+    </VaModal>
   </div>
 </template>
