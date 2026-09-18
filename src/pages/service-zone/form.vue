@@ -1105,6 +1105,86 @@
           </div>
         </VaCardContent>
       </VaCard>
+
+      <!-- Customer app (loyalty app): e-mail rule, new products, announcements, push.
+           customerSettings / pushSettings — sent on save only when changed. -->
+      <VaCard class="mt-6">
+        <VaCardContent>
+          <h2 class="font-bold text-base mb-4">{{ t('outletForm.customerApp.title') }}</h2>
+          <div class="text-sm mb-4 opacity-70">{{ t('outletForm.customerApp.intro') }}</div>
+
+          <div class="flex flex-col w-full gap-6">
+            <div class="flex flex-col">
+              <VaSwitch
+                v-model="restaurantData.customerSettings.requireEmail"
+                :label="t('outletForm.customerApp.requireEmail')"
+                left-label
+                size="small"
+              />
+              <div class="text-sm mt-2 opacity-70">{{ t('outletForm.customerApp.requireEmailHelp') }}</div>
+            </div>
+
+            <div class="flex flex-col">
+              <VaSelect
+                v-model="restaurantData.customerSettings.newProductsCategoryId"
+                :label="t('outletForm.customerApp.newProductsCategory')"
+                :options="newProductsCategoryOptions"
+                value-by="value"
+                text-by="text"
+                :placeholder="t('outletForm.customerApp.newProductsCategoryNone')"
+                :disabled="!restaurantId"
+                clearable
+                searchable
+                class="w-full md:w-1/2"
+              />
+              <div class="text-sm mt-2 opacity-70">
+                {{
+                  restaurantId
+                    ? t('outletForm.customerApp.newProductsCategoryHelp')
+                    : t('outletForm.customerApp.newProductsCategoryCreateHint')
+                }}
+              </div>
+            </div>
+
+            <div class="flex flex-col">
+              <VaSwitch
+                v-model="restaurantData.customerSettings.announcementsEnabled"
+                :label="t('outletForm.customerApp.announcementsEnabled')"
+                left-label
+                size="small"
+              />
+              <div class="text-sm mt-2 opacity-70">{{ t('outletForm.customerApp.announcementsEnabledHelp') }}</div>
+            </div>
+
+            <div class="flex flex-col">
+              <VaSwitch
+                v-model="restaurantData.pushSettings.enabled"
+                :label="t('outletForm.customerApp.pushEnabled')"
+                left-label
+                size="small"
+              />
+              <div class="text-sm mt-2 opacity-70">{{ t('outletForm.customerApp.pushEnabledHelp') }}</div>
+
+              <div v-if="restaurantData.pushSettings.enabled" class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mt-4">
+                <VaInput
+                  v-model="restaurantData.pushSettings.androidChannelId"
+                  :label="t('outletForm.customerApp.androidChannelId')"
+                  name="pushAndroidChannelId"
+                  :rules="[validators.required, androidChannelIdRule]"
+                  :helper-text="t('outletForm.customerApp.androidChannelIdHelp')"
+                />
+                <VaInput
+                  v-model="restaurantData.pushSettings.senderName"
+                  :label="t('outletForm.customerApp.senderName')"
+                  name="pushSenderName"
+                  :rules="[senderNameRule]"
+                  :helper-text="t('outletForm.customerApp.senderNameHelp')"
+                />
+              </div>
+            </div>
+          </div>
+        </VaCardContent>
+      </VaCard>
     </VaForm>
     <VaSkeletonGroup v-else>
       <VaCard>
@@ -1130,11 +1210,47 @@ import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { useToast } from 'vuestic-ui'
+import { useI18n } from 'vue-i18n'
 
 import FileUpload from '@/components/file-uploader/FileUpload.vue'
 import { validators, removeNulls } from '../../services/utils.ts'
 import { useServiceStore } from '@/stores/services'
 import { languages } from '@/services/languages'
+import { getCategories } from '../../data/pages/categories'
+
+// Customer-app (loyalty app) settings — outlet.customerSettings / pushSettings.
+// Absent on every outlet that never set them, so the form starts from these
+// (everything off) and sends a sub-document ONLY when the user changed it.
+// The category is '' (not null) inside the form: VaSelect clears to '' and
+// the save maps '' -> null.
+const customerSettingsDefaults = () => ({
+  requireEmail: false,
+  newProductsCategoryId: '',
+  announcementsEnabled: false,
+})
+const pushSettingsDefaults = () => ({
+  enabled: false,
+  androidChannelId: 'announcements',
+  senderName: '',
+})
+// The shape the save compares and sends (outlets.zod.ts): '' category -> null,
+// push strings trimmed. Snapshots and the dirty check both go through these,
+// so surrounding spaces or a cleared select never count as a change twice.
+const normaliseCustomerSettings = (cs) => {
+  const merged = { ...customerSettingsDefaults(), ...(cs || {}) }
+  return { ...merged, newProductsCategoryId: merged.newProductsCategoryId || null }
+}
+const normalisePushSettings = (ps) => {
+  const merged = { ...pushSettingsDefaults(), ...(ps || {}) }
+  return {
+    ...merged,
+    androidChannelId: String(merged.androidChannelId || '').trim(),
+    senderName: String(merged.senderName || '').trim(),
+  }
+}
+// Category names are a string or { en, el } (see pages/categories).
+const categoryLabel = (name) =>
+  typeof name === 'string' ? name : name?.en || Object.values(name || {}).find(Boolean) || ''
 
 export default {
   components: {
@@ -1174,9 +1290,15 @@ export default {
     const route = useRoute()
     const restaurantId = route.params.id
     const { init } = useToast()
+    const { t } = useI18n()
     const loading = ref(false)
 
     const url = import.meta.env.VITE_API_BASE_URL
+
+    // pushSettings rules mirror the backend validator (outlets.zod.ts).
+    const androidChannelIdRule = (v) =>
+      /^[A-Za-z0-9_.-]{1,64}$/.test((v || '').trim()) || t('outletForm.customerApp.androidChannelIdInvalid')
+    const senderNameRule = (v) => (v || '').trim().length <= 80 || t('outletForm.customerApp.senderNameTooLong')
 
     const fetchOutletTypes = async () => {
       try {
@@ -1229,12 +1351,22 @@ export default {
       languages,
       loyaltyTriggerOptions,
       posSalesModes,
+      t,
+      androidChannelIdRule,
+      senderNameRule,
     }
   },
   data() {
     return {
       isProgrammaticNavigation: false,
       syncingReceiptHeader: false,
+      // JSON of customerSettings / pushSettings as loaded (or as defaulted on
+      // create); the save sends only what differs from these.
+      customerSettingsSnapshot: JSON.stringify(normaliseCustomerSettings(customerSettingsDefaults())),
+      pushSettingsSnapshot: JSON.stringify(normalisePushSettings(pushSettingsDefaults())),
+      // [{ text, value }] of this outlet's live categories, for the
+      // "New products category" select.
+      newProductsCategoryOptions: [],
       restaurantData: {
         name: '',
         description: '',
@@ -1329,6 +1461,8 @@ export default {
           allocationTrigger: 'order',
           welcomePoints: 0,
         },
+        customerSettings: customerSettingsDefaults(),
+        pushSettings: pushSettingsDefaults(),
         openingTimes: {
           selected: '',
           byDay: {
@@ -1904,6 +2038,14 @@ export default {
               welcomePoints: 0,
               ...(res.loyaltySettings || {}),
             }
+            // Customer-app settings: absent on every outlet that never set
+            // them (all other brands) -> defaults, everything off.
+            res.customerSettings = { ...customerSettingsDefaults(), ...(res.customerSettings || {}) }
+            const newProductsCategory = res.customerSettings.newProductsCategoryId
+            res.customerSettings.newProductsCategoryId = newProductsCategory
+              ? String(newProductsCategory._id || newProductsCategory)
+              : ''
+            res.pushSettings = { ...pushSettingsDefaults(), ...(res.pushSettings || {}) }
             const tplDefaults = {
               registrationConfirmation: { subject: '', html: '' },
               orderConfirmation: { subject: '', html: '' },
@@ -1935,11 +2077,67 @@ export default {
             res.winmaxConfig.failureAlertPhonesRaw = (res.winmaxConfig.failureAlertPhones ?? []).join(', ')
           }
           this.restaurantData = res
+          if (res) {
+            this.snapshotCustomerAppSettings()
+            this.fetchNewProductsCategories()
+          }
           this.loading = false
         } catch (error) {
           console.error('Error fetching restaurant details:', error)
           this.loading = false
         }
+      }
+    },
+    /**
+     * Customer-app settings (customerSettings / pushSettings). The snapshot is
+     * re-taken after every load and every successful save, so a save sends
+     * only the keys the user changed since — the backend flattens a partial
+     * sub-document to dot paths, and an outlet whose admin merely saved
+     * another field never gets these sub-documents materialised.
+     */
+    snapshotCustomerAppSettings() {
+      this.customerSettingsSnapshot = JSON.stringify(normaliseCustomerSettings(this.restaurantData.customerSettings))
+      this.pushSettingsSnapshot = JSON.stringify(normalisePushSettings(this.restaurantData.pushSettings))
+    },
+    /** `{ customerSettings?, pushSettings? }` — only the changed keys; `{}` when nothing changed. */
+    changedCustomerAppSettings() {
+      const changedKeys = (current, snapshot) => {
+        const before = JSON.parse(snapshot || '{}')
+        const changed = {}
+        Object.keys(current || {}).forEach((key) => {
+          if (JSON.stringify(current[key]) !== JSON.stringify(before[key])) changed[key] = current[key]
+        })
+        return changed
+      }
+      const patch = {}
+      const customer = changedKeys(
+        normaliseCustomerSettings(this.restaurantData.customerSettings),
+        this.customerSettingsSnapshot,
+      )
+      if (Object.keys(customer).length) patch.customerSettings = customer
+      const push = changedKeys(normalisePushSettings(this.restaurantData.pushSettings), this.pushSettingsSnapshot)
+      // The backend refuses an empty channel id (min 1): a field cleared and then
+      // hidden by switching push off is simply not sent — the stored one stays.
+      if (push.androidChannelId === '') delete push.androidChannelId
+      if (Object.keys(push).length) patch.pushSettings = push
+      return patch
+    },
+    /** This outlet's live categories -> options of the "New products category" select. */
+    async fetchNewProductsCategories() {
+      if (!this.restaurantId) return
+      try {
+        const { data } = await getCategories(this.restaurantId, 'name', 'asc')
+        const list = Array.isArray(data) ? data : data?.data || []
+        this.newProductsCategoryOptions = list
+          .filter((category) => category && category._id && !category.isDeleted)
+          .map((category) => ({
+            value: String(category._id),
+            text: category.code ? `${categoryLabel(category.name)} (${category.code})` : categoryLabel(category.name),
+          }))
+      } catch (error) {
+        console.error('Error fetching categories for the New products select:', error)
+        this.newProductsCategoryOptions = []
+        this.init({ message: this.t('outletForm.customerApp.categoriesLoadFailed'), color: 'danger' })
       }
     },
     createPayload() {
@@ -2254,6 +2452,8 @@ export default {
     async createRestaurant() {
       if (this.$refs.form.validate()) {
         const data = removeNulls(this.createPayload())
+        // Customer-app settings only when the user touched them on the create form.
+        Object.assign(data, this.changedCustomerAppSettings())
         const url = import.meta.env.VITE_API_BASE_URL
         console.log(url)
         try {
@@ -2273,11 +2473,25 @@ export default {
         const data = removeNulls(this.createPayload())
         const url = import.meta.env.VITE_API_BASE_URL
         delete data.name
+        // Customer-app sub-documents ride along ONLY when changed, attached
+        // after removeNulls so a `newProductsCategoryId: null` clear survives.
+        Object.assign(data, this.changedCustomerAppSettings())
 
-        const response = await axios.patch(`${url}/outlets/${this.restaurantId}`, data)
+        let response
+        try {
+          response = await axios.patch(`${url}/outlets/${this.restaurantId}`, data)
+        } catch (error) {
+          // e.g. 400 "customerSettings.newProductsCategoryId is not a category of this outlet"
+          this.init({
+            message: error?.response?.data?.message || this.t('outletForm.customerApp.saveFailed'),
+            color: 'danger',
+          })
+          return
+        }
 
         if (response.status === 200) {
           this.init({ message: "You've successfully updated outlet", color: 'success' })
+          this.snapshotCustomerAppSettings()
           if (this.$route.name === 'admin-update-outlet') {
             this.$router.push({ name: 'list' })
           }

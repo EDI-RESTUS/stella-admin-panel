@@ -248,6 +248,37 @@
         </Transition>
       </div>
 
+      <!-- Customer App (announcements) — the backend's staff roles: editors
+           compose drafts, admins publish / schedule / push. -->
+      <div v-if="['admin', 'super-admin', 'editor'].includes(userRole)" class="flex flex-col gap-y-1 mb-2">
+        <span
+          class="flex items-center justify-between font-bold text-slate-800 uppercase tracking-wide text-xs cursor-pointer py-1 rounded-lg transition relative -ml-2 mr-2 pl-2 pr-2 hover:bg-slate-50"
+          @click="customerAppOpen = !customerAppOpen"
+        >
+          <span v-if="customerAppOpen" class="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg bg-g-600"></span>
+
+          {{ t('customerApp.group') }}
+          <VaIcon :name="customerAppOpen ? 'expand_less' : 'expand_more'" />
+        </span>
+
+        <Transition name="fade">
+          <div v-if="customerAppOpen" class="flex flex-col gap-y-1">
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'announcements'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/announcements"
+            >
+              <VaIcon name="campaign" class="mr-2" />
+              {{ t('customerApp.announcements') }}
+            </RouterLink>
+          </div>
+        </Transition>
+      </div>
+
       <!-- Configuration -->
       <div v-if="userRole.includes('admin') || userRole === 'supervisor'" class="flex flex-col gap-y-1 mb-2">
         <span
@@ -441,6 +472,7 @@
 <script lang="ts">
 import { defineComponent, ref, computed } from 'vue'
 import { useColors, useToast } from 'vuestic-ui'
+import { useI18n } from 'vue-i18n'
 import { useUsersStore } from '@/stores/users'
 import { useServiceStore } from '@/stores/services'
 
@@ -456,6 +488,7 @@ export default defineComponent({
     const userStore = useUsersStore()
     const servicesStore = useServiceStore()
     const { init } = useToast()
+    const { t } = useI18n()
 
     userStore.getUser().then((response) => {
       userRole.value = response.data.role
@@ -475,6 +508,7 @@ export default defineComponent({
     const scheduledOrdersOpen = ref(true)
     const menuOpen = ref(true)
     const loyaltyOpen = ref(false)
+    const customerAppOpen = ref(false)
     const configOpen = ref(true)
     const adminOpen = ref(true)
 
@@ -488,9 +522,11 @@ export default defineComponent({
       scheduledOrdersOpen,
       menuOpen,
       loyaltyOpen,
+      customerAppOpen,
       configOpen,
       adminOpen,
       init,
+      t,
     }
   },
   methods: {

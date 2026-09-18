@@ -80,6 +80,15 @@ const routes: Array<RouteRecordRaw> = [
         meta: { roles: ['admin', 'super-admin'] },
       },
       {
+        // Customer-app announcements of the navbar outlet. The backend's staff
+        // roles (super-admin | admin | editor); publish / schedule / push are
+        // admin-only and the page hides them from editors.
+        name: 'announcements',
+        path: 'announcements',
+        component: () => import('../pages/announcements/index.vue'),
+        meta: { roles: ['admin', 'super-admin', 'editor'] },
+      },
+      {
         name: 'deliveryZone',
         path: 'deliveryZone',
         component: () => import('../pages/deliveryZone/index.vue'),
