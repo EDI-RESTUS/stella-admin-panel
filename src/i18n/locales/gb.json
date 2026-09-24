@@ -93,6 +93,7 @@
   "user": {
     "language": "Change language",
     "logout": "Logout",
+    "changePassword": "Change password",
     "profile": "Profile",
     "settings": "Settings",
     "billing": "Billing",
