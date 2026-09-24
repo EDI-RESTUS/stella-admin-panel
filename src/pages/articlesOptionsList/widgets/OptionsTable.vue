@@ -95,6 +95,61 @@ function getTypeClasses(type) {
       return 'text-slate-800 bg-slate-100 hover:bg-slate-200'
   }
 }
+// ---- Per-zone stock menu: teleported to <body> and positioned fixed, so the
+// VaDataTable scroll container (sticky-header => overflow:auto) cannot clip it.
+const ZONE_MENU_WIDTH = 224
+const zoneMenuPos = reactive<Record<string, { left: number; top: number; bottom: number; openUp: boolean }>>({})
+
+const closeZoneMenus = () => {
+  props.items.forEach((item: any) => {
+    if (item._showZoneMenu) item._showZoneMenu = false
+  })
+}
+
+const toggleZoneMenu = (rowData: any, ev: MouseEvent) => {
+  if (rowData._showZoneMenu) {
+    rowData._showZoneMenu = false
+    return
+  }
+  closeZoneMenus()
+  const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect()
+  const spaceBelow = window.innerHeight - rect.bottom
+  const openUp = spaceBelow < 260 && rect.top > spaceBelow
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - ZONE_MENU_WIDTH - 8))
+  zoneMenuPos[rowData._id] = {
+    left,
+    top: rect.bottom + 4,
+    bottom: window.innerHeight - rect.top + 4,
+    openUp,
+  }
+  rowData._showZoneMenu = true
+}
+
+const zoneMenuStyle = (id: string) => {
+  const p = zoneMenuPos[id]
+  if (!p) return {}
+  const style: Record<string, string> = { left: `${p.left}px`, width: `${ZONE_MENU_WIDTH}px` }
+  if (p.openUp) style.bottom = `${p.bottom}px`
+  else style.top = `${p.top}px`
+  return style
+}
+
+// A fixed-position menu would drift away from its trigger when the table or
+// page scrolls, so close it instead (scrolling inside the menu itself is fine).
+const onZoneMenuScroll = (e: Event) => {
+  const target = e.target as HTMLElement | null
+  if (target && typeof target.closest === 'function' && target.closest('.stock-zone-wrapper')) return
+  closeZoneMenus()
+}
+onMounted(() => {
+  window.addEventListener('scroll', onZoneMenuScroll, true)
+  window.addEventListener('resize', closeZoneMenus)
+})
+onUnmounted(() => {
+  window.removeEventListener('scroll', onZoneMenuScroll, true)
+  window.removeEventListener('resize', closeZoneMenus)
+})
+
 onMounted(() => {
   const handleClickOutside = (e: MouseEvent) => {
     props.items.forEach((i) => (i.showTypeDropdown = false))
@@ -722,7 +777,7 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
                       ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                       : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
                   "
-                  @click.stop="rowData._showZoneMenu = !rowData._showZoneMenu"
+                  @click.stop="toggleZoneMenu(rowData, $event)"
                 >
                   <span class="truncate">
                     <template v-if="(rowSelectedZones[rowData._id] || []).length > 0">
@@ -747,33 +802,37 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
                   </svg>
                 </button>
 
-                <!-- Dropdown menu -->
-                <div
-                  v-if="rowData._showZoneMenu"
-                  class="absolute left-0 top-full mt-1 w-48 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-xl p-2 z-50"
-                >
-                  <div class="flex flex-col gap-0.5 max-h-[200px] overflow-auto">
-                    <label
-                      v-for="zone in deliveryZones"
-                      :key="zone._id"
-                      class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer hover:bg-slate-50 transition-colors"
-                    >
-                      <!-- Loading spinner for this specific zone+row -->
-                      <div
-                        v-if="stockUpdating.has(`${rowData._id}_${zone._id}`)"
-                        class="animate-spin w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full flex-shrink-0"
-                      ></div>
-                      <input
-                        v-else
-                        type="checkbox"
-                        class="accent-emerald-500 h-3.5 w-3.5 rounded flex-shrink-0"
-                        :checked="(rowSelectedZones[rowData._id] || []).includes(zone._id)"
-                        @change="(e) => toggleZoneStock(rowData, zone._id, (e.target as HTMLInputElement).checked)"
-                      />
-                      <span class="truncate text-slate-700">{{ zone.name }}</span>
-                    </label>
+                <!-- Dropdown menu (teleported so the table's scroll container can't clip it) -->
+                <Teleport to="body">
+                  <div
+                    v-if="rowData._showZoneMenu"
+                    class="stock-zone-wrapper fixed bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-xl p-2 z-[1000]"
+                    :style="zoneMenuStyle(rowData._id)"
+                    @click.stop
+                  >
+                    <div class="flex flex-col gap-0.5 max-h-[200px] overflow-auto">
+                      <label
+                        v-for="zone in deliveryZones"
+                        :key="zone._id"
+                        class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer hover:bg-slate-50 transition-colors"
+                      >
+                        <!-- Loading spinner for this specific zone+row -->
+                        <div
+                          v-if="stockUpdating.has(`${rowData._id}_${zone._id}`)"
+                          class="animate-spin w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full flex-shrink-0"
+                        ></div>
+                        <input
+                          v-else
+                          type="checkbox"
+                          class="accent-emerald-500 h-3.5 w-3.5 rounded flex-shrink-0"
+                          :checked="(rowSelectedZones[rowData._id] || []).includes(zone._id)"
+                          @change="(e) => toggleZoneStock(rowData, zone._id, (e.target as HTMLInputElement).checked)"
+                        />
+                        <span class="truncate text-slate-700">{{ zone.name }}</span>
+                      </label>
+                    </div>
                   </div>
-                </div>
+                </Teleport>
               </div>
             </template>
             <template v-else>
