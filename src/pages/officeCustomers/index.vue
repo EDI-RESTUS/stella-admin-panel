@@ -37,6 +37,10 @@ const resendLoading = ref(false)
 const resetTarget = ref<any>(null)
 const resetPassword = ref('')
 const resetLoading = ref(false)
+// "Email the new password to the employee" — on by default; only possible when
+// the row has an email address (the backend would refuse to send otherwise).
+const resetSendEmail = ref(true)
+const resetCanEmail = computed(() => !!resetTarget.value?.email)
 
 // Winmax balances, loaded separately so the table renders immediately and a slow
 // or unavailable Winmax never blocks the list. Keyed by winmaxId.
@@ -216,7 +220,18 @@ async function confirmResend() {
   resendLoading.value = true
   try {
     const { data } = await axios.post(`${url}/customers/office/${resendTarget.value.id}/resend-welcome`)
-    init({ message: data?.message || 'Welcome email sent', color: 'success' })
+    if (data?.data?.passwordIncluded === false) {
+      // Sent, but without the password (no longer known, or the outlet's
+      // template leaves it out) — tell the admin how to get one to the employee.
+      init({
+        message:
+          'Welcome email sent, without the password. To send the employee a password, use Reset password with "Email the new password to the employee".',
+        color: 'info',
+        duration: 10000,
+      })
+    } else {
+      init({ message: data?.message || 'Welcome email sent', color: 'success' })
+    }
     resendTarget.value = null
   } catch (err: any) {
     init({ message: err?.response?.data?.message || 'Failed to send the welcome email', color: 'danger' })
@@ -225,19 +240,58 @@ async function confirmResend() {
   }
 }
 
+function openReset(row: any) {
+  resetTarget.value = row
+  resetPassword.value = ''
+  resetSendEmail.value = true
+}
+
+function closeReset() {
+  resetTarget.value = null
+  resetPassword.value = ''
+  resetSendEmail.value = true
+}
+
 async function confirmResetPassword() {
   if (!resetTarget.value || String(resetPassword.value).length < 6) return
+  const target = resetTarget.value
+  const sendEmail = resetCanEmail.value && resetSendEmail.value
   resetLoading.value = true
   try {
-    const { data } = await axios.post(`${url}/customers/office/${resetTarget.value.id}/reset-password`, {
+    const { data } = await axios.post(`${url}/customers/office/${target.id}/reset-password`, {
       password: resetPassword.value,
+      sendEmail,
     })
-    init({
-      message: data?.message || 'Password reset — the employee will set a new one at next login',
-      color: 'success',
-    })
-    resetTarget.value = null
-    resetPassword.value = ''
+    const result = data?.data || {}
+    if (result.emailSent === true) {
+      init({ message: `Password reset and emailed to ${target.email}`, color: 'success' })
+    } else if (sendEmail) {
+      // The password WAS reset — only the email failed (no outlet sender, ...).
+      // This toast is the admin's only cue to pass the password on themselves,
+      // so it stays until closed. The backend message already says the email
+      // was not sent; emailError only adds the reason (minus its own "the email
+      // was not sent" tail). An older backend without emailSent returns a plain
+      // "Password reset." message, so that case gets a neutral text instead.
+      let message: string
+      if (typeof result.emailSent === 'boolean') {
+        message =
+          data?.message || 'Password reset, but the email was not sent — give the employee the new password yourself.'
+        const reason = String(result.emailError || '')
+          .replace(/\s*—\s*the email was not sent\.?\s*$/i, '')
+          .trim()
+        if (reason) message += ` Reason: ${/[.!?]$/.test(reason) ? reason : `${reason}.`}`
+      } else {
+        message =
+          'Password reset, but the server did not confirm that an email was sent — give the employee the new password yourself.'
+      }
+      init({ message, color: 'warning', duration: 0 })
+    } else {
+      init({
+        message: data?.message || 'Password reset — the employee will set a new one at next login',
+        color: 'success',
+      })
+    }
+    closeReset()
     refresh()
   } catch (err: any) {
     init({ message: err?.response?.data?.message || 'Failed to reset the password', color: 'danger' })
@@ -455,7 +509,7 @@ function formatTxAmount(v: number | null | undefined) {
                 size="small"
                 icon="lock_reset"
                 title="Reset password"
-                @click="((resetTarget = rowData), (resetPassword = ''))"
+                @click="openReset(rowData)"
               />
             </div>
           </template>
@@ -544,7 +598,7 @@ function formatTxAmount(v: number | null | undefined) {
       :mobile-fullscreen="false"
       hide-default-actions
       close-button
-      @update:modelValue="((resetTarget = null), (resetPassword = ''))"
+      @update:modelValue="closeReset"
     >
       <template #header>
         <h1 class="va-h6 mb-2">Reset password</h1>
@@ -575,9 +629,19 @@ function formatTxAmount(v: number | null | undefined) {
           </template>
         </VaInput>
       </VaValue>
+      <VaCheckbox
+        :model-value="resetCanEmail && resetSendEmail"
+        :disabled="!resetCanEmail"
+        label="Email the new password to the employee"
+        class="mt-4"
+        @update:modelValue="resetSendEmail = !!$event"
+      />
+      <p v-if="!resetCanEmail" class="text-xs text-slate-500 mt-1">
+        This employee has no email address — add one with Edit to email the new password.
+      </p>
       <template #footer>
         <div class="flex justify-end gap-2 mt-4">
-          <VaButton preset="secondary" @click="((resetTarget = null), (resetPassword = ''))">Cancel</VaButton>
+          <VaButton preset="secondary" @click="closeReset">Cancel</VaButton>
           <VaButton
             :disabled="String(resetPassword).length < 6"
             :loading="resetLoading"
