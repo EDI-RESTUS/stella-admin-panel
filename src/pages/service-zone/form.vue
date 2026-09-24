@@ -904,6 +904,7 @@
                   />
                 </div>
               </div>
+              <p v-if="tpl.note" class="text-xs text-gray-500 mb-2">{{ tpl.note }}</p>
               <div class="grid grid-cols-1 gap-3">
                 <VaInput
                   v-model="restaurantData.emailSettings.templates[tpl.key].subject"
@@ -1561,6 +1562,9 @@ export default {
             complaintReceived: { subject: '', html: '' },
             careerApplicationReceived: { subject: '', html: '' },
             winmaxFailureAlert: { subject: '', html: '', toOverride: [], _toOverrideRaw: '' },
+            officeWelcome: { subject: '', html: '' },
+            officePasswordReset: { subject: '', html: '' },
+            officeAdminPasswordReset: { subject: '', html: '' },
           },
         },
       },
@@ -1629,6 +1633,68 @@ export default {
           subjectPlaceholder: 'WINMAX FAILED - {{orderNo}}',
           htmlPlaceholder: '<div>Order {{orderNo}} failed to send to Winmax.</div>',
           hasToOverride: true,
+        },
+        // Office-customer (employee) emails. Empty subject/body = the backend's
+        // built-in default wording is sent.
+        {
+          key: 'officeWelcome',
+          label: 'Office Customer Welcome',
+          vars: [
+            '{{customerName}}',
+            '{{employeeId}}',
+            '{{password}}',
+            '{{email}}',
+            '{{outletName}}',
+            '{{websiteUrl}}',
+            '{{supportPhone}}',
+            '{{supportEmail}}',
+            '{{logoUrl}}',
+            '{{ctaLink}}',
+          ],
+          subjectPlaceholder: 'Welcome to {{outletName}} — your account is ready',
+          htmlPlaceholder:
+            "<p>Hi {{customerName}},</p><p>Your Employee ID: <b>{{employeeId}}</b><br/>Your initial password: <b>{{password}}</b></p><p>You'll be asked to set your own password the first time you sign in.</p>",
+          hasToOverride: false,
+          note: "{{password}} is filled at registration. On Re-send welcome it is only known while the employee still has their Employee ID as password — otherwise the re-send is refused if the template uses {{password}}; use Reset password with 'Email the new password' instead.",
+        },
+        {
+          key: 'officePasswordReset',
+          label: 'Office Customer Password Reset Code (forgot password)',
+          vars: [
+            '{{customerName}}',
+            '{{employeeId}}',
+            '{{code}}',
+            '{{email}}',
+            '{{outletName}}',
+            '{{websiteUrl}}',
+            '{{supportPhone}}',
+            '{{supportEmail}}',
+            '{{logoUrl}}',
+          ],
+          subjectPlaceholder: '{{outletName}} — your password reset code',
+          htmlPlaceholder:
+            "<p>Hi {{customerName}} (Employee ID {{employeeId}}),</p><p>Use this code to reset your password: <b>{{code}}</b></p><p>The code expires in 10 minutes. If you didn't request a password reset, you can ignore this email.</p>",
+          hasToOverride: false,
+        },
+        {
+          key: 'officeAdminPasswordReset',
+          label: 'Office Customer Password Reset by Admin',
+          vars: [
+            '{{customerName}}',
+            '{{employeeId}}',
+            '{{password}}',
+            '{{email}}',
+            '{{outletName}}',
+            '{{websiteUrl}}',
+            '{{supportPhone}}',
+            '{{supportEmail}}',
+            '{{logoUrl}}',
+          ],
+          subjectPlaceholder: '{{outletName}} — your password has been reset',
+          htmlPlaceholder:
+            "<p>Hi {{customerName}},</p><p>Your password has been reset.</p><p>Employee ID: <b>{{employeeId}}</b><br/>New temporary password: <b>{{password}}</b></p><p>You'll be asked to set your own password the next time you sign in.</p>",
+          hasToOverride: false,
+          note: "Sent only when 'Email the new password to the employee' is ticked in Office Customers → Reset password.",
         },
       ],
     }
@@ -2052,7 +2118,13 @@ export default {
               complaintReceived: { subject: '', html: '' },
               careerApplicationReceived: { subject: '', html: '' },
               winmaxFailureAlert: { subject: '', html: '', toOverride: [], _toOverrideRaw: '' },
+              officeWelcome: { subject: '', html: '' },
+              officePasswordReset: { subject: '', html: '' },
+              officeAdminPasswordReset: { subject: '', html: '' },
             }
+            // Only these (the editor's) keys get defaults + the <div> strip
+            // below; any other template on the outlet (officeStatement,
+            // voucherCode, ...) is left untouched and passed through on save.
             Object.keys(tplDefaults).forEach((key) => {
               res.emailSettings.templates[key] = {
                 ...tplDefaults[key],
@@ -2424,6 +2496,14 @@ export default {
             html: wrapHtml(tpl[key]?.html),
             ...extras,
           })
+          // The backend $sets emailSettings as a whole, so a template this
+          // editor doesn't manage (officeStatement, voucherCode,
+          // voucherFailureAlert, anything added later) would be wiped on every
+          // outlet save. Carry those over exactly as loaded.
+          const managedKeys = this.emailTemplates.map((t) => t.key)
+          const unmanagedTemplates = Object.fromEntries(
+            Object.entries(tpl).filter(([key]) => !managedKeys.includes(key)),
+          )
           return {
             replyTo: es.replyTo || '',
             logoUrl: es.logoUrl || '',
@@ -2432,6 +2512,7 @@ export default {
             websiteUrl: es.websiteUrl || '',
             legalFooterHtml: es.legalFooterHtml || '',
             templates: {
+              ...unmanagedTemplates,
               registrationConfirmation: mapTpl('registrationConfirmation'),
               orderConfirmation: mapTpl('orderConfirmation'),
               complaintReceived: mapTpl('complaintReceived'),
@@ -2443,6 +2524,9 @@ export default {
                   .map((e) => e.trim())
                   .filter(Boolean),
               },
+              officeWelcome: mapTpl('officeWelcome'),
+              officePasswordReset: mapTpl('officePasswordReset'),
+              officeAdminPasswordReset: mapTpl('officeAdminPasswordReset'),
             },
           }
         })(),
