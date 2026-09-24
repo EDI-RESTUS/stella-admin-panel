@@ -7,7 +7,7 @@
     close-button
     @update:modelValue="emits('cancel')"
   >
-    <h1 class="va-h5 mb-4">Reset password</h1>
+    <h1 class="va-h5 mb-4">Change password</h1>
     <VaForm ref="form" class="space-y-6" @submit.prevent="submit">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <VaInput
@@ -52,7 +52,15 @@
       </div>
       <div class="flex flex-col-reverse md:justify-end md:flex-row md:space-x-4">
         <VaButton :style="buttonStyles" preset="secondary" color="secondary" @click="emits('cancel')"> Cancel</VaButton>
-        <VaButton :style="buttonStyles" class="mb-4 md:mb-0" type="submit"> Change Password</VaButton>
+        <VaButton
+          :style="buttonStyles"
+          class="mb-4 md:mb-0"
+          type="submit"
+          :loading="isSubmitting"
+          :disabled="isSubmitting"
+        >
+          Change Password</VaButton
+        >
       </div>
     </VaForm>
   </VaModal>
@@ -73,24 +81,42 @@ const { init } = useToast()
 const { push } = useRouter()
 const emits = defineEmits(['cancel'])
 
+// The signed-in user's id: the login response stores it as `id`, but after a
+// page reload the store is refilled from GET /users/:id (raw doc, `_id`);
+// sessionStorage 'user' holds it either way.
+const currentUserId = () => {
+  const u: any = userStore.userDetails
+  return u?.id || u?._id || window.sessionStorage.getItem('user') || ''
+}
+
+// One request at a time — a double-click must not send two changes.
+const isSubmitting = ref(false)
+
 const submit = () => {
+  if (isSubmitting.value) return
   if (validate()) {
+    const userId = currentUserId()
+    if (!userId) {
+      init({ message: 'Could not identify your account — please sign in again.', color: 'danger' })
+      return
+    }
     const url: any = import.meta.env.VITE_API_BASE_URL
+    isSubmitting.value = true
     axios
-      .patch(`${url}/users/change-password/${userStore.userDetails.id}`, {
+      .patch(`${url}/users/change-password/${userId}`, {
         oldPassword: oldPassword.value,
         newPassword: newPassword.value,
         newConfirmPassword: newConfirmPassword.value,
       })
-      .then((response) => {
-        window.sessionStorage.setItem('token', response.data.accessToken)
-        init({ message: "You've successfully changed your password", color: 'success' })
-        window.sessionStorage.removeItem('token')
-        push('/auth/login')
+      .then(() => {
+        init({ message: 'Password changed — please sign in with your new password.', color: 'success' })
         emits('cancel')
+        // Same as the Logout menu item: clears the session, then the login page.
+        push({ name: 'logout' })
       })
       .catch((err) => {
-        init({ message: err.response.data.message, color: 'danger' })
+        isSubmitting.value = false
+        init({ message: err?.response?.data?.message || 'Could not change the password.', color: 'danger' })
       })
   }
 }

@@ -29,8 +29,10 @@
           <VaListItem
             v-for="item in group.list"
             :key="item.name"
-            class="menu-item px-4 text-base cursor-pointer h-8"
+            class="menu-item text-base cursor-pointer h-8"
             v-bind="resolveLinkAttribute(item)"
+            @click="onItemClick(item)"
+            @keydown.enter="onItemClick(item)"
           >
             <VaIcon :name="item.icon" class="pr-1" color="secondary" />
             {{ t(`user.${item.name}`) }}
@@ -39,6 +41,7 @@
         </VaList>
       </VaDropdownContent>
     </VaDropdown>
+    <ResetPasswordModal v-if="isChangePasswordOpen" @cancel="isChangePasswordOpen = false" />
   </div>
 </template>
 
@@ -47,6 +50,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useColors } from 'vuestic-ui'
 import { useUsersStore } from '@/stores/users'
+import ResetPasswordModal from '@/pages/preferences/modals/ResetPasswordModal.vue'
 
 const { colors, setHSLAColor } = useColors()
 const hoverColor = computed(() => setHSLAColor(colors.focus, { a: 0.1 }))
@@ -78,6 +82,8 @@ type ProfileListItem = {
   name: string
   to?: string
   href?: string
+  // Opens something in place instead of navigating.
+  action?: 'changePassword'
   icon: string
 }
 
@@ -96,7 +102,13 @@ const props = withDefaults(
       {
         name: 'account',
         separator: true,
-        list: [],
+        list: [
+          {
+            name: 'changePassword',
+            action: 'changePassword',
+            icon: 'mso-lock_reset',
+          },
+        ],
       },
       {
         name: '',
@@ -123,6 +135,14 @@ const updatedOptions = computed(() => {
 })
 
 const isShown = ref(false)
+const isChangePasswordOpen = ref(false)
+
+const onItemClick = (item: ProfileListItem) => {
+  if (item.action === 'changePassword') {
+    isShown.value = false
+    isChangePasswordOpen.value = true
+  }
+}
 
 const resolveLinkAttribute = (item: ProfileListItem) => {
   return item.to ? { to: { name: item.to } } : item.href ? { href: item.href, target: '_blank' } : {}
@@ -140,6 +160,11 @@ const resolveLinkAttribute = (item: ProfileListItem) => {
   &__content {
     .menu-item:hover {
       background: var(--hover-color);
+    }
+    // Padding lives on the inner element: VaListItem only emits click from
+    // there, so the whole row width must be clickable.
+    .menu-item .va-list-item__inner {
+      padding: 0 1rem;
     }
   }
 
