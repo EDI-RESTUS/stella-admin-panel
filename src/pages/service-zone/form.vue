@@ -892,7 +892,10 @@
             <div class="border rounded-lg p-4 mb-4">
               <div class="flex items-center justify-between mb-2">
                 <span class="font-semibold text-sm">{{ tpl.label }}</span>
-                <div class="flex flex-wrap gap-1">
+                <VaButton v-if="tpl.plainText" preset="secondary" size="small" @click="applyStandardText(tpl)">
+                  Use standard text
+                </VaButton>
+                <div v-else class="flex flex-wrap gap-1">
                   <VaBadge
                     v-for="v in tpl.vars"
                     :key="v"
@@ -905,7 +908,62 @@
                 </div>
               </div>
               <p v-if="tpl.note" class="text-xs text-gray-500 mb-2">{{ tpl.note }}</p>
-              <div class="grid grid-cols-1 gap-3">
+              <!-- Office emails: written as plain text, like a normal email.
+                   The backend turns it into the branded email (paragraphs,
+                   line breaks, **bold**). -->
+              <div v-if="tpl.plainText" class="grid grid-cols-1 gap-3">
+                <div class="flex flex-wrap items-center gap-1">
+                  <span class="text-xs text-gray-500 mr-1">Insert:</span>
+                  <VaBadge
+                    v-for="v in tpl.vars"
+                    :key="v"
+                    :text="placeholderLabels[v] || v"
+                    color="info"
+                    class="placeholder-chip cursor-pointer select-none"
+                    :title="v"
+                    @click="insertPlaceholder(tpl.key, v)"
+                  />
+                </div>
+                <div @focusin="tplLastField[tpl.key] = 'subject'">
+                  <VaInput
+                    :ref="'subject-' + tpl.key"
+                    v-model="restaurantData.emailSettings.templates[tpl.key].subject"
+                    label="Subject"
+                    :placeholder="tpl.subjectPlaceholder"
+                  />
+                </div>
+                <div @focusin="tplLastField[tpl.key] = 'text'">
+                  <VaTextarea
+                    :ref="'message-' + tpl.key"
+                    v-model="restaurantData.emailSettings.templates[tpl.key].text"
+                    label="Message"
+                    :placeholder="tpl.standardText"
+                    autosize
+                    :min-rows="12"
+                    :max-rows="30"
+                    class="w-full"
+                  />
+                  <p class="text-xs text-gray-500 mt-1">
+                    Write it like a normal email: press Enter for a new line and leave an empty line between paragraphs.
+                    Use **double asterisks** for bold. Leave empty to send the standard message.
+                  </p>
+                  <p
+                    v-if="
+                      !(restaurantData.emailSettings.templates[tpl.key].text || '').trim() &&
+                      (restaurantData.emailSettings.templates[tpl.key].html || '').trim()
+                    "
+                    class="text-xs text-warning mt-1"
+                  >
+                    This email still has an older HTML version saved, and that is what's sent while the message is
+                    empty. Type a message (or use the standard text) to replace it, or
+                    <button type="button" class="underline font-semibold" @click="removeOldHtml(tpl.key)">
+                      remove the old HTML version
+                    </button>
+                    to send the built-in email.
+                  </p>
+                </div>
+              </div>
+              <div v-else class="grid grid-cols-1 gap-3">
                 <VaInput
                   v-model="restaurantData.emailSettings.templates[tpl.key].subject"
                   :label="'Subject'"
@@ -1249,6 +1307,23 @@ const normalisePushSettings = (ps) => {
     senderName: String(merged.senderName || '').trim(),
   }
 }
+// Office-customer emails are written as plain text: the backend escapes it,
+// makes an empty line a new paragraph, Enter a line break and **…** bold, and
+// wraps it in the branded email. Their placeholder chips show these names;
+// the {{token}} itself is the chip's tooltip.
+const OFFICE_PLACEHOLDER_LABELS = {
+  '{{customerName}}': 'Employee name',
+  '{{employeeId}}': 'Employee ID',
+  '{{password}}': 'Password',
+  '{{email}}': 'Email',
+  '{{outletName}}': 'Outlet name',
+  '{{websiteUrl}}': 'Website',
+  '{{supportPhone}}': 'Support phone',
+  '{{supportEmail}}': 'Support email',
+  '{{logoUrl}}': 'Logo URL',
+  '{{ctaLink}}': 'Website link (ctaLink)',
+  '{{code}}': 'Reset code',
+}
 // Category names are a string or { en, el } (see pages/categories).
 const categoryLabel = (name) =>
   typeof name === 'string' ? name : name?.en || Object.values(name || {}).find(Boolean) || ''
@@ -1562,9 +1637,9 @@ export default {
             complaintReceived: { subject: '', html: '' },
             careerApplicationReceived: { subject: '', html: '' },
             winmaxFailureAlert: { subject: '', html: '', toOverride: [], _toOverrideRaw: '' },
-            officeWelcome: { subject: '', html: '' },
-            officePasswordReset: { subject: '', html: '' },
-            officeAdminPasswordReset: { subject: '', html: '' },
+            officeWelcome: { subject: '', text: '', html: '' },
+            officePasswordReset: { subject: '', text: '', html: '' },
+            officeAdminPasswordReset: { subject: '', text: '', html: '' },
           },
         },
       },
@@ -1634,11 +1709,14 @@ export default {
           htmlPlaceholder: '<div>Order {{orderNo}} failed to send to Winmax.</div>',
           hasToOverride: true,
         },
-        // Office-customer (employee) emails. Empty subject/body = the backend's
-        // built-in default wording is sent.
+        // Office-customer (employee) emails, edited as plain text (template
+        // `text`, see OFFICE_PLACEHOLDER_LABELS). Empty subject/message = the
+        // backend's built-in default wording is sent. subjectPlaceholder +
+        // standardText are that wording, for "Use standard text".
         {
           key: 'officeWelcome',
           label: 'Office Customer Welcome',
+          plainText: true,
           vars: [
             '{{customerName}}',
             '{{employeeId}}',
@@ -1652,14 +1730,25 @@ export default {
             '{{ctaLink}}',
           ],
           subjectPlaceholder: 'Welcome to {{outletName}} — your account is ready',
-          htmlPlaceholder:
-            "<p>Hi {{customerName}},</p><p>Your Employee ID: <b>{{employeeId}}</b><br/>Your initial password: <b>{{password}}</b></p><p>You'll be asked to set your own password the first time you sign in.</p>",
+          standardText: [
+            'Hi {{customerName}},',
+            '',
+            'An account has been created for you at {{outletName}}.',
+            '',
+            'Your Employee ID: **{{employeeId}}**',
+            'Your initial password: **{{password}}** (the same as your Employee ID)',
+            '',
+            "Open the ordering app from the shortcut on your desktop and sign in with your Employee ID and the initial password above. You'll be asked to set your own password the first time you sign in.",
+            '',
+            "If you weren't expecting this account, please contact your administrator.",
+          ].join('\n'),
           hasToOverride: false,
-          note: "{{password}} is filled at registration. On Re-send welcome it is only known while the employee still has their Employee ID as password — otherwise the re-send is refused if the template uses {{password}}; use Reset password with 'Email the new password' instead.",
+          note: "The password is shown only while it is still the Employee ID (always the case for new accounts). If an employee has already changed it, use Reset password → 'Email the new password' instead of Re-send welcome.",
         },
         {
           key: 'officePasswordReset',
           label: 'Office Customer Password Reset Code (forgot password)',
+          plainText: true,
           vars: [
             '{{customerName}}',
             '{{employeeId}}',
@@ -1671,14 +1760,25 @@ export default {
             '{{supportEmail}}',
             '{{logoUrl}}',
           ],
-          subjectPlaceholder: '{{outletName}} — your password reset code',
-          htmlPlaceholder:
-            "<p>Hi {{customerName}} (Employee ID {{employeeId}}),</p><p>Use this code to reset your password: <b>{{code}}</b></p><p>The code expires in 10 minutes. If you didn't request a password reset, you can ignore this email.</p>",
+          subjectPlaceholder: '{{outletName}} — Your password reset code',
+          standardText: [
+            'Hi {{customerName}},',
+            '',
+            'Use this code to reset your password:',
+            '',
+            '**{{code}}**',
+            '',
+            'The code expires in 10 minutes.',
+            '',
+            "If you didn't request a password reset, you can safely ignore this email — your password will not change.",
+          ].join('\n'),
           hasToOverride: false,
+          note: "Sent when an employee uses 'Forgot password' in the app. With the message left empty, the code is shown in large type; in a typed message it's in bold.",
         },
         {
           key: 'officeAdminPasswordReset',
           label: 'Office Customer Password Reset by Admin',
+          plainText: true,
           vars: [
             '{{customerName}}',
             '{{employeeId}}',
@@ -1690,13 +1790,28 @@ export default {
             '{{supportEmail}}',
             '{{logoUrl}}',
           ],
-          subjectPlaceholder: '{{outletName}} — your password has been reset',
-          htmlPlaceholder:
-            "<p>Hi {{customerName}},</p><p>Your password has been reset.</p><p>Employee ID: <b>{{employeeId}}</b><br/>New temporary password: <b>{{password}}</b></p><p>You'll be asked to set your own password the next time you sign in.</p>",
+          subjectPlaceholder: '{{outletName}} — Your password has been reset',
+          standardText: [
+            'Hi {{customerName}},',
+            '',
+            'Your password has been reset by your administrator.',
+            '',
+            'Your Employee ID: **{{employeeId}}**',
+            '',
+            'Your new temporary password: **{{password}}**',
+            '',
+            "Sign in to the ordering app with your Employee ID and this temporary password. You'll be asked to set your own password the next time you sign in.",
+            '',
+            "If you didn't expect this, please contact your administrator.",
+          ].join('\n'),
           hasToOverride: false,
-          note: "Sent only when 'Email the new password to the employee' is ticked in Office Customers → Reset password.",
+          note: "Sent when you tick 'Email the new password to the employee' in Office Customers → Reset password.",
         },
       ],
+      placeholderLabels: OFFICE_PLACEHOLDER_LABELS,
+      // Per office template: which field a placeholder chip inserts into —
+      // 'subject' if the admin was last in the subject, else the message.
+      tplLastField: {},
     }
   },
   computed: {
@@ -1845,6 +1960,50 @@ export default {
         const pos = start + variable.length
         textarea.setSelectionRange(pos, pos)
       })
+    },
+    // Office (plain-text) templates: insert a {{placeholder}} at the cursor of
+    // the field the admin was last in — the message, unless that was the subject.
+    insertPlaceholder(templateKey, token) {
+      const field = this.tplLastField[templateKey] === 'subject' ? 'subject' : 'text'
+      const fieldRef = this.$refs[(field === 'subject' ? 'subject-' : 'message-') + templateKey]
+      const component = Array.isArray(fieldRef) ? fieldRef[0] : fieldRef
+      const el = component?.$el?.querySelector(field === 'subject' ? 'input' : 'textarea')
+      const tpl = this.restaurantData.emailSettings.templates[templateKey]
+      const current = tpl[field] || ''
+      // A field that was never clicked into has its cursor at the end.
+      const start = typeof el?.selectionStart === 'number' ? el.selectionStart : current.length
+      const end = typeof el?.selectionEnd === 'number' ? el.selectionEnd : start
+      tpl[field] = current.slice(0, start) + token + current.slice(end)
+      this.$nextTick(() => {
+        if (!el) return
+        el.focus()
+        const pos = start + token.length
+        el.setSelectionRange(pos, pos)
+      })
+    },
+    // "Use standard text": the backend's built-in wording, as editable text.
+    applyStandardText(tplDef) {
+      const tpl = this.restaurantData.emailSettings.templates[tplDef.key]
+      if (
+        (tpl.text || '').trim() &&
+        !window.confirm('Replace the current subject and message with the standard text?')
+      ) {
+        return
+      }
+      tpl.subject = tplDef.subjectPlaceholder
+      tpl.text = tplDef.standardText
+    },
+    // An office template's HTML from the old editor is sent while the message
+    // is empty; clearing it brings back the backend's built-in email.
+    removeOldHtml(templateKey) {
+      if (
+        !window.confirm(
+          'Remove the old HTML version of this email? While the message is empty, the built-in email will be sent instead (once you save).',
+        )
+      ) {
+        return
+      }
+      this.restaurantData.emailSettings.templates[templateKey].html = ''
     },
     deleteAsset(type) {
       const image = this.restaurantData.assetIds.find((a) => a.assetType === type)
@@ -2118,9 +2277,9 @@ export default {
               complaintReceived: { subject: '', html: '' },
               careerApplicationReceived: { subject: '', html: '' },
               winmaxFailureAlert: { subject: '', html: '', toOverride: [], _toOverrideRaw: '' },
-              officeWelcome: { subject: '', html: '' },
-              officePasswordReset: { subject: '', html: '' },
-              officeAdminPasswordReset: { subject: '', html: '' },
+              officeWelcome: { subject: '', text: '', html: '' },
+              officePasswordReset: { subject: '', text: '', html: '' },
+              officeAdminPasswordReset: { subject: '', text: '', html: '' },
             }
             // Only these (the editor's) keys get defaults + the <div> strip
             // below; any other template on the outlet (officeStatement,
@@ -2140,7 +2299,11 @@ export default {
               const m = html.trim().match(/^<div>([\s\S]*)<\/div>$/i)
               return m ? m[1].trim() : html
             }
+            // Plain-text (office) templates keep their html exactly as loaded:
+            // it isn't shown in the editor and goes back unchanged on save.
+            const plainTextKeys = this.emailTemplates.filter((t) => t.plainText).map((t) => t.key)
             Object.keys(tplDefaults).forEach((key) => {
+              if (plainTextKeys.includes(key)) return
               res.emailSettings.templates[key].html = stripOuterDiv(res.emailSettings.templates[key].html)
             })
           }
@@ -2496,6 +2659,14 @@ export default {
             html: wrapHtml(tpl[key]?.html),
             ...extras,
           })
+          // Office templates: the admin's line breaks and spaces ARE the
+          // formatting, so only trailing whitespace is dropped; html (not
+          // editable here) goes back exactly as loaded.
+          const mapPlainTextTpl = (key) => ({
+            subject: tpl[key]?.subject || '',
+            text: (tpl[key]?.text || '').trimEnd(),
+            html: tpl[key]?.html ?? '',
+          })
           // The backend $sets emailSettings as a whole, so a template this
           // editor doesn't manage (officeStatement, voucherCode,
           // voucherFailureAlert, anything added later) would be wiped on every
@@ -2524,9 +2695,9 @@ export default {
                   .map((e) => e.trim())
                   .filter(Boolean),
               },
-              officeWelcome: mapTpl('officeWelcome'),
-              officePasswordReset: mapTpl('officePasswordReset'),
-              officeAdminPasswordReset: mapTpl('officeAdminPasswordReset'),
+              officeWelcome: mapPlainTextTpl('officeWelcome'),
+              officePasswordReset: mapPlainTextTpl('officePasswordReset'),
+              officeAdminPasswordReset: mapPlainTextTpl('officeAdminPasswordReset'),
             },
           }
         })(),
@@ -2590,6 +2761,15 @@ export default {
 <style scoped>
 .config {
   --va-switch-label-left-padding: 0.8rem;
+}
+/* Office-email placeholder chips read as normal words, not tiny capitals. */
+.placeholder-chip {
+  --va-badge-text-transform: none;
+  --va-badge-font-size: 0.75rem;
+  --va-badge-text-py: 0.125rem;
+  --va-badge-text-px: 0.5rem;
+  --va-badge-text-wrapper-letter-spacing: normal;
+  --va-badge-text-wrapper-font-weight: 600;
 }
 .day {
   font-size: 12px;

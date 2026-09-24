@@ -21,6 +21,10 @@ const firstName = ref('')
 const surname = ref('')
 const email = ref('')
 const password = ref('')
+// New accounts start with the Employee ID as their password (the employee must
+// change it at first sign-in), so the password follows the ID as it's typed —
+// until the admin edits the password field themselves.
+const passwordEdited = ref(false)
 const officeNo = ref('')
 const officePhone = ref('')
 const saving = ref(false)
@@ -178,12 +182,38 @@ const canSave = computed(
     String(password.value).length >= 6,
 )
 
+// Programmatic writes don't emit update:modelValue, so only the admin's own
+// typing in the password field stops the sync.
+watch(winmaxId, (id) => {
+  if (!passwordEdited.value) password.value = String(id ?? '').trim()
+})
+
+function onPasswordTyped() {
+  passwordEdited.value = true
+}
+
+// Hint under the password field. An auto-filled ID under 6 characters fails
+// minPwd without showing an error (a programmatic write never touches the
+// field), so say why Register is disabled; and a typed password that isn't the
+// ID gets a reminder, since a welcome message may say the two are the same.
+const passwordHint = computed(() => {
+  const id = String(winmaxId.value ?? '').trim()
+  if (!passwordEdited.value && id && String(password.value).length < 6) {
+    return 'This Employee ID is shorter than 6 characters, so type a password (at least 6 characters).'
+  }
+  if (passwordEdited.value && password.value && password.value !== id) {
+    return "Not the Employee ID — make sure the welcome email doesn't say the password is the same as the ID."
+  }
+  return 'Defaults to the Employee ID — the employee must change it at first sign-in.'
+})
+
 function resetForm() {
   winmaxId.value = ''
   firstName.value = ''
   surname.value = ''
   email.value = ''
   password.value = ''
+  passwordEdited.value = false
   officeNo.value = ''
   officePhone.value = ''
   // Emptying the values re-triggers every field's `required` rule — clear the
@@ -388,7 +418,8 @@ function formatTxAmount(v: number | null | undefined) {
                 required-mark
                 :rules="[validators.required, minPwd]"
                 placeholder="Min 6 characters (temporary)"
-                messages="Temporary — the employee sets their own password at first login."
+                :messages="passwordHint"
+                @update:modelValue="onPasswordTyped"
                 @clickAppendInner="isPasswordVisible.value = !isPasswordVisible.value"
               >
                 <template #appendInner>
