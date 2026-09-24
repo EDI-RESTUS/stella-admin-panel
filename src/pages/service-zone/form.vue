@@ -944,8 +944,9 @@
                     class="w-full"
                   />
                   <p class="text-xs text-gray-500 mt-1">
-                    Write it like a normal email: press Enter for a new line and leave an empty line between paragraphs.
-                    Use **double asterisks** for bold. Leave empty to send the standard message.
+                    The grey text is only a preview of the standard message, which is sent while this box is empty. To
+                    change it, click "Use standard text" and edit it, or write your own: press Enter for a new line,
+                    leave an empty line between paragraphs, and use **double asterisks** for bold.
                   </p>
                   <p
                     v-if="
@@ -1207,8 +1208,6 @@ const OFFICE_PLACEHOLDER_LABELS = {
   '{{websiteUrl}}': 'Website',
   '{{supportPhone}}': 'Support phone',
   '{{supportEmail}}': 'Support email',
-  '{{logoUrl}}': 'Logo URL',
-  '{{ctaLink}}': 'Website link (ctaLink)',
   '{{code}}': 'Reset code',
 }
 
@@ -1592,8 +1591,6 @@ export default {
             '{{websiteUrl}}',
             '{{supportPhone}}',
             '{{supportEmail}}',
-            '{{logoUrl}}',
-            '{{ctaLink}}',
           ],
           subjectPlaceholder: 'Welcome to {{outletName}} — your account is ready',
           standardText: [
@@ -1609,7 +1606,7 @@ export default {
             "If you weren't expecting this account, please contact your administrator.",
           ].join('\n'),
           hasToOverride: false,
-          note: "{{password}} is the password the admin typed when registering the employee. Re-send welcome can't show it again (the system doesn't keep it in readable form) unless it is the Employee ID — to send a password later, use Reset password → 'Email the new password'.",
+          note: "The password in this email is the one typed when the employee was registered. 'Re-send welcome' can only repeat it while it is still the Employee ID — otherwise use Reset password and tick 'Email the new password'.",
         },
         {
           key: 'officePasswordReset',
@@ -1624,7 +1621,6 @@ export default {
             '{{websiteUrl}}',
             '{{supportPhone}}',
             '{{supportEmail}}',
-            '{{logoUrl}}',
           ],
           subjectPlaceholder: '{{outletName}} — Your password reset code',
           standardText: [
@@ -1654,7 +1650,6 @@ export default {
             '{{websiteUrl}}',
             '{{supportPhone}}',
             '{{supportEmail}}',
-            '{{logoUrl}}',
           ],
           subjectPlaceholder: '{{outletName}} — Your password has been reset',
           standardText: [
