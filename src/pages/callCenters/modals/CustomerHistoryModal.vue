@@ -370,6 +370,16 @@
             </template>
             {{ order.status }}
           </span>
+
+          <!-- POS (Novasero) outcome: only when the order was rejected or never got there -->
+          <span
+            v-if="posFailureLabel(order)"
+            class="ml-2 px-3 py-2 rounded-full text-xs font-semibold tracking-wide flex items-center gap-1 transition-colors bg-red-600 text-white"
+            :title="posFailureDetail(order)"
+          >
+            <XCircle class="w-3.5 h-3.5" />
+            {{ posFailureLabel(order) }}
+          </span>
         </div>
 
         <!-- EXPANDABLE ARTICLE LIST -->
@@ -1812,6 +1822,17 @@ const getPromisedTime = (createdAt, orderType) => {
 const getOrderSource = (source) => (!source ? '' : source === 'CC' ? 'Call Center' : source)
 
 const getDisplayStatus = (order, index) => (index === 0 && liveStatus.value ? liveStatus.value : order.status)
+
+// Novasero (Papa Johns POS) outcome: 'rejected' = the POS refused the order,
+// 'failed' = it never reached the POS. Accepted / unconfirmed / absent: no chip.
+const posFailureLabel = (order) => {
+  const s = String(order?.novaseroStatus || '').toLowerCase()
+  return s === 'rejected' ? 'POS rejected' : s === 'failed' ? 'POS failed' : ''
+}
+const posFailureDetail = (order) =>
+  (Array.isArray(order?.novaseroErrors) ? order.novaseroErrors : [])
+    .map((e) => (typeof e === 'string' ? e : e?.message || JSON.stringify(e)))
+    .join('; ')
 
 const getDeliveryZoneName = (deliveryZoneId) => {
   if (!deliveryZoneId || !Array.isArray(props.deliveryZoneOptions)) return ''

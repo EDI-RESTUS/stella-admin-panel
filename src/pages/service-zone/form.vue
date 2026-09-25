@@ -994,6 +994,13 @@
                   label="To Override (comma-separated emails)"
                   placeholder="admin@example.com, ops@example.com"
                 />
+                <VaInput
+                  v-if="tpl.key === 'winmaxFailureAlert'"
+                  v-model="restaurantData.posFailureAlert._phonesRaw"
+                  label="POS failure alert — SMS numbers"
+                  placeholder="e.g. 35799123456, 35799654321"
+                  helper-text="Comma-separated, international format (e.g. 35799123456). Sent when an online order is rejected by or fails to reach the POS (Novasero). Emails go to the Winmax Failure Alert recipients above."
+                />
               </div>
             </div>
           </template>
@@ -1524,6 +1531,12 @@ export default {
           senderId: '',
           baseUrl: '',
           otpTemplate: '',
+        },
+        // POS (Novasero) failure alert SMS numbers. _phonesRaw is the
+        // comma-separated input; the phones array is built on save.
+        posFailureAlert: {
+          phones: [],
+          _phonesRaw: '',
         },
         turnstileSettings: {
           enabled: false,
@@ -2251,6 +2264,9 @@ export default {
               secretKey: '',
               ...(res.turnstileSettings || {}),
             }
+            // Absent on every outlet that never set it (all other brands).
+            res.posFailureAlert = { phones: [], ...(res.posFailureAlert || {}) }
+            res.posFailureAlert._phonesRaw = (res.posFailureAlert.phones ?? []).join(', ')
             res.loyaltySettings = {
               enabled: false,
               pointsPerEuro: 1,
@@ -2449,6 +2465,16 @@ export default {
           senderId: this.restaurantData.smsSettings?.senderId || '',
           baseUrl: this.restaurantData.smsSettings?.baseUrl || '',
           otpTemplate: this.restaurantData.smsSettings?.otpTemplate || '',
+        },
+        // POS (Novasero) failure alert: the spread keeps anything else stored
+        // in the sub-document, the raw input becomes the phones array.
+        posFailureAlert: {
+          ...this.restaurantData.posFailureAlert,
+          phones: (this.restaurantData.posFailureAlert?._phonesRaw || '')
+            .split(',')
+            .map((p) => p.trim())
+            .filter(Boolean),
+          _phonesRaw: undefined,
         },
         turnstileSettings: {
           enabled: !!this.restaurantData.turnstileSettings?.enabled,
@@ -2702,6 +2728,10 @@ export default {
     async createRestaurant() {
       if (this.$refs.form.validate()) {
         const data = removeNulls(this.createPayload())
+        // Same as update: removeNulls drops an empty phones array (and then the
+        // sub-document), so the new outlet would come back without posFailureAlert
+        // and the template's `posFailureAlert._phonesRaw` binding would throw.
+        data.posFailureAlert = { ...(data.posFailureAlert || {}), phones: data.posFailureAlert?.phones || [] }
         // Customer-app settings only when the user touched them on the create form.
         Object.assign(data, this.changedCustomerAppSettings())
         const url = import.meta.env.VITE_API_BASE_URL
@@ -2723,6 +2753,9 @@ export default {
         const data = removeNulls(this.createPayload())
         const url = import.meta.env.VITE_API_BASE_URL
         delete data.name
+        // removeNulls drops an empty phones array (and then the empty
+        // sub-document), which would turn "clear the numbers" into a no-op.
+        data.posFailureAlert = { ...(data.posFailureAlert || {}), phones: data.posFailureAlert?.phones || [] }
         // Customer-app sub-documents ride along ONLY when changed, attached
         // after removeNulls so a `newProductsCategoryId: null` clear survives.
         Object.assign(data, this.changedCustomerAppSettings())
