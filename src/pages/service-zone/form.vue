@@ -202,7 +202,7 @@
                   label="Winmax Failure Alert Phones"
                   name="failureAlertPhones"
                   placeholder="e.g. 35799111111, 35799222222"
-                  helper-text="Comma-separated phone numbers in international format. An SMS is sent to these numbers when an order fails to reach Winmax."
+                  helper-text="Comma-separated phone numbers in international format. An SMS is sent to these numbers when an order fails to reach Winmax, and when an online order is rejected by or fails to reach the POS (Novasero)."
                 />
               </div>
               <div v-if="restaurantData.pos == 'winmax'" class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4">
