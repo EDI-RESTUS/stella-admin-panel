@@ -28,7 +28,13 @@ const saving = ref(false)
 // List of existing office customers for the selected outlet.
 const tableItems = ref<any[]>([])
 const loadingList = ref(false)
+// The input binds to `search` so typing stays instant; the list filters on
+// `searchQuery`, a ~300 ms debounced copy, so ~1000 rows are not re-filtered and
+// re-rendered on every keystroke. Client-side pages of 50 keep the DOM small.
 const search = ref('')
+const searchQuery = ref('')
+const page = ref(1)
+const perPage = 50
 
 // Row-action state.
 const editTarget = ref<any>(null)
@@ -90,8 +96,31 @@ function creditIsLow(row?: { creditLimit: number | null; remaining: number | nul
   return (row.balance ?? 0) < 0
 }
 
+// One ready-made Credit cell per employee, rebuilt once when the balances arrive
+// (a single plain lookup per row instead of three reactive ones per cell).
+const EMPTY_CREDIT = {
+  text: formatCredit(),
+  low: false,
+  title: `Winmax balance: ${formatBalance(null)} — click for transactions`,
+}
+const creditCells = computed(() => {
+  const map: Record<string, { text: string; low: boolean; title: string }> = {}
+  for (const [id, b] of Object.entries(balances.value)) {
+    map[id] = {
+      text: formatCredit(b),
+      low: creditIsLow(b),
+      title: `Winmax balance: ${formatBalance(b.balance)} — click for transactions`,
+    }
+  }
+  return map
+})
+
+function creditCell(winmaxId: unknown) {
+  return creditCells.value[String(winmaxId)] || EMPTY_CREDIT
+}
+
 const filteredItems = computed(() => {
-  const q = search.value.trim().toLowerCase()
+  const q = searchQuery.value.trim().toLowerCase()
   if (!q) return tableItems.value
   return tableItems.value.filter((c) =>
     [c.customerName, c.email, c.officeNo, c.officePhone, c.phone, String(c.winmaxId)].some((f) =>
@@ -100,6 +129,24 @@ const filteredItems = computed(() => {
         .includes(q),
     ),
   )
+})
+
+const pages = computed(() => Math.max(1, Math.ceil(filteredItems.value.length / perPage)))
+
+// Debounced search; applying a new query goes back to page 1.
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(search, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    if (searchQuery.value === search.value) return
+    searchQuery.value = search.value
+    page.value = 1
+  }, 300)
+})
+
+// Never sit on a page that no longer exists (list reloaded or shrank).
+watch(pages, (p) => {
+  if (page.value > p) page.value = p
 })
 
 async function getOfficeCustomers() {
@@ -163,7 +210,10 @@ onMounted(async () => {
 })
 
 // Reload whenever the chosen outlet (login / top navbar) changes.
-watch(outletId, () => refresh())
+watch(outletId, () => {
+  page.value = 1
+  refresh()
+})
 
 const numberRule = (v: any) => /^[0-9]+$/.test(String(v ?? '').trim()) || 'Must be a number'
 const minPwd = (v: any) => String(v ?? '').length >= 6 || 'At least 6 characters'
@@ -460,6 +510,8 @@ function formatTxAmount(v: number | null | undefined) {
         <VaDataTable
           :columns="columns"
           :items="filteredItems"
+          :per-page="perPage"
+          :current-page="page"
           :loading="loadingList"
           :style="{
             '--va-data-table-thead-background': 'var(--va-background-element)',
@@ -477,13 +529,11 @@ function formatTxAmount(v: number | null | undefined) {
               <span
                 v-else
                 class="cursor-pointer underline decoration-dotted underline-offset-2"
-                :title="`Winmax balance: ${formatBalance(balances[String(rowData.winmaxId)]?.balance)} — click for transactions`"
-                :class="
-                  creditIsLow(balances[String(rowData.winmaxId)]) ? 'text-red-600 font-semibold' : 'text-slate-800'
-                "
+                :title="creditCell(rowData.winmaxId).title"
+                :class="creditCell(rowData.winmaxId).low ? 'text-red-600 font-semibold' : 'text-slate-800'"
                 @click="openTransactions(rowData)"
               >
-                {{ formatCredit(balances[String(rowData.winmaxId)]) }}
+                {{ creditCell(rowData.winmaxId).text }}
               </span>
             </div>
           </template>
@@ -519,6 +569,13 @@ function formatTxAmount(v: number | null | undefined) {
             </tr>
           </template>
         </VaDataTable>
+
+        <div class="flex items-center justify-between mt-4 gap-3 flex-wrap">
+          <span v-if="tableItems.length || !loadingList" class="text-sm text-slate-500">
+            {{ filteredItems.length }} of {{ tableItems.length }} employees
+          </span>
+          <VaPagination v-if="pages > 1" v-model="page" :pages="pages" :visible-pages="5" buttons-preset="secondary" />
+        </div>
       </VaCardContent>
     </VaCard>
 
