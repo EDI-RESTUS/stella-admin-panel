@@ -316,6 +316,63 @@
                   entity's current account as credit. The earn rate itself is set under Loyalty → Settings.
                 </div>
               </div>
+              <!-- Use Winmax for stock: Stella owns each article's per-zone quantity
+                   (Articles page → Stock); with this on, an entered quantity is pushed
+                   to Winmax as a fabrication document for the difference, and every
+                   5 minutes the Winmax warehouse stock is read back to deduct sales
+                   rung at the till. Top-level outlet fields (winmaxConfig is replaced
+                   wholesale on save). Off = the outlet is untouched. -->
+              <div v-if="restaurantData.pos == 'winmax'" class="w-full mt-6">
+                <VaSwitch
+                  v-model="restaurantData.winmaxStockSync"
+                  label="Use Winmax for stock"
+                  left-label
+                  size="small"
+                  class="whitespace-nowrap"
+                />
+                <div class="va-text-secondary text-xs mt-1">
+                  Keep the Articles page stock in step with Winmax: a quantity entered here is sent to Winmax as a
+                  fabrication document (only the difference — Winmax cannot be reset), and every 5 minutes sales rung at
+                  the Winmax till are deducted from the Stella quantity. Requires the articles to be configured as
+                  fabricated compositions in Winmax.
+                </div>
+              </div>
+              <div
+                v-if="restaurantData.pos == 'winmax' && restaurantData.winmaxStockSync"
+                class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4"
+              >
+                <VaInput
+                  v-model="restaurantData.winmaxStockWarehouseCode"
+                  label="Winmax Warehouse Code"
+                  name="winmaxStockWarehouseCode"
+                  type="number"
+                  placeholder="e.g. 1"
+                  helper-text="The Winmax warehouse whose stock this outlet sells from (the service zone's warehouse in Winmax). Required."
+                />
+                <VaSelect
+                  v-model="restaurantData.winmaxStockZoneId"
+                  label="Stock Zone"
+                  :options="stockZoneOptions"
+                  :track-by="(option) => option.value"
+                  :value-by="(option) => option.value"
+                  placeholder="Choose the delivery zone"
+                  helper-text="The Stella delivery zone whose stock column mirrors that warehouse (e.g. Online). Required."
+                />
+                <VaInput
+                  v-model="restaurantData.winmaxStockFabricationDocType"
+                  label="Fabrication Document Type"
+                  name="winmaxStockFabricationDocType"
+                  placeholder="M+"
+                  helper-text="Winmax document type posted when a quantity is entered (M+ = Manufacturing - In)."
+                />
+                <div class="va-text-secondary text-xs self-end pb-2">
+                  Last sync:
+                  {{ restaurantData.winmaxStockLastSyncAt ? new Date(restaurantData.winmaxStockLastSyncAt).toLocaleString() : 'never' }}
+                  <span v-if="restaurantData.winmaxStockLastSyncError" class="text-danger">
+                    — {{ restaurantData.winmaxStockLastSyncError }}
+                  </span>
+                </div>
+              </div>
               <div
                 v-if="restaurantData.pos == 'winmax' && restaurantData.winmaxRetailLoyalty"
                 class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4"
@@ -1435,6 +1492,8 @@ export default {
     return {
       isProgrammaticNavigation: false,
       syncingReceiptHeader: false,
+      // Delivery zones of this outlet for the "Use Winmax for stock" zone select
+      stockZoneOptions: [],
       // JSON of customerSettings / pushSettings as loaded (or as defaulted on
       // create); the save sends only what differs from these.
       customerSettingsSnapshot: JSON.stringify(normaliseCustomerSettings(customerSettingsDefaults())),
@@ -1514,6 +1573,14 @@ export default {
         winmaxRetailLoyaltyRedeemDocType: '',
         winmaxRetailLoyaltyRedeemArticleCode: '',
         winmaxRetailLoyaltyPointsPerCreditEuro: 50,
+        // Use Winmax for stock (top-level for the same reason). The zone is the
+        // delivery zone _id whose stock column mirrors the Winmax warehouse.
+        winmaxStockSync: false,
+        winmaxStockWarehouseCode: 0,
+        winmaxStockZoneId: '',
+        winmaxStockFabricationDocType: 'M+',
+        winmaxStockLastSyncAt: null,
+        winmaxStockLastSyncError: '',
         // Strings default to '' rather than null: removeNulls() drops null keys
         // and empty objects, which would make the whole subdoc vanish from the
         // payload and blur "never configured" with "deliberately cleared".
@@ -1857,6 +1924,23 @@ export default {
      * the delivery zone (shop) POW! PLATEIA carries "IR4" with the real shop
      * header. Winmax has no footer and only a list of VAT rates — manual.
      */
+    /**
+     * Delivery zones of this outlet as options for the "Use Winmax for stock"
+     * zone select. Fail-open: an error just leaves the list empty.
+     */
+    async loadStockZoneOptions() {
+      if (!this.restaurantId) return
+      try {
+        const url = import.meta.env.VITE_API_BASE_URL
+        const z = await axios.get(`${url}/deliveryZones/${this.restaurantId}`)
+        const list = Array.isArray(z.data) ? z.data : z.data?.data || []
+        this.stockZoneOptions = list
+          .filter((dz) => dz && !dz.isDeleted)
+          .map((dz) => ({ text: dz.name, value: String(dz._id) }))
+      } catch {
+        this.stockZoneOptions = []
+      }
+    },
     async syncReceiptHeaderFromWinmax() {
       if (!this.restaurantId || this.syncingReceiptHeader) return
       this.syncingReceiptHeader = true
@@ -2233,6 +2317,13 @@ export default {
             res.winmaxRetailLoyaltyRedeemDocType = res.winmaxRetailLoyaltyRedeemDocType || ''
             res.winmaxRetailLoyaltyRedeemArticleCode = res.winmaxRetailLoyaltyRedeemArticleCode || ''
             res.winmaxRetailLoyaltyPointsPerCreditEuro = Number(res.winmaxRetailLoyaltyPointsPerCreditEuro) || 50
+            // Use Winmax for stock: outlets saved before these fields existed have no keys.
+            res.winmaxStockSync = res.winmaxStockSync === true
+            res.winmaxStockWarehouseCode = Number(res.winmaxStockWarehouseCode) || 0
+            res.winmaxStockZoneId = res.winmaxStockZoneId ? String(res.winmaxStockZoneId) : ''
+            res.winmaxStockFabricationDocType = res.winmaxStockFabricationDocType || 'M+'
+            res.winmaxStockLastSyncAt = res.winmaxStockLastSyncAt || null
+            res.winmaxStockLastSyncError = res.winmaxStockLastSyncError || ''
             // Outlets saved before smsSettings existed have no such key, and
             // `this.restaurantData = res` below replaces the defaults wholesale
             // — without this the v-models in the SMS card would throw.
@@ -2308,6 +2399,7 @@ export default {
           }
           this.restaurantData = res
           if (res) {
+            this.loadStockZoneOptions()
             this.snapshotCustomerAppSettings()
             this.fetchNewProductsCategories()
           }
@@ -2423,6 +2515,12 @@ export default {
         winmaxRetailLoyaltyRedeemArticleCode: (this.restaurantData.winmaxRetailLoyaltyRedeemArticleCode || '').trim(),
         winmaxRetailLoyaltyPointsPerCreditEuro:
           Number(this.restaurantData.winmaxRetailLoyaltyPointsPerCreditEuro) || 50,
+        // Use Winmax for stock (last-sync fields are written by the backend job only)
+        winmaxStockSync: this.restaurantData.winmaxStockSync === true,
+        winmaxStockWarehouseCode: Number(this.restaurantData.winmaxStockWarehouseCode) || 0,
+        winmaxStockZoneId: this.restaurantData.winmaxStockZoneId || null,
+        winmaxStockFabricationDocType:
+          (this.restaurantData.winmaxStockFabricationDocType || 'M+').trim().toUpperCase() || 'M+',
         winmaxConfig: {
           ...this.restaurantData.winmaxConfig,
           terminal: this.restaurantData.winmaxConfig.terminal || null,
