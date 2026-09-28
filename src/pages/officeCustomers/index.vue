@@ -49,12 +49,21 @@ const resetSendEmail = ref(true)
 const resetCanEmail = computed(() => !!resetTarget.value?.email)
 
 // Winmax balances, loaded separately so the table renders immediately and a slow
-// or unavailable Winmax never blocks the list. Keyed by winmaxId.
-const balances = ref<Record<string, { balance: number | null; creditLimit: number | null; remaining: number | null }>>({})
+// or unavailable Winmax never blocks the list. Keyed by winmaxId. Winmax sign
+// convention: balance > 0 = the employee owes (amountDue), < 0 = prepaid.
+// creditBlocked = the backend refuses "On Credit" orders (amountDue >= creditLimit).
+type OfficePosition = {
+  balance: number | null
+  creditLimit: number | null
+  amountDue: number | null
+  prepaid: number | null
+  creditBlocked: boolean
+}
+const balances = ref<Record<string, OfficePosition>>({})
 const balancesLoading = ref(false)
 
 // Transaction-history modal (the entity's Winmax current-account statement),
-// opened by clicking a row's Credit cell. txRows null after load = Winmax
+// opened by clicking a row's Balance cell. txRows null after load = Winmax
 // unreachable (the backend fails open).
 const txTarget = ref<any>(null)
 const txLoading = ref(false)
@@ -66,7 +75,7 @@ const columns = defineVaDataTableColumns([
   { label: 'Email', key: 'email', sortable: true },
   { label: 'Office No', key: 'officeNo', sortable: true },
   { label: 'Office Phone', key: 'officePhone', sortable: false },
-  { label: 'Credit', key: 'balance', sortable: false, thAlign: 'right' },
+  { label: 'Balance', key: 'balance', sortable: false, thAlign: 'right' },
   { label: 'Status', key: 'isActive', sortable: false, thAlign: 'center' },
   { label: 'Actions', key: 'actions', sortable: false, thAlign: 'center' },
 ])
@@ -76,47 +85,51 @@ function formatBalance(v: number | null | undefined) {
   return `€${Number(v).toFixed(2)}`
 }
 
-// "€94.00 / €100" when a real limit is set (remaining of limit — remaining is
-// the prepaid balance alone when positive). A limit of 0/unset = UNLIMITED
-// (Winmax convention): show the raw balance. "—" while unknown.
-function formatCredit(row?: { balance: number | null; creditLimit: number | null; remaining: number | null }) {
-  if (!row) return '—'
-  if (row.creditLimit !== null && row.creditLimit !== 0 && row.remaining !== null) {
-    return `${formatBalance(row.remaining)} / €${row.creditLimit}`
-  }
-  return formatBalance(row.balance)
+// The employee's position, not "remaining credit": "Due €6.00" when they owe,
+// "Prepaid €10.00" when in advance, "€0.00" when settled, "—" while unknown
+// (Winmax unreachable). The credit limit is a rule, not money, so it is not
+// shown here. amountDue/prepaid come from the backend; an older backend that
+// only sends the balance still displays correctly.
+function formatPosition(row?: OfficePosition) {
+  if (!row || row.balance === null) return '—'
+  const cents = Math.round(row.balance * 100) // same whole-cent test as the backend rule
+  if (cents > 0) return `Due ${formatBalance(row.amountDue ?? row.balance)}`
+  if (cents < 0) return `Prepaid ${formatBalance(row.prepaid ?? -row.balance)}`
+  return formatBalance(0)
 }
 
-function creditIsLow(row?: { creditLimit: number | null; remaining: number | null; balance: number | null }) {
-  if (!row) return false
-  // Unlimited accounts never red out — a negative balance is just normal
-  // post-paid debt there, not "out of credit".
-  if (row.creditLimit === null || row.creditLimit === 0) return false
-  if (row.remaining !== null) return row.remaining <= 0
-  return (row.balance ?? 0) < 0
+// due = red, prepaid = green, settled/unknown = neutral.
+function positionClass(row?: OfficePosition) {
+  if (!row || row.balance === null) return 'text-slate-800'
+  const cents = Math.round(row.balance * 100)
+  if (cents > 0) return 'text-red-600 font-semibold'
+  if (cents < 0) return 'text-green-700 font-semibold'
+  return 'text-slate-800'
 }
 
-// One ready-made Credit cell per employee, rebuilt once when the balances arrive
-// (a single plain lookup per row instead of three reactive ones per cell).
-const EMPTY_CREDIT = {
-  text: formatCredit(),
-  low: false,
+// One ready-made Balance cell per employee, rebuilt once when the balances arrive
+// (plain lookups per row instead of reactive ones per cell).
+const EMPTY_POSITION = {
+  text: formatPosition(),
+  cls: positionClass(),
+  blocked: false,
   title: `Winmax balance: ${formatBalance(null)} — click for transactions`,
 }
-const creditCells = computed(() => {
-  const map: Record<string, { text: string; low: boolean; title: string }> = {}
+const positionCells = computed(() => {
+  const map: Record<string, { text: string; cls: string; blocked: boolean; title: string }> = {}
   for (const [id, b] of Object.entries(balances.value)) {
     map[id] = {
-      text: formatCredit(b),
-      low: creditIsLow(b),
+      text: formatPosition(b),
+      cls: positionClass(b),
+      blocked: b.creditBlocked,
       title: `Winmax balance: ${formatBalance(b.balance)} — click for transactions`,
     }
   }
   return map
 })
 
-function creditCell(winmaxId: unknown) {
-  return creditCells.value[String(winmaxId)] || EMPTY_CREDIT
+function positionCell(winmaxId: unknown) {
+  return positionCells.value[String(winmaxId)] || EMPTY_POSITION
 }
 
 const filteredItems = computed(() => {
@@ -173,12 +186,14 @@ async function getBalances() {
   balancesLoading.value = true
   try {
     const { data } = await axios.get(`${url}/customers/office/balances`, { params: { outletId: outletId.value } })
-    const map: Record<string, { balance: number | null; creditLimit: number | null; remaining: number | null }> = {}
+    const map: Record<string, OfficePosition> = {}
     for (const b of data?.data || []) {
       map[String(b.winmaxId)] = {
         balance: b.balance ?? null,
         creditLimit: b.creditLimit ?? null,
-        remaining: b.remaining ?? null,
+        amountDue: b.amountDue ?? null,
+        prepaid: b.prepaid ?? null,
+        creditBlocked: b.creditBlocked === true,
       }
     }
     balances.value = map
@@ -526,15 +541,23 @@ function formatTxAmount(v: number | null | undefined) {
           <template #cell(balance)="{ rowData }">
             <div class="text-right tabular-nums">
               <span v-if="balancesLoading" class="text-slate-400">…</span>
-              <span
-                v-else
-                class="cursor-pointer underline decoration-dotted underline-offset-2"
-                :title="creditCell(rowData.winmaxId).title"
-                :class="creditCell(rowData.winmaxId).low ? 'text-red-600 font-semibold' : 'text-slate-800'"
-                @click="openTransactions(rowData)"
-              >
-                {{ creditCell(rowData.winmaxId).text }}
-              </span>
+              <template v-else>
+                <span
+                  class="cursor-pointer underline decoration-dotted underline-offset-2"
+                  :title="positionCell(rowData.winmaxId).title"
+                  :class="positionCell(rowData.winmaxId).cls"
+                  @click="openTransactions(rowData)"
+                >
+                  {{ positionCell(rowData.winmaxId).text }}
+                </span>
+                <VaBadge
+                  v-if="positionCell(rowData.winmaxId).blocked"
+                  text="Limit reached"
+                  color="danger"
+                  class="ml-1"
+                  title="Amount due has reached the credit limit — 'On Credit' orders are refused"
+                />
+              </template>
             </div>
           </template>
           <template #cell(isActive)="{ rowData }">

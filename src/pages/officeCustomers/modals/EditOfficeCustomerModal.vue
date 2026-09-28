@@ -42,8 +42,8 @@
           label="Credit Limit (€)"
           type="number"
           min="0"
-          placeholder="e.g. 100 — empty = no site-side limit"
-          messages="Mirrors the Winmax credit limit; checkout blocks orders beyond limit + balance."
+          placeholder="e.g. 100 — empty or 0 = unlimited"
+          messages="'On Credit' orders are refused once the employee's amount due reaches this figure (the order amount is not counted). Never shown to employees."
         />
         <div class="flex items-center">
           <VaSwitch v-model="formData.isActive" label="Active" size="small" />
@@ -100,7 +100,7 @@ async function submit() {
       officeNo: formData.value.officeNo.trim(),
       officePhone: formData.value.officePhone.trim(),
       isActive: formData.value.isActive,
-      // empty input -> null = no site-side limit; otherwise a number >= 0
+      // empty input -> null = unlimited (0 means unlimited too); otherwise a number >= 0
       creditLimit:
         formData.value.creditLimit === '' || formData.value.creditLimit === null
           ? null
