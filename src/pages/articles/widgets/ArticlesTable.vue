@@ -109,8 +109,11 @@ const toggleZoneStock = async (rowData: any, zoneId: string, inStock: boolean) =
     } else {
       currentZones.push({ deliveryZoneId: zoneId, inStock })
     }
+    // Send NO quantities: a toggle must not overwrite counters that orders (or
+    // the Winmax stock sync) moved since this page was loaded — the backend
+    // keeps the current quantity of every entry sent without one.
     await axios.patch(`${url}/menuItems/${rowData._id}`, {
-      inStockByZones: currentZones,
+      inStockByZones: currentZones.map((z: any) => ({ deliveryZoneId: z.deliveryZoneId, inStock: z.inStock !== false })),
       outletId: serviceStore.selectedRest,
     })
     // Update the row data in-place so it stays in sync
@@ -217,8 +220,15 @@ const setZoneQuantity = async (rowData: any, zoneId: string, raw: string) => {
       currentZones.push({ deliveryZoneId: zoneId, inStock, quantity })
     }
 
+    // Only the edited zone carries a quantity; the other entries are sent
+    // without one so the backend keeps whatever they hold right now (orders and
+    // the Winmax stock sync may have moved them since this page was loaded).
     await axios.patch(`${url}/menuItems/${rowData._id}`, {
-      inStockByZones: currentZones,
+      inStockByZones: currentZones.map((z: any) =>
+        z.deliveryZoneId === zoneId
+          ? { deliveryZoneId: z.deliveryZoneId, inStock: z.inStock !== false, quantity }
+          : { deliveryZoneId: z.deliveryZoneId, inStock: z.inStock !== false },
+      ),
       outletId: serviceStore.selectedRest,
     })
     rowData.inStockByZones = currentZones
