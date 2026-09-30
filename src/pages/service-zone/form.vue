@@ -443,6 +443,44 @@
                   helper-text="Value of the points on the Winmax entity: 50 = 50 points are €1 of credit. Keep equal to the website's redemption rate."
                 />
               </div>
+              <!-- Daily stock reset: every morning at the set time (Cyprus time) the
+                   backend puts each article's per-zone quantity back to the last
+                   number entered in the Articles page stock column, minus the
+                   pre-orders already placed for that day; a zone never given a
+                   number keeps its stock as it is. Top-level outlet fields, sent
+                   only when changed; the last-reset fields are written by the
+                   backend only (switched on, or the time changed, after today's
+                   reset time: the backend marks today done, so the first reset
+                   is the next morning). Off = the outlet is untouched. -->
+              <div class="w-full mt-6">
+                <VaSwitch
+                  v-model="restaurantData.stockDailyReset"
+                  label="Daily stock reset"
+                  left-label
+                  size="small"
+                  class="whitespace-nowrap"
+                />
+                <div class="va-text-secondary text-xs mt-1">
+                  Each morning every item goes back to the last stock number you entered, minus the pre-orders for that
+                  day.
+                </div>
+              </div>
+              <div v-if="restaurantData.stockDailyReset" class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4">
+                <VaInput
+                  v-model="restaurantData.stockDailyResetTime"
+                  label="Reset Time"
+                  name="stockDailyResetTime"
+                  placeholder="05:00"
+                  :rules="[stockDailyResetTimeRule]"
+                  helper-text="Cyprus time, 24-hour HH:mm, before the first orders of the day (e.g. 05:00). Switched on or changed after today's time, the first reset is tomorrow."
+                />
+                <div class="va-text-secondary text-xs self-end pb-2">
+                  Last reset: {{ stockDailyResetSummary }}
+                  <span v-if="stockDailyResetErrorCount" class="text-danger" :title="stockDailyResetErrorText">
+                    — {{ stockDailyResetErrorCount }} error{{ stockDailyResetErrorCount === 1 ? '' : 's' }}
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mt-4">
@@ -660,6 +698,95 @@
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Public holidays + "refuse orders out of hours" (outlet level, all Cyprus
+                 time). A listed date = closed all day, whatever the Opening Times say;
+                 the list is pre-filled from the backend's Cyprus calendar and freely
+                 editable. Rows without a valid date are flagged and never sent. Both
+                 are top-level outlet fields sent only when changed, so every other
+                 outlet's save payload is exactly as before. The switch makes the
+                 server refuse online orders outside the Opening Times and on the
+                 listed dates (GOC); off = no server check. -->
+            <div class="w-full">
+              <div class="font-bold mb-1">Public holidays (closed all day):</div>
+              <div class="va-text-secondary text-xs mb-3">
+                Cyprus dates. On a listed date the outlet is closed all day, whatever the Opening Times above say.
+              </div>
+              <div
+                v-if="publicHolidayRows.length"
+                class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-2"
+              >
+                <div v-for="(holiday, index) in publicHolidayRows" :key="holiday._key || index">
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model="holiday.date"
+                      type="date"
+                      aria-label="Date"
+                      class="border border-1 h-8 w-[150px] shrink-0 px-2 rounded"
+                      @blur="sortPublicHolidays"
+                    />
+                    <!-- 80 = the backend's HOLIDAY_NAME_MAX: a longer name is a 400 that blocks the whole save. -->
+                    <input
+                      v-model="holiday.name"
+                      type="text"
+                      aria-label="Name"
+                      placeholder="Name, e.g. Christmas Day"
+                      maxlength="80"
+                      class="border border-1 h-8 flex-1 min-w-0 px-2 rounded"
+                    />
+                    <VaButton
+                      preset="primary"
+                      size="small"
+                      color="danger"
+                      icon="mso-delete"
+                      aria-label="Remove date"
+                      title="Remove date"
+                      @click="removePublicHoliday(holiday)"
+                    />
+                  </div>
+                  <div v-if="publicHolidayProblems[index]" class="text-danger text-xs mt-1">
+                    {{ publicHolidayProblems[index] }}
+                  </div>
+                </div>
+              </div>
+              <div v-else class="va-text-secondary text-xs">No dates listed.</div>
+              <div class="flex flex-wrap items-center gap-3 mt-3">
+                <VaButton preset="secondary" size="small" icon="mso-add" @click="addPublicHoliday">Add date</VaButton>
+                <VaButton
+                  preset="secondary"
+                  size="small"
+                  icon="mso-event"
+                  :loading="fillingPublicHolidays"
+                  @click="fillCyprusPublicHolidays"
+                >
+                  Fill Cyprus public holidays {{ publicHolidayFillYears.from }}–{{ publicHolidayFillYears.to }}
+                </VaButton>
+              </div>
+              <div class="mt-6">
+                <!-- Without usable Opening Times the server restricts nothing, so "on"
+                     would accept orders 24/7: the switch cannot be turned on then, but
+                     one already on stays clickable so it can be switched off (the save
+                     is blocked while it is on without hours). -->
+                <VaSwitch
+                  v-model="restaurantData.enforceOpeningTimes"
+                  label="Refuse online orders outside these hours and on public holidays"
+                  left-label
+                  size="small"
+                  :disabled="!restaurantData.enforceOpeningTimes && !!enforceOpeningTimesProblem"
+                />
+                <div
+                  v-if="enforceOpeningTimesHint"
+                  class="text-xs mt-1"
+                  :class="restaurantData.enforceOpeningTimes ? 'text-danger' : 'va-text-secondary'"
+                >
+                  {{ enforceOpeningTimesHint }}
+                </div>
+                <div class="va-text-secondary text-xs mt-1">
+                  On: the server refuses online orders outside the Opening Times above and on the listed dates (Cyprus
+                  time). Off: orders are not checked.
                 </div>
               </div>
             </div>
@@ -1383,6 +1510,78 @@ const OFFICE_PLACEHOLDER_LABELS = {
 // Category names are a string or { en, el } (see pages/categories).
 const categoryLabel = (name) =>
   typeof name === 'string' ? name : name?.en || Object.values(name || {}).find(Boolean) || ''
+// Daily stock reset time: "HH:mm" 00:00–23:59 (a single-digit hour is padded,
+// "5:00" -> "05:00"); null when not a valid time.
+const STOCK_DAILY_RESET_TIME_DEFAULT = '05:00'
+const normaliseResetTime = (value) => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(value ?? '').trim())
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return null
+  return `${m[1].padStart(2, '0')}:${m[2]}`
+}
+// Public holidays (closed all day): outlet.publicHolidays [{ date: 'YYYY-MM-DD', name }],
+// Cyprus calendar dates. A date is valid when it is a real day of 2000–2100.
+const isValidHolidayDate = (value) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? '').trim())
+  if (!m) return false
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  if (year < 2000 || year > 2100) return false
+  const d = new Date(Date.UTC(year, month - 1, day))
+  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day
+}
+// A form row: the stored { date, name } plus a local v-for key (never sent).
+let publicHolidayKeySeq = 0
+const publicHolidayRow = (holiday) => {
+  const date = String(holiday?.date ?? '').trim()
+  return {
+    date: /^\d{4}-\d{2}-\d{2}T/.test(date) ? date.slice(0, 10) : date,
+    name: String(holiday?.name ?? ''),
+    _key: `holiday-${++publicHolidayKeySeq}`,
+  }
+}
+// Form order: by date, rows without a valid date last (in the order they were added).
+const comparePublicHolidayRows = (a, b) => {
+  const aValid = isValidHolidayDate(a?.date)
+  const bValid = isValidHolidayDate(b?.date)
+  if (aValid !== bValid) return aValid ? -1 : 1
+  if (!aValid) return 0
+  return a.date.trim() < b.date.trim() ? -1 : a.date.trim() > b.date.trim() ? 1 : 0
+}
+// The list as the save sends it: valid dates only, names trimmed, one entry per
+// date (the first non-empty name wins), sorted by date.
+const cleanPublicHolidays = (rows) => {
+  const byDate = new Map()
+  const list = Array.isArray(rows) ? rows : []
+  list.forEach((row) => {
+    const date = String(row?.date ?? '').trim()
+    if (!isValidHolidayDate(date)) return
+    const name = String(row?.name ?? '').trim()
+    if (!byDate.has(date) || (!byDate.get(date) && name)) byDate.set(date, name)
+  })
+  return [...byDate.keys()].sort().map((date) => ({ date, name: byDate.get(date) }))
+}
+// This year in Cyprus (the "Fill Cyprus public holidays" range starts here).
+const cyprusYear = () => {
+  try {
+    const year = Number(
+      new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Nicosia', year: 'numeric' }).format(new Date()),
+    )
+    if (Number.isInteger(year)) return year
+  } catch {
+    // no Intl time zone data: fall back to the browser's year
+  }
+  return new Date().getFullYear()
+}
+// The backend's opening-hours rules (outletHours.ts): only these Opening Times
+// modes restrict anything, and a 'daily' window missing either time restricts
+// nothing — with "refuse online orders" on, either would accept orders 24/7.
+const OPENING_TIMES_MODES = ['daily', 'byDay', 'is24h']
+// A time the backend reads (its minutesOfDay): "H:mm" / "HH:mm" / "HH:mm:ss", up to 24:00.
+const isOpeningTimeOfDay = (value) => {
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(String(value ?? '').trim())
+  if (!m) return false
+  const [hours, minutes] = [Number(m[1]), Number(m[2])]
+  return minutes <= 59 && (hours < 24 || (hours === 24 && minutes === 0))
+}
 
 export default {
   components: {
@@ -1498,6 +1697,16 @@ export default {
       // create); the save sends only what differs from these.
       customerSettingsSnapshot: JSON.stringify(normaliseCustomerSettings(customerSettingsDefaults())),
       pushSettingsSnapshot: JSON.stringify(normalisePushSettings(pushSettingsDefaults())),
+      // Daily stock reset { stockDailyReset, stockDailyResetTime } as loaded (or
+      // defaulted on create); the save sends the pair only when it differs.
+      stockDailyResetSnapshot: JSON.stringify({
+        stockDailyReset: false,
+        stockDailyResetTime: STOCK_DAILY_RESET_TIME_DEFAULT,
+      }),
+      // { publicHolidays (cleaned), enforceOpeningTimes } as loaded (or defaulted
+      // on create); the save sends each only when it differs.
+      orderingHoursSnapshot: JSON.stringify({ publicHolidays: [], enforceOpeningTimes: false }),
+      fillingPublicHolidays: false,
       // [{ text, value }] of this outlet's live categories, for the
       // "New products category" select.
       newProductsCategoryOptions: [],
@@ -1581,6 +1790,16 @@ export default {
         winmaxStockFabricationDocType: 'M+',
         winmaxStockLastSyncAt: null,
         winmaxStockLastSyncError: '',
+        // Daily stock reset (top-level). LastDate / LastResult are written by
+        // the backend job only and shown read-only.
+        stockDailyReset: false,
+        stockDailyResetTime: STOCK_DAILY_RESET_TIME_DEFAULT,
+        stockDailyResetLastDate: '',
+        stockDailyResetLastResult: null,
+        // Public holidays (rows { date, name, _key }) and "refuse online orders
+        // outside the opening hours" (top-level, Cyprus time).
+        publicHolidays: [],
+        enforceOpeningTimes: false,
         // Strings default to '' rather than null: removeNulls() drops null keys
         // and empty objects, which would make the whole subdoc vanish from the
         // payload and blur "never configured" with "deliberately cleared".
@@ -1888,6 +2107,79 @@ export default {
         return []
       }
       return this.languages.filter((lang) => this.restaurantData.supportedLanguages.includes(lang.value))
+    },
+    /**
+     * "01/10/2026, 05:00:12 — 12 of 14 items reset, 3 pre-ordered portions
+     * subtracted" from stockDailyResetLastResult {at, items, reset, preOrdered,
+     * errors} (written by the backend job; the counts are numbers, an array is
+     * counted too); 'never' before the first run. stockDailyResetLastDate is
+     * the job's once-a-day claim, which the backend also sets when the reset
+     * is switched on after the day's reset time (no reset ran then), so it
+     * only stands in for a result without a readable time.
+     */
+    stockDailyResetSummary() {
+      const r = this.restaurantData.stockDailyResetLastResult
+      if (!r) return 'never'
+      const count = (v) => (Array.isArray(v) ? v.length : Number(v) || 0)
+      const at = r.at ? new Date(r.at) : null
+      const when =
+        at && !Number.isNaN(at.getTime()) ? at.toLocaleString() : this.restaurantData.stockDailyResetLastDate || ''
+      let text = when ? `${when} — ` : ''
+      text += `${count(r.reset)} of ${count(r.items)} item${count(r.items) === 1 ? '' : 's'} reset`
+      text += `, ${count(r.preOrdered)} pre-ordered portion${count(r.preOrdered) === 1 ? '' : 's'} subtracted`
+      return text
+    },
+    stockDailyResetErrorCount() {
+      const errors = this.restaurantData.stockDailyResetLastResult?.errors
+      return Array.isArray(errors) ? errors.length : Number(errors) || 0
+    },
+    stockDailyResetErrorText() {
+      const errors = this.restaurantData.stockDailyResetLastResult?.errors
+      if (!Array.isArray(errors)) return ''
+      return errors.map((e) => (typeof e === 'string' ? e : e?.message || JSON.stringify(e))).join('\n')
+    },
+    publicHolidayRows() {
+      return Array.isArray(this.restaurantData.publicHolidays) ? this.restaurantData.publicHolidays : []
+    },
+    /** Per row (same index): why it is not saved as it stands, or ''. */
+    publicHolidayProblems() {
+      const seen = new Set()
+      return this.publicHolidayRows.map((row) => {
+        const date = String(row?.date ?? '').trim()
+        if (!date) return 'No date — this row is not saved'
+        if (!isValidHolidayDate(date)) return 'Not a valid date — this row is not saved'
+        if (seen.has(date)) return 'Date listed twice — saved once'
+        seen.add(date)
+        return ''
+      })
+    },
+    publicHolidayFillYears() {
+      const from = cyprusYear()
+      return { from, to: from + 1 }
+    },
+    /**
+     * What the Opening Times lack for "refuse online orders" to mean anything,
+     * or '': no mode chosen, or 'daily' without both an opening and a closing
+     * time (the form keeps those in openingTime / closingTime).
+     */
+    enforceOpeningTimesProblem() {
+      const mode = String(this.restaurantData.openingTimes?.selected ?? '').trim()
+      if (!OPENING_TIMES_MODES.includes(mode)) return 'Set the Opening Times above first'
+      if (
+        mode === 'daily' &&
+        !(isOpeningTimeOfDay(this.restaurantData.openingTime) && isOpeningTimeOfDay(this.restaurantData.closingTime))
+      ) {
+        return 'Set the Opening Times above first (Daily needs an opening and a closing time)'
+      }
+      return ''
+    },
+    /** Helper under the switch: why it is disabled (off), or why the save is blocked (on). */
+    enforceOpeningTimesHint() {
+      const problem = this.enforceOpeningTimesProblem
+      if (!problem) return ''
+      return this.restaurantData.enforceOpeningTimes === true
+        ? `${problem}, or switch this off: the outlet cannot be saved while it is on without opening hours.`
+        : `${problem}.`
     },
   },
   watch: {
@@ -2324,6 +2616,21 @@ export default {
             res.winmaxStockFabricationDocType = res.winmaxStockFabricationDocType || 'M+'
             res.winmaxStockLastSyncAt = res.winmaxStockLastSyncAt || null
             res.winmaxStockLastSyncError = res.winmaxStockLastSyncError || ''
+            // Daily stock reset: outlets saved before these fields existed have no keys.
+            res.stockDailyReset = res.stockDailyReset === true
+            res.stockDailyResetTime = normaliseResetTime(res.stockDailyResetTime) || STOCK_DAILY_RESET_TIME_DEFAULT
+            res.stockDailyResetLastDate = res.stockDailyResetLastDate || ''
+            res.stockDailyResetLastResult =
+              res.stockDailyResetLastResult && typeof res.stockDailyResetLastResult === 'object'
+                ? res.stockDailyResetLastResult
+                : null
+            // Public holidays / enforce opening times: outlets saved before these
+            // fields existed have no keys (= no dates, not enforced).
+            res.publicHolidays = (Array.isArray(res.publicHolidays) ? res.publicHolidays : []).map((holiday) =>
+              publicHolidayRow(holiday),
+            )
+            res.publicHolidays.sort(comparePublicHolidayRows)
+            res.enforceOpeningTimes = res.enforceOpeningTimes === true
             // Outlets saved before smsSettings existed have no such key, and
             // `this.restaurantData = res` below replaces the defaults wholesale
             // — without this the v-models in the SMS card would throw.
@@ -2401,6 +2708,8 @@ export default {
           if (res) {
             this.loadStockZoneOptions()
             this.snapshotCustomerAppSettings()
+            this.snapshotStockDailyReset()
+            this.snapshotOrderingHours()
             this.fetchNewProductsCategories()
           }
           this.loading = false
@@ -2443,6 +2752,127 @@ export default {
       if (push.androidChannelId === '') delete push.androidChannelId
       if (Object.keys(push).length) patch.pushSettings = push
       return patch
+    },
+    /** VaInput rule of the daily stock reset time. */
+    stockDailyResetTimeRule(value) {
+      return normaliseResetTime(value) !== null || 'Enter a time as HH:mm, e.g. 05:00'
+    },
+    /** The daily stock reset pair as the save sends it (an invalid time keeps the stored one). */
+    currentStockDailyReset() {
+      const before = JSON.parse(this.stockDailyResetSnapshot || '{}')
+      return {
+        stockDailyReset: this.restaurantData.stockDailyReset === true,
+        stockDailyResetTime:
+          normaliseResetTime(this.restaurantData.stockDailyResetTime) ||
+          before.stockDailyResetTime ||
+          STOCK_DAILY_RESET_TIME_DEFAULT,
+      }
+    },
+    /** Re-taken after every load and every successful save, like the customer-app snapshot. */
+    snapshotStockDailyReset() {
+      this.stockDailyResetSnapshot = JSON.stringify(this.currentStockDailyReset())
+    },
+    /**
+     * `{ stockDailyReset, stockDailyResetTime }` when either changed since the
+     * snapshot, else `{}` — an outlet whose admin never touches the card saves
+     * exactly the payload it did before. Both keys ride together so the
+     * backend always holds an explicit time once the reset is switched on.
+     */
+    changedStockDailyReset() {
+      const current = this.currentStockDailyReset()
+      return JSON.stringify(current) === this.stockDailyResetSnapshot ? {} : current
+    },
+    /** Public holidays (cleaned) + enforceOpeningTimes as the save sends them. */
+    currentOrderingHours() {
+      return {
+        publicHolidays: cleanPublicHolidays(this.restaurantData.publicHolidays),
+        enforceOpeningTimes: this.restaurantData.enforceOpeningTimes === true,
+      }
+    },
+    /** Re-taken after every load and every successful save, like the stock reset snapshot. */
+    snapshotOrderingHours() {
+      this.orderingHoursSnapshot = JSON.stringify(this.currentOrderingHours())
+    },
+    /**
+     * `{ publicHolidays?, enforceOpeningTimes? }` — each key only when it
+     * differs from the snapshot, else `{}`: an outlet whose admin never touches
+     * the holidays list or the switch saves exactly the payload it did before.
+     * Attached after removeNulls, so clearing the whole list sends `[]`.
+     */
+    changedOrderingHours() {
+      const current = this.currentOrderingHours()
+      const before = JSON.parse(this.orderingHoursSnapshot || '{}')
+      const changed = {}
+      Object.keys(current).forEach((key) => {
+        if (JSON.stringify(current[key]) !== JSON.stringify(before[key])) changed[key] = current[key]
+      })
+      return changed
+    },
+    /**
+     * Save guard: false (with a toast) while "refuse online orders" is on but the
+     * Opening Times restrict nothing — saved like that the outlet would take
+     * orders 24/7. Switching it off always passes, so an outlet saved in that
+     * state can still be fixed either way.
+     */
+    enforceOpeningTimesSaveAllowed() {
+      if (this.restaurantData.enforceOpeningTimes !== true || !this.enforceOpeningTimesProblem) return true
+      this.init({
+        message: `Not saved: "Refuse online orders outside these hours" is on without opening hours. ${this.enforceOpeningTimesProblem}, or switch it off.`,
+        color: 'danger',
+      })
+      return false
+    },
+    /** Keeps the holiday rows in date order (rows without a valid date last). */
+    sortPublicHolidays() {
+      if (Array.isArray(this.restaurantData.publicHolidays)) {
+        this.restaurantData.publicHolidays.sort(comparePublicHolidayRows)
+      }
+    },
+    addPublicHoliday() {
+      if (!Array.isArray(this.restaurantData.publicHolidays)) this.restaurantData.publicHolidays = []
+      this.restaurantData.publicHolidays.push(publicHolidayRow({}))
+    },
+    removePublicHoliday(holiday) {
+      this.restaurantData.publicHolidays = this.publicHolidayRows.filter((row) => row !== holiday)
+    },
+    /**
+     * Merges the backend's Cyprus public holidays for this year and next into
+     * the list by date: rows already listed (and their names) are kept, only
+     * missing dates are added, then the list is re-sorted. Saved on Save.
+     */
+    async fillCyprusPublicHolidays() {
+      if (this.fillingPublicHolidays) return
+      this.fillingPublicHolidays = true
+      const { from, to } = this.publicHolidayFillYears
+      try {
+        const url = import.meta.env.VITE_API_BASE_URL
+        const res = await axios.get(`${url}/outlets/public-holidays/cyprus`, { params: { from, to } })
+        const holidays = res.data?.holidays ?? res.data?.data?.holidays
+        if (!Array.isArray(holidays)) throw new Error('Unexpected reply from the public holidays service')
+        if (!Array.isArray(this.restaurantData.publicHolidays)) this.restaurantData.publicHolidays = []
+        const rows = this.restaurantData.publicHolidays
+        const listed = new Set(rows.map((row) => String(row?.date ?? '').trim()))
+        let added = 0
+        holidays.forEach((holiday) => {
+          const date = String(holiday?.date ?? '').trim()
+          if (!isValidHolidayDate(date) || listed.has(date)) return
+          listed.add(date)
+          rows.push(publicHolidayRow({ date, name: String(holiday?.name ?? '').trim() }))
+          added += 1
+        })
+        this.sortPublicHolidays()
+        this.init({
+          message: added
+            ? `Added ${added} Cyprus public holiday${added === 1 ? '' : 's'} (${from}–${to}). Save to keep them.`
+            : `The Cyprus public holidays for ${from}–${to} are all listed already.`,
+          color: added ? 'success' : 'info',
+        })
+      } catch (e) {
+        const reason = e?.response?.data?.message || e?.message || 'request failed'
+        this.init({ message: `Could not load the Cyprus public holidays: ${reason}`, color: 'danger' })
+      } finally {
+        this.fillingPublicHolidays = false
+      }
     },
     /** This outlet's live categories -> options of the "New products category" select. */
     async fetchNewProductsCategories() {
@@ -2799,9 +3229,14 @@ export default {
     },
     async createRestaurant() {
       if (this.$refs.form.validate()) {
+        if (!this.enforceOpeningTimesSaveAllowed()) return
         const data = removeNulls(this.createPayload())
         // Customer-app settings only when the user touched them on the create form.
         Object.assign(data, this.changedCustomerAppSettings())
+        // Daily stock reset likewise (off / 05:00 = not sent).
+        Object.assign(data, this.changedStockDailyReset())
+        // Public holidays / enforce opening times likewise (none / off = not sent).
+        Object.assign(data, this.changedOrderingHours())
         const url = import.meta.env.VITE_API_BASE_URL
         console.log(url)
         try {
@@ -2818,12 +3253,18 @@ export default {
     },
     async updateRestaurant() {
       if (this.$refs.form.validate()) {
+        if (!this.enforceOpeningTimesSaveAllowed()) return
         const data = removeNulls(this.createPayload())
         const url = import.meta.env.VITE_API_BASE_URL
         delete data.name
         // Customer-app sub-documents ride along ONLY when changed, attached
         // after removeNulls so a `newProductsCategoryId: null` clear survives.
         Object.assign(data, this.changedCustomerAppSettings())
+        // Daily stock reset: the { stockDailyReset, stockDailyResetTime } pair
+        // only when changed (the last-reset fields are never sent).
+        Object.assign(data, this.changedStockDailyReset())
+        // Public holidays (cleaned) / enforceOpeningTimes: each only when changed.
+        Object.assign(data, this.changedOrderingHours())
 
         let response
         try {
@@ -2840,6 +3281,8 @@ export default {
         if (response.status === 200) {
           this.init({ message: "You've successfully updated outlet", color: 'success' })
           this.snapshotCustomerAppSettings()
+          this.snapshotStockDailyReset()
+          this.snapshotOrderingHours()
           if (this.$route.name === 'admin-update-outlet') {
             this.$router.push({ name: 'list' })
           }
