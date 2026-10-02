@@ -316,12 +316,17 @@
                   entity's current account as credit. The earn rate itself is set under Loyalty → Settings.
                 </div>
               </div>
-              <!-- Use Winmax for stock: Stella owns each article's per-zone quantity
-                   (Articles page → Stock); with this on, an entered quantity is pushed
-                   to Winmax as a fabrication document for the difference, and every
-                   5 minutes the Winmax warehouse stock is read back to deduct sales
-                   rung at the till. Top-level outlet fields (winmaxConfig is replaced
-                   wholesale on save). Off = the outlet is untouched. -->
+              <!-- Use Winmax for stock: with this on, a stock number typed on the
+                   Articles page (the article's quantity in the stock zone) is sent to
+                   Winmax as a manufacturing document (M+ / M-) for the difference —
+                   the article must be a composition set to Fabrication — and every
+                   minute the backend reads the Winmax warehouse stock from the
+                   outlet's own Winmax database and Stella's counter follows it. On
+                   needs a warehouse code, a stock zone and that database's name
+                   (winmaxSqlDatabase, the field the retail loyalty card below edits
+                   too): the save is refused without them. Top-level outlet fields
+                   (winmaxConfig is replaced wholesale on save); the last-sync fields
+                   are written by the backend only. Off = the outlet is untouched. -->
               <div v-if="restaurantData.pos == 'winmax'" class="w-full mt-6">
                 <VaSwitch
                   v-model="restaurantData.winmaxStockSync"
@@ -330,13 +335,16 @@
                   size="small"
                   class="whitespace-nowrap"
                 />
+                <div v-if="winmaxStockSyncHint" class="text-danger text-xs mt-1">
+                  {{ winmaxStockSyncHint }}
+                </div>
                 <div class="va-text-secondary text-xs mt-1">
-                  Keep the Articles page stock in step with Winmax: a quantity entered here is sent to Winmax as a
-                  fabrication document (only the difference — Winmax cannot be reset), and every 5 minutes sales rung at
-                  the Winmax till are deducted from the Stella quantity. Requires the articles to be configured as
-                  fabricated compositions in Winmax.
+                  Stock numbers typed on the Articles page are sent to Winmax (the item must be a composition set to
+                  Fabrication) and Stella follows Winmax's stock every minute.
                 </div>
               </div>
+              <!-- The hints here use `messages` (shown under the field): `helper-text`
+                   is not a Vuestic prop, so its text never reaches the screen. -->
               <div
                 v-if="restaurantData.pos == 'winmax' && restaurantData.winmaxStockSync"
                 class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4"
@@ -347,7 +355,8 @@
                   name="winmaxStockWarehouseCode"
                   type="number"
                   placeholder="e.g. 1"
-                  helper-text="The Winmax warehouse whose stock this outlet sells from (the service zone's warehouse in Winmax). Required."
+                  required-mark
+                  messages="The Winmax warehouse whose stock this outlet sells from (the service zone's warehouse in Winmax). Required."
                 />
                 <VaSelect
                   v-model="restaurantData.winmaxStockZoneId"
@@ -356,18 +365,28 @@
                   :track-by="(option) => option.value"
                   :value-by="(option) => option.value"
                   placeholder="Choose the delivery zone"
-                  helper-text="The Stella delivery zone whose stock column mirrors that warehouse (e.g. Online). Required."
+                  required-mark
+                  messages="The Stella delivery zone whose stock column mirrors that warehouse (e.g. Online). Required."
                 />
-                <VaInput
-                  v-model="restaurantData.winmaxStockFabricationDocType"
-                  label="Fabrication Document Type"
-                  name="winmaxStockFabricationDocType"
-                  placeholder="M+"
-                  helper-text="Winmax document type posted when a quantity is entered (M+ = Manufacturing - In)."
-                />
-                <div class="va-text-secondary text-xs self-end pb-2">
-                  Last sync:
-                  {{ restaurantData.winmaxStockLastSyncAt ? new Date(restaurantData.winmaxStockLastSyncAt).toLocaleString() : 'never' }}
+                <!-- The same outlet field as "Winmax Database" under Winmax retail
+                     loyalty (one database per outlet); its own `name` here because
+                     both inputs are on screen when both switches are on. -->
+                <div class="w-full">
+                  <VaInput
+                    v-model="restaurantData.winmaxSqlDatabase"
+                    label="Winmax Database"
+                    name="winmaxStockSqlDatabase"
+                    class="w-full"
+                    :placeholder="`e.g. ${winmaxStockExpectedDatabase || 'Winmax4_Test'}`"
+                    required-mark
+                    messages="This outlet's own database on the Winmax SQL server: Winmax4_ followed by the Company above. Stella reads the stock from it. Required."
+                  />
+                  <div v-if="winmaxStockDatabaseWarning" class="text-danger text-xs mt-1">
+                    {{ winmaxStockDatabaseWarning }}
+                  </div>
+                </div>
+                <div class="va-text-secondary text-xs md:col-span-2">
+                  Last sync: {{ winmaxStockLastSyncText }}
                   <span v-if="restaurantData.winmaxStockLastSyncError" class="text-danger">
                     — {{ restaurantData.winmaxStockLastSyncError }}
                   </span>
@@ -1582,6 +1601,12 @@ const isOpeningTimeOfDay = (value) => {
   const [hours, minutes] = [Number(m[1]), Number(m[2])]
   return minutes <= 59 && (hours < 24 || (hours === 24 && minutes === 0))
 }
+// "Use Winmax for stock": a database name the backend can open at all
+// (winmaxSql.service) — letters, digits and underscore.
+const WINMAX_DATABASE_NAME = /^[A-Za-z0-9_]+$/
+// 'a', 'a and b', 'a, b and c'.
+const joinWithAnd = (parts) =>
+  parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 
 export default {
   components: {
@@ -1783,13 +1808,17 @@ export default {
         winmaxRetailLoyaltyRedeemArticleCode: '',
         winmaxRetailLoyaltyPointsPerCreditEuro: 50,
         // Use Winmax for stock (top-level for the same reason). The zone is the
-        // delivery zone _id whose stock column mirrors the Winmax warehouse.
+        // delivery zone _id whose stock column mirrors the Winmax warehouse; the
+        // card also edits winmaxSqlDatabase above. The document type has no
+        // input any more and goes back as loaded; the LastSync* fields are
+        // written by the backend job only and shown read-only.
         winmaxStockSync: false,
         winmaxStockWarehouseCode: 0,
         winmaxStockZoneId: '',
         winmaxStockFabricationDocType: 'M+',
         winmaxStockLastSyncAt: null,
         winmaxStockLastSyncError: '',
+        winmaxStockLastSyncSummary: '',
         // Daily stock reset (top-level). LastDate / LastResult are written by
         // the backend job only and shown read-only.
         stockDailyReset: false,
@@ -2107,6 +2136,69 @@ export default {
         return []
       }
       return this.languages.filter((lang) => this.restaurantData.supportedLanguages.includes(lang.value))
+    },
+    /**
+     * "Use Winmax for stock": the database name the backend expects for this
+     * outlet — "Winmax4_" + its Winmax company — or '' without a company.
+     */
+    winmaxStockExpectedDatabase() {
+      const company = String(this.restaurantData.winmaxConfig?.company ?? '').trim()
+      return company ? `Winmax4_${company}` : ''
+    },
+    /**
+     * Red line under the card's Winmax Database input, or '': the backend only
+     * syncs against the outlet's own company database (any letter case) and
+     * leaves the outlet idle on another name. A warning, not a save guard.
+     */
+    winmaxStockDatabaseWarning() {
+      const database = String(this.restaurantData.winmaxSqlDatabase ?? '').trim()
+      const expected = this.winmaxStockExpectedDatabase
+      if (!expected || !WINMAX_DATABASE_NAME.test(database)) return ''
+      if (database.toLowerCase() === expected.toLowerCase()) return ''
+      return `Not the database of this outlet's Winmax company (${expected}): the stock sync stays idle until the two match.`
+    },
+    /**
+     * "02/10/2026, 14:03:11 — 8 items: 6 in sync, 2 not Fabrication in Winmax
+     * (A-040, A-044)": when the stock sync last ran through
+     * (winmaxStockLastSyncAt; 'never' before the first time) and the backend's
+     * one-line summary of it (winmaxStockLastSyncSummary — absent until the
+     * backend writes one). The last error is shown after it, in red.
+     */
+    winmaxStockLastSyncText() {
+      const at = this.restaurantData.winmaxStockLastSyncAt ? new Date(this.restaurantData.winmaxStockLastSyncAt) : null
+      const when = at && !Number.isNaN(at.getTime()) ? at.toLocaleString() : 'never'
+      const summary = this.restaurantData.winmaxStockLastSyncSummary
+      return typeof summary === 'string' && summary.trim() ? `${when} — ${summary.trim()}` : when
+    },
+    /**
+     * What "Use Winmax for stock" still lacks to be saved switched on, or '':
+     * without a warehouse code, a stock zone and the outlet's Winmax database
+     * name the backend leaves the outlet idle. Only while the switch is on and
+     * its card is on screen (POS = Winmax).
+     */
+    winmaxStockSyncProblem() {
+      if (this.restaurantData.pos !== 'winmax' || this.restaurantData.winmaxStockSync !== true) return ''
+      const missing = []
+      if (!(Number(this.restaurantData.winmaxStockWarehouseCode) > 0)) missing.push('the Winmax warehouse code')
+      if (!this.restaurantData.winmaxStockZoneId) {
+        missing.push(
+          this.stockZoneOptions.length
+            ? 'the stock zone'
+            : 'the stock zone (none to choose from yet: add a delivery zone to this outlet first)',
+        )
+      }
+      const database = String(this.restaurantData.winmaxSqlDatabase ?? '').trim()
+      if (!database) {
+        missing.push('the Winmax database name')
+      } else if (!WINMAX_DATABASE_NAME.test(database)) {
+        missing.push('a valid Winmax database name (letters, digits and underscore only)')
+      }
+      return joinWithAnd(missing)
+    },
+    /** Red helper under the switch while it is on with something missing: why the save is blocked. */
+    winmaxStockSyncHint() {
+      const problem = this.winmaxStockSyncProblem
+      return problem ? `Still needed below: ${problem}. Until then the outlet cannot be saved with this switch on.` : ''
     },
     /**
      * "01/10/2026, 05:00:12 — 12 of 14 items reset, 3 pre-ordered portions
@@ -2616,6 +2708,8 @@ export default {
             res.winmaxStockFabricationDocType = res.winmaxStockFabricationDocType || 'M+'
             res.winmaxStockLastSyncAt = res.winmaxStockLastSyncAt || null
             res.winmaxStockLastSyncError = res.winmaxStockLastSyncError || ''
+            res.winmaxStockLastSyncSummary =
+              typeof res.winmaxStockLastSyncSummary === 'string' ? res.winmaxStockLastSyncSummary : ''
             // Daily stock reset: outlets saved before these fields existed have no keys.
             res.stockDailyReset = res.stockDailyReset === true
             res.stockDailyResetTime = normaliseResetTime(res.stockDailyResetTime) || STOCK_DAILY_RESET_TIME_DEFAULT
@@ -2822,6 +2916,21 @@ export default {
       })
       return false
     },
+    /**
+     * Save guard: false (with a toast) while "Use Winmax for stock" is on without
+     * a warehouse code, a stock zone or a usable Winmax database name — saved
+     * like that the backend would leave the outlet idle. Switching it off always
+     * passes, and an outlet with it off is never checked: its save is as before.
+     */
+    winmaxStockSyncSaveAllowed() {
+      const problem = this.winmaxStockSyncProblem
+      if (!problem) return true
+      this.init({
+        message: `Not saved: "Use Winmax for stock" is on without ${problem}. Fill that in under the switch, or switch it off.`,
+        color: 'danger',
+      })
+      return false
+    },
     /** Keeps the holiday rows in date order (rows without a valid date last). */
     sortPublicHolidays() {
       if (Array.isArray(this.restaurantData.publicHolidays)) {
@@ -2945,7 +3054,8 @@ export default {
         winmaxRetailLoyaltyRedeemArticleCode: (this.restaurantData.winmaxRetailLoyaltyRedeemArticleCode || '').trim(),
         winmaxRetailLoyaltyPointsPerCreditEuro:
           Number(this.restaurantData.winmaxRetailLoyaltyPointsPerCreditEuro) || 50,
-        // Use Winmax for stock (last-sync fields are written by the backend job only)
+        // Use Winmax for stock (last-sync fields are written by the backend job
+        // only; the document type has no input any more and goes back as loaded)
         winmaxStockSync: this.restaurantData.winmaxStockSync === true,
         winmaxStockWarehouseCode: Number(this.restaurantData.winmaxStockWarehouseCode) || 0,
         winmaxStockZoneId: this.restaurantData.winmaxStockZoneId || null,
@@ -3230,6 +3340,7 @@ export default {
     async createRestaurant() {
       if (this.$refs.form.validate()) {
         if (!this.enforceOpeningTimesSaveAllowed()) return
+        if (!this.winmaxStockSyncSaveAllowed()) return
         const data = removeNulls(this.createPayload())
         // Customer-app settings only when the user touched them on the create form.
         Object.assign(data, this.changedCustomerAppSettings())
@@ -3254,6 +3365,7 @@ export default {
     async updateRestaurant() {
       if (this.$refs.form.validate()) {
         if (!this.enforceOpeningTimesSaveAllowed()) return
+        if (!this.winmaxStockSyncSaveAllowed()) return
         const data = removeNulls(this.createPayload())
         const url = import.meta.env.VITE_API_BASE_URL
         delete data.name
