@@ -250,6 +250,59 @@
                   the pre-orders already waiting to the new times.
                 </div>
               </div>
+              <!-- Skip tables still in use: before the zone counter hands a paid
+                   order its table number, the backend passes over the numbers of
+                   its own orders that have not reached the kitchen yet and the
+                   tables open at the till right now (one read of this outlet's
+                   Winmax database, so that half needs the Winmax Database field
+                   below). For a zone with few tables and many orders a day, where
+                   a number comes round again while its table is still open.
+                   Top-level outlet field sent only when changed: absent = off, so
+                   an outlet left alone never gets the key and its counter runs
+                   exactly as before. -->
+              <div v-if="restaurantData.pos == 'winmax'" class="w-full mt-4">
+                <VaSwitch
+                  v-model="restaurantData.skipTablesInUse"
+                  label="Table numbers: skip tables still in use"
+                  left-label
+                  size="small"
+                  class="whitespace-nowrap"
+                />
+                <!-- A hint, not a save guard: without a database the backend may
+                     read, the Stella half still works, and the field may be
+                     filled later. -->
+                <div v-if="skipTablesInUseHint" class="text-danger text-xs mt-1">
+                  {{ skipTablesInUseHint }}
+                </div>
+                <div class="va-text-secondary text-xs mt-1">
+                  Before a table number is handed out, Stella passes over the numbers of its own orders that have not
+                  reached the kitchen yet and the tables open at the till right now (read from this outlet's Winmax
+                  database — needs the Winmax Database field below). For a zone with few tables and many orders a day,
+                  where a number comes round again while its table is still open.
+                </div>
+                <!-- The same outlet field as "Winmax Database" in the stock and
+                     retail loyalty cards below (one database per outlet). Shown
+                     here only while neither of those cards is on screen, so the
+                     field the hints point at is always somewhere on the page and
+                     never twice; its own `name` like theirs. -->
+                <div
+                  v-if="
+                    restaurantData.skipTablesInUse &&
+                    !restaurantData.winmaxStockSync &&
+                    !restaurantData.winmaxRetailLoyalty
+                  "
+                  class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4"
+                >
+                  <VaInput
+                    v-model="restaurantData.winmaxSqlDatabase"
+                    label="Winmax Database"
+                    name="winmaxSkipTablesSqlDatabase"
+                    class="w-full"
+                    :placeholder="`e.g. ${winmaxStockExpectedDatabase || 'Winmax4_Test'}`"
+                    messages="This outlet's own database on the Winmax SQL server: Winmax4_ followed by the Company above. Stella reads the tables open at the till from it."
+                  />
+                </div>
+              </div>
               <div
                 v-if="restaurantData.pos == 'winmax' && restaurantData.posSalesMode === 'document'"
                 class="w-full mt-4"
@@ -1769,6 +1822,9 @@ export default {
       // futureOrderDispatch as loaded (or defaulted on create); the save sends
       // it only when it differs.
       futureOrderDispatchSnapshot: 'pickupLead',
+      // skipTablesInUse as loaded (or defaulted on create); the save sends it
+      // only when it differs.
+      skipTablesInUseSnapshot: false,
       fillingPublicHolidays: false,
       // [{ text, value }] of this outlet's live categories, for the
       // "New products category" select.
@@ -1832,6 +1888,9 @@ export default {
         // When pre-orders go to Winmax (top-level for the same reason); sent
         // only when changed, so an outlet left on "pickupLead" never gets the key.
         futureOrderDispatch: 'pickupLead',
+        // Table numbers pass over tables still in use (top-level for the same
+        // reason); sent only when changed, so an outlet left off never gets the key.
+        skipTablesInUse: false,
         // Stella POS receipt (printed by the handheld; '' / '' / '' = none)
         posReceiptHeader: '',
         posReceiptFooter: '',
@@ -2187,16 +2246,50 @@ export default {
       return company ? `Winmax4_${company}` : ''
     },
     /**
+     * The database name the backend expects when the stored Winmax Database is
+     * a well-formed name but another company's, else '' (no company, an empty
+     * or malformed name, or a match in any letter case). The one rule for every
+     * SQL read of the outlet's database (backend winmaxStock.math
+     * winmaxDatabaseProblem): the stock sync and the table counter's read of
+     * the tables open at the till. Switch-neutral — each card words its own
+     * warning from it.
+     */
+    winmaxDatabaseMismatch() {
+      const database = String(this.restaurantData.winmaxSqlDatabase ?? '').trim()
+      const expected = this.winmaxStockExpectedDatabase
+      if (!expected || !WINMAX_DATABASE_NAME.test(database)) return ''
+      return database.toLowerCase() === expected.toLowerCase() ? '' : expected
+    },
+    /**
      * Red line under the card's Winmax Database input, or '': the backend only
      * syncs against the outlet's own company database (any letter case) and
      * leaves the outlet idle on another name. A warning, not a save guard.
      */
     winmaxStockDatabaseWarning() {
-      const database = String(this.restaurantData.winmaxSqlDatabase ?? '').trim()
-      const expected = this.winmaxStockExpectedDatabase
-      if (!expected || !WINMAX_DATABASE_NAME.test(database)) return ''
-      if (database.toLowerCase() === expected.toLowerCase()) return ''
+      const expected = this.winmaxDatabaseMismatch
+      if (!expected) return ''
       return `Not the database of this outlet's Winmax company (${expected}): the stock sync stays idle until the two match.`
+    },
+    /**
+     * Red line under "Table numbers: skip tables still in use" while it is on,
+     * or '': why the backend would not read the tables open at the till — no
+     * Winmax Database, a name it cannot open, no Winmax company, or another
+     * company's database (the same four refusals as winmaxDatabaseProblem) —
+     * and what that costs: only Stella's own orders are passed over then. A
+     * warning, not a save guard: the Stella half works without it.
+     */
+    skipTablesInUseHint() {
+      if (this.restaurantData.pos !== 'winmax' || this.restaurantData.skipTablesInUse !== true) return ''
+      const database = String(this.restaurantData.winmaxSqlDatabase ?? '').trim()
+      const cost = "only Stella's own orders are passed over — tables the till opened by hand are not seen."
+      if (!database) return `Without the Winmax Database field ${cost}`
+      if (!WINMAX_DATABASE_NAME.test(database)) {
+        return `"${database}" is not a database name Stella can open (letters, digits and underscore only): ${cost}`
+      }
+      if (!this.winmaxStockExpectedDatabase) return `Without the Company field above ${cost}`
+      const expected = this.winmaxDatabaseMismatch
+      if (expected) return `Not the database of this outlet's Winmax company (${expected}): ${cost}`
+      return ''
     },
     /**
      * "02/10/2026, 14:03:11 — 8 items: 6 in sync, 2 not Fabrication in Winmax
@@ -2729,6 +2822,9 @@ export default {
             // Pre-order dispatch: outlets saved before the field existed have no
             // key; absent (or anything else) means the historical "before pickup".
             res.futureOrderDispatch = res.futureOrderDispatch === 'paidOrOpening' ? 'paidOrOpening' : 'pickupLead'
+            // Skip tables still in use: outlets saved before the field existed
+            // have no key; absent (or anything but true) means off.
+            res.skipTablesInUse = res.skipTablesInUse === true
             res.posReceiptHeader = res.posReceiptHeader || ''
             res.posReceiptFooter = res.posReceiptFooter || ''
             res.posReceiptVatPercent =
@@ -2849,6 +2945,7 @@ export default {
             this.snapshotStockDailyReset()
             this.snapshotOrderingHours()
             this.snapshotFutureOrderDispatch()
+            this.snapshotSkipTablesInUse()
             this.fetchNewProductsCategories()
           }
           this.loading = false
@@ -2964,6 +3061,24 @@ export default {
     changedFutureOrderDispatch() {
       const current = this.currentFutureOrderDispatch()
       return current === this.futureOrderDispatchSnapshot ? {} : { futureOrderDispatch: current }
+    },
+    /** "Skip tables still in use" as the save sends it (anything but true is off). */
+    currentSkipTablesInUse() {
+      return this.restaurantData.skipTablesInUse === true
+    },
+    /** Re-taken after every load and every successful save, like the pre-order dispatch snapshot. */
+    snapshotSkipTablesInUse() {
+      this.skipTablesInUseSnapshot = this.currentSkipTablesInUse()
+    },
+    /**
+     * `{ skipTablesInUse }` when the switch changed since the snapshot, else `{}`:
+     * an outlet whose admin never touches it saves exactly the payload it did
+     * before, so other brands' saved outlets never get the key (the backend
+     * reads a missing key as off and hands out table numbers as it always has).
+     */
+    changedSkipTablesInUse() {
+      const current = this.currentSkipTablesInUse()
+      return current === this.skipTablesInUseSnapshot ? {} : { skipTablesInUse: current }
     },
     /**
      * Save guard: false (with a toast) while "refuse online orders" is on but the
@@ -3413,6 +3528,8 @@ export default {
         Object.assign(data, this.changedOrderingHours())
         // Pre-order dispatch likewise ("before pickup" = not sent).
         Object.assign(data, this.changedFutureOrderDispatch())
+        // Skip tables still in use likewise (off = not sent).
+        Object.assign(data, this.changedSkipTablesInUse())
         const url = import.meta.env.VITE_API_BASE_URL
         console.log(url)
         try {
@@ -3445,6 +3562,9 @@ export default {
         // Pre-order dispatch: only when changed (the backend then reschedules
         // this outlet's waiting pre-orders).
         Object.assign(data, this.changedFutureOrderDispatch())
+        // Skip tables still in use: only when changed, so other brands' saved
+        // outlets never get the key.
+        Object.assign(data, this.changedSkipTablesInUse())
 
         let response
         try {
@@ -3464,6 +3584,7 @@ export default {
           this.snapshotStockDailyReset()
           this.snapshotOrderingHours()
           this.snapshotFutureOrderDispatch()
+          this.snapshotSkipTablesInUse()
           if (this.$route.name === 'admin-update-outlet') {
             this.$router.push({ name: 'list' })
           }
