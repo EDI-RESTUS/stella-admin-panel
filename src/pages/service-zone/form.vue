@@ -223,6 +223,33 @@
                   helper-text="Winmax document type code used for sales (Invoice/Receipt). A delivery zone (shop) can override it with its own type."
                 />
               </div>
+              <!-- Pre-order dispatch: when a paid order for later (orderFor
+                   "future") is sent to Winmax. "Before pickup" is the historical
+                   rule (pickup time minus the delivery zone's lead time); the
+                   other sends today's pre-orders at once, like a normal order
+                   (the ticket keeps its FUTURE line and pickup time), and a later
+                   day's at this outlet's opening time on that day (Opening Times,
+                   Cyprus time). Top-level outlet field sent only when changed:
+                   absent = before pickup, so an outlet left alone never gets the
+                   key. Changing it also moves the pre-orders already waiting. -->
+              <div v-if="restaurantData.pos == 'winmax'" class="w-full mt-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+                  <VaSelect
+                    v-model="restaurantData.futureOrderDispatch"
+                    label="Send pre-orders to Winmax"
+                    :options="futureOrderDispatchModes"
+                    :track-by="(option) => option.value"
+                    :value-by="(option) => option.value"
+                  />
+                </div>
+                <div class="va-text-secondary text-xs mt-1">
+                  Before pickup: a pre-order reaches the kitchen the zone's lead time before its pickup time (as today).
+                  Same day / later days: a pre-order for today is sent the moment it is paid, like a normal order, with
+                  its FUTURE line and pickup time on the ticket; one for a later day is sent at this outlet's opening
+                  time on that day (Opening Times, Cyprus time; a day without hours uses the lead time). Switching moves
+                  the pre-orders already waiting to the new times.
+                </div>
+              </div>
               <div
                 v-if="restaurantData.pos == 'winmax' && restaurantData.posSalesMode === 'document'"
                 class="w-full mt-4"
@@ -1636,6 +1663,13 @@ export default {
       { text: 'Table orders (kitchen requests)', value: 'table' },
       { text: 'Sales documents (retail POS, no tables)', value: 'document' },
     ]
+    // When a paid pre-order (orderFor "future") is sent to Winmax
+    // (outlet.futureOrderDispatch) — absent means "pickupLead", the historical
+    // rule: the pickup time minus the delivery zone's lead time.
+    const futureOrderDispatchModes = [
+      { text: "Before pickup (the zone's lead time)", value: 'pickupLead' },
+      { text: 'Same day: when paid; later days: at opening time', value: 'paidOrOpening' },
+    ]
     const loyaltyTriggerOptions = [
       { text: 'On order (Winmax dispatch)', value: 'order' },
       { text: 'On delivery (delivery-system callback)', value: 'delivered' },
@@ -1707,6 +1741,7 @@ export default {
       languages,
       loyaltyTriggerOptions,
       posSalesModes,
+      futureOrderDispatchModes,
       t,
       androidChannelIdRule,
       senderNameRule,
@@ -1731,6 +1766,9 @@ export default {
       // { publicHolidays (cleaned), enforceOpeningTimes } as loaded (or defaulted
       // on create); the save sends each only when it differs.
       orderingHoursSnapshot: JSON.stringify({ publicHolidays: [], enforceOpeningTimes: false }),
+      // futureOrderDispatch as loaded (or defaulted on create); the save sends
+      // it only when it differs.
+      futureOrderDispatchSnapshot: 'pickupLead',
       fillingPublicHolidays: false,
       // [{ text, value }] of this outlet's live categories, for the
       // "New products category" select.
@@ -1791,6 +1829,9 @@ export default {
         posSalesMode: 'table',
         posSaleDocumentTypeCode: '',
         posQuickMenuOffers: false,
+        // When pre-orders go to Winmax (top-level for the same reason); sent
+        // only when changed, so an outlet left on "pickupLead" never gets the key.
+        futureOrderDispatch: 'pickupLead',
         // Stella POS receipt (printed by the handheld; '' / '' / '' = none)
         posReceiptHeader: '',
         posReceiptFooter: '',
@@ -2685,6 +2726,9 @@ export default {
             res.posSalesMode = res.posSalesMode === 'document' ? 'document' : 'table'
             res.posSaleDocumentTypeCode = res.posSaleDocumentTypeCode || ''
             res.posQuickMenuOffers = res.posQuickMenuOffers === true
+            // Pre-order dispatch: outlets saved before the field existed have no
+            // key; absent (or anything else) means the historical "before pickup".
+            res.futureOrderDispatch = res.futureOrderDispatch === 'paidOrOpening' ? 'paidOrOpening' : 'pickupLead'
             res.posReceiptHeader = res.posReceiptHeader || ''
             res.posReceiptFooter = res.posReceiptFooter || ''
             res.posReceiptVatPercent =
@@ -2804,6 +2848,7 @@ export default {
             this.snapshotCustomerAppSettings()
             this.snapshotStockDailyReset()
             this.snapshotOrderingHours()
+            this.snapshotFutureOrderDispatch()
             this.fetchNewProductsCategories()
           }
           this.loading = false
@@ -2901,6 +2946,24 @@ export default {
         if (JSON.stringify(current[key]) !== JSON.stringify(before[key])) changed[key] = current[key]
       })
       return changed
+    },
+    /** The pre-order dispatch rule as the save sends it (anything but "paidOrOpening" is "pickupLead"). */
+    currentFutureOrderDispatch() {
+      return this.restaurantData.futureOrderDispatch === 'paidOrOpening' ? 'paidOrOpening' : 'pickupLead'
+    },
+    /** Re-taken after every load and every successful save, like the ordering-hours snapshot. */
+    snapshotFutureOrderDispatch() {
+      this.futureOrderDispatchSnapshot = this.currentFutureOrderDispatch()
+    },
+    /**
+     * `{ futureOrderDispatch }` when the select changed since the snapshot, else
+     * `{}`: an outlet whose admin never touches it saves exactly the payload it
+     * did before (the backend reads a missing key as "pickupLead", and a changed
+     * value makes it move the pre-orders already waiting in the Winmax queue).
+     */
+    changedFutureOrderDispatch() {
+      const current = this.currentFutureOrderDispatch()
+      return current === this.futureOrderDispatchSnapshot ? {} : { futureOrderDispatch: current }
     },
     /**
      * Save guard: false (with a toast) while "refuse online orders" is on but the
@@ -3348,6 +3411,8 @@ export default {
         Object.assign(data, this.changedStockDailyReset())
         // Public holidays / enforce opening times likewise (none / off = not sent).
         Object.assign(data, this.changedOrderingHours())
+        // Pre-order dispatch likewise ("before pickup" = not sent).
+        Object.assign(data, this.changedFutureOrderDispatch())
         const url = import.meta.env.VITE_API_BASE_URL
         console.log(url)
         try {
@@ -3377,6 +3442,9 @@ export default {
         Object.assign(data, this.changedStockDailyReset())
         // Public holidays (cleaned) / enforceOpeningTimes: each only when changed.
         Object.assign(data, this.changedOrderingHours())
+        // Pre-order dispatch: only when changed (the backend then reschedules
+        // this outlet's waiting pre-orders).
+        Object.assign(data, this.changedFutureOrderDispatch())
 
         let response
         try {
@@ -3395,6 +3463,7 @@ export default {
           this.snapshotCustomerAppSettings()
           this.snapshotStockDailyReset()
           this.snapshotOrderingHours()
+          this.snapshotFutureOrderDispatch()
           if (this.$route.name === 'admin-update-outlet') {
             this.$router.push({ name: 'list' })
           }
