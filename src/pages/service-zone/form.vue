@@ -560,8 +560,15 @@
                   class="whitespace-nowrap"
                 />
                 <div class="va-text-secondary text-xs mt-1">
-                  Each morning every item goes back to the last stock number you entered, minus the pre-orders for that
-                  day.
+                  Each day at the reset time the counters go back to the kitchen's last entry minus that day's
+                  pre-orders. A pre-order for a later day takes nothing from today's counter: the website's day tabs
+                  show each later day's own number (the kitchen's last entry minus that day's pre-orders) and the
+                  counter takes it at that day's reset. A number typed between the reset time and the day's closing time
+                  is today's stock (today's pre-orders still to be collected are deducted from it); typed after closing,
+                  or on a closed day, it is the next open day's stock. Until the next day's number is typed, the last
+                  number typed stands in for it. Needs the Opening Times below for the closing time; without them every
+                  entry counts as today's. An item follows these rules once its number has been typed while this switch
+                  is on; until then it is checked and taken when the order is placed, as before.
                 </div>
               </div>
               <div v-if="restaurantData.stockDailyReset" class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4">
