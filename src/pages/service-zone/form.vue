@@ -223,6 +223,86 @@
                   helper-text="Winmax document type code used for sales (Invoice/Receipt). A delivery zone (shop) can override it with its own type."
                 />
               </div>
+              <!-- Pre-order dispatch: when a paid order for later (orderFor
+                   "future") is sent to Winmax. "Before pickup" is the historical
+                   rule (pickup time minus the delivery zone's lead time); the
+                   other sends today's pre-orders at once, like a normal order
+                   (the ticket keeps its FUTURE line and pickup time), and a later
+                   day's at this outlet's opening time on that day (Opening Times,
+                   Cyprus time). Top-level outlet field sent only when changed:
+                   absent = before pickup, so an outlet left alone never gets the
+                   key. Changing it also moves the pre-orders already waiting. -->
+              <div v-if="restaurantData.pos == 'winmax'" class="w-full mt-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+                  <VaSelect
+                    v-model="restaurantData.futureOrderDispatch"
+                    label="Send pre-orders to Winmax"
+                    :options="futureOrderDispatchModes"
+                    :track-by="(option) => option.value"
+                    :value-by="(option) => option.value"
+                  />
+                </div>
+                <div class="va-text-secondary text-xs mt-1">
+                  Before pickup: a pre-order reaches the kitchen the zone's lead time before its pickup time (as today).
+                  Same day / later days: a pre-order for today is sent the moment it is paid, like a normal order, with
+                  its FUTURE line and pickup time on the ticket; one for a later day is sent at this outlet's opening
+                  time on that day (Opening Times, Cyprus time; a day without hours uses the lead time). Switching moves
+                  the pre-orders already waiting to the new times.
+                </div>
+              </div>
+              <!-- Skip tables still in use: before the zone counter hands a paid
+                   order its table number, the backend passes over the numbers of
+                   its own orders that have not reached the kitchen yet and the
+                   tables open at the till right now (one read of this outlet's
+                   Winmax database, so that half needs the Winmax Database field
+                   below). For a zone with few tables and many orders a day, where
+                   a number comes round again while its table is still open.
+                   Top-level outlet field sent only when changed: absent = off, so
+                   an outlet left alone never gets the key and its counter runs
+                   exactly as before. -->
+              <div v-if="restaurantData.pos == 'winmax'" class="w-full mt-4">
+                <VaSwitch
+                  v-model="restaurantData.skipTablesInUse"
+                  label="Table numbers: skip tables still in use"
+                  left-label
+                  size="small"
+                  class="whitespace-nowrap"
+                />
+                <!-- A hint, not a save guard: without a database the backend may
+                     read, the Stella half still works, and the field may be
+                     filled later. -->
+                <div v-if="skipTablesInUseHint" class="text-danger text-xs mt-1">
+                  {{ skipTablesInUseHint }}
+                </div>
+                <div class="va-text-secondary text-xs mt-1">
+                  Before a table number is handed out, Stella passes over the numbers of its own orders that have not
+                  reached the kitchen yet and the tables open at the till right now (read from this outlet's Winmax
+                  database — needs the Winmax Database field below). For a zone with few tables and many orders a day,
+                  where a number comes round again while its table is still open.
+                </div>
+                <!-- The same outlet field as "Winmax Database" in the stock and
+                     retail loyalty cards below (one database per outlet). Shown
+                     here only while neither of those cards is on screen, so the
+                     field the hints point at is always somewhere on the page and
+                     never twice; its own `name` like theirs. -->
+                <div
+                  v-if="
+                    restaurantData.skipTablesInUse &&
+                    !restaurantData.winmaxStockSync &&
+                    !restaurantData.winmaxRetailLoyalty
+                  "
+                  class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4"
+                >
+                  <VaInput
+                    v-model="restaurantData.winmaxSqlDatabase"
+                    label="Winmax Database"
+                    name="winmaxSkipTablesSqlDatabase"
+                    class="w-full"
+                    :placeholder="`e.g. ${winmaxStockExpectedDatabase || 'Winmax4_Test'}`"
+                    messages="This outlet's own database on the Winmax SQL server: Winmax4_ followed by the Company above. Stella reads the tables open at the till from it."
+                  />
+                </div>
+              </div>
               <div
                 v-if="restaurantData.pos == 'winmax' && restaurantData.posSalesMode === 'document'"
                 class="w-full mt-4"
@@ -316,12 +396,17 @@
                   entity's current account as credit. The earn rate itself is set under Loyalty → Settings.
                 </div>
               </div>
-              <!-- Use Winmax for stock: Stella owns each article's per-zone quantity
-                   (Articles page → Stock); with this on, an entered quantity is pushed
-                   to Winmax as a fabrication document for the difference, and every
-                   5 minutes the Winmax warehouse stock is read back to deduct sales
-                   rung at the till. Top-level outlet fields (winmaxConfig is replaced
-                   wholesale on save). Off = the outlet is untouched. -->
+              <!-- Use Winmax for stock: with this on, a stock number typed on the
+                   Articles page (the article's quantity in the stock zone) is sent to
+                   Winmax as a manufacturing document (M+ / M-) for the difference —
+                   the article must be a composition set to Fabrication — and every
+                   minute the backend reads the Winmax warehouse stock from the
+                   outlet's own Winmax database and Stella's counter follows it. On
+                   needs a warehouse code, a stock zone and that database's name
+                   (winmaxSqlDatabase, the field the retail loyalty card below edits
+                   too): the save is refused without them. Top-level outlet fields
+                   (winmaxConfig is replaced wholesale on save); the last-sync fields
+                   are written by the backend only. Off = the outlet is untouched. -->
               <div v-if="restaurantData.pos == 'winmax'" class="w-full mt-6">
                 <VaSwitch
                   v-model="restaurantData.winmaxStockSync"
@@ -330,13 +415,16 @@
                   size="small"
                   class="whitespace-nowrap"
                 />
+                <div v-if="winmaxStockSyncHint" class="text-danger text-xs mt-1">
+                  {{ winmaxStockSyncHint }}
+                </div>
                 <div class="va-text-secondary text-xs mt-1">
-                  Keep the Articles page stock in step with Winmax: a quantity entered here is sent to Winmax as a
-                  fabrication document (only the difference — Winmax cannot be reset), and every 5 minutes sales rung at
-                  the Winmax till are deducted from the Stella quantity. Requires the articles to be configured as
-                  fabricated compositions in Winmax.
+                  Stock numbers typed on the Articles page are sent to Winmax (the item must be a composition set to
+                  Fabrication) and Stella follows Winmax's stock every minute.
                 </div>
               </div>
+              <!-- The hints here use `messages` (shown under the field): `helper-text`
+                   is not a Vuestic prop, so its text never reaches the screen. -->
               <div
                 v-if="restaurantData.pos == 'winmax' && restaurantData.winmaxStockSync"
                 class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4"
@@ -347,7 +435,8 @@
                   name="winmaxStockWarehouseCode"
                   type="number"
                   placeholder="e.g. 1"
-                  helper-text="The Winmax warehouse whose stock this outlet sells from (the service zone's warehouse in Winmax). Required."
+                  required-mark
+                  messages="The Winmax warehouse whose stock this outlet sells from (the service zone's warehouse in Winmax). Required."
                 />
                 <VaSelect
                   v-model="restaurantData.winmaxStockZoneId"
@@ -356,18 +445,28 @@
                   :track-by="(option) => option.value"
                   :value-by="(option) => option.value"
                   placeholder="Choose the delivery zone"
-                  helper-text="The Stella delivery zone whose stock column mirrors that warehouse (e.g. Online). Required."
+                  required-mark
+                  messages="The Stella delivery zone whose stock column mirrors that warehouse (e.g. Online). Required."
                 />
-                <VaInput
-                  v-model="restaurantData.winmaxStockFabricationDocType"
-                  label="Fabrication Document Type"
-                  name="winmaxStockFabricationDocType"
-                  placeholder="M+"
-                  helper-text="Winmax document type posted when a quantity is entered (M+ = Manufacturing - In)."
-                />
-                <div class="va-text-secondary text-xs self-end pb-2">
-                  Last sync:
-                  {{ restaurantData.winmaxStockLastSyncAt ? new Date(restaurantData.winmaxStockLastSyncAt).toLocaleString() : 'never' }}
+                <!-- The same outlet field as "Winmax Database" under Winmax retail
+                     loyalty (one database per outlet); its own `name` here because
+                     both inputs are on screen when both switches are on. -->
+                <div class="w-full">
+                  <VaInput
+                    v-model="restaurantData.winmaxSqlDatabase"
+                    label="Winmax Database"
+                    name="winmaxStockSqlDatabase"
+                    class="w-full"
+                    :placeholder="`e.g. ${winmaxStockExpectedDatabase || 'Winmax4_Test'}`"
+                    required-mark
+                    messages="This outlet's own database on the Winmax SQL server: Winmax4_ followed by the Company above. Stella reads the stock from it. Required."
+                  />
+                  <div v-if="winmaxStockDatabaseWarning" class="text-danger text-xs mt-1">
+                    {{ winmaxStockDatabaseWarning }}
+                  </div>
+                </div>
+                <div class="va-text-secondary text-xs md:col-span-2">
+                  Last sync: {{ winmaxStockLastSyncText }}
                   <span v-if="restaurantData.winmaxStockLastSyncError" class="text-danger">
                     — {{ restaurantData.winmaxStockLastSyncError }}
                   </span>
@@ -461,8 +560,15 @@
                   class="whitespace-nowrap"
                 />
                 <div class="va-text-secondary text-xs mt-1">
-                  Each morning every item goes back to the last stock number you entered, minus the pre-orders for that
-                  day.
+                  Each day at the reset time the counters go back to the kitchen's last entry minus that day's
+                  pre-orders. A pre-order for a later day takes nothing from today's counter: the website's day tabs
+                  show each later day's own number (the kitchen's last entry minus that day's pre-orders) and the
+                  counter takes it at that day's reset. A number typed between the reset time and the day's closing time
+                  is today's stock (today's pre-orders still to be collected are deducted from it); typed after closing,
+                  or on a closed day, it is the next open day's stock. Until the next day's number is typed, the last
+                  number typed stands in for it. Needs the Opening Times below for the closing time; without them every
+                  entry counts as today's. An item follows these rules once its number has been typed while this switch
+                  is on; until then it is checked and taken when the order is placed, as before.
                 </div>
               </div>
               <div v-if="restaurantData.stockDailyReset" class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-4">
@@ -1582,6 +1688,12 @@ const isOpeningTimeOfDay = (value) => {
   const [hours, minutes] = [Number(m[1]), Number(m[2])]
   return minutes <= 59 && (hours < 24 || (hours === 24 && minutes === 0))
 }
+// "Use Winmax for stock": a database name the backend can open at all
+// (winmaxSql.service) — letters, digits and underscore.
+const WINMAX_DATABASE_NAME = /^[A-Za-z0-9_]+$/
+// 'a', 'a and b', 'a, b and c'.
+const joinWithAnd = (parts) =>
+  parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 
 export default {
   components: {
@@ -1610,6 +1722,13 @@ export default {
     const posSalesModes = [
       { text: 'Table orders (kitchen requests)', value: 'table' },
       { text: 'Sales documents (retail POS, no tables)', value: 'document' },
+    ]
+    // When a paid pre-order (orderFor "future") is sent to Winmax
+    // (outlet.futureOrderDispatch) — absent means "pickupLead", the historical
+    // rule: the pickup time minus the delivery zone's lead time.
+    const futureOrderDispatchModes = [
+      { text: "Before pickup (the zone's lead time)", value: 'pickupLead' },
+      { text: 'Same day: when paid; later days: at opening time', value: 'paidOrOpening' },
     ]
     const loyaltyTriggerOptions = [
       { text: 'On order (Winmax dispatch)', value: 'order' },
@@ -1682,6 +1801,7 @@ export default {
       languages,
       loyaltyTriggerOptions,
       posSalesModes,
+      futureOrderDispatchModes,
       t,
       androidChannelIdRule,
       senderNameRule,
@@ -1706,6 +1826,12 @@ export default {
       // { publicHolidays (cleaned), enforceOpeningTimes } as loaded (or defaulted
       // on create); the save sends each only when it differs.
       orderingHoursSnapshot: JSON.stringify({ publicHolidays: [], enforceOpeningTimes: false }),
+      // futureOrderDispatch as loaded (or defaulted on create); the save sends
+      // it only when it differs.
+      futureOrderDispatchSnapshot: 'pickupLead',
+      // skipTablesInUse as loaded (or defaulted on create); the save sends it
+      // only when it differs.
+      skipTablesInUseSnapshot: false,
       fillingPublicHolidays: false,
       // [{ text, value }] of this outlet's live categories, for the
       // "New products category" select.
@@ -1766,6 +1892,12 @@ export default {
         posSalesMode: 'table',
         posSaleDocumentTypeCode: '',
         posQuickMenuOffers: false,
+        // When pre-orders go to Winmax (top-level for the same reason); sent
+        // only when changed, so an outlet left on "pickupLead" never gets the key.
+        futureOrderDispatch: 'pickupLead',
+        // Table numbers pass over tables still in use (top-level for the same
+        // reason); sent only when changed, so an outlet left off never gets the key.
+        skipTablesInUse: false,
         // Stella POS receipt (printed by the handheld; '' / '' / '' = none)
         posReceiptHeader: '',
         posReceiptFooter: '',
@@ -1783,13 +1915,17 @@ export default {
         winmaxRetailLoyaltyRedeemArticleCode: '',
         winmaxRetailLoyaltyPointsPerCreditEuro: 50,
         // Use Winmax for stock (top-level for the same reason). The zone is the
-        // delivery zone _id whose stock column mirrors the Winmax warehouse.
+        // delivery zone _id whose stock column mirrors the Winmax warehouse; the
+        // card also edits winmaxSqlDatabase above. The document type has no
+        // input any more and goes back as loaded; the LastSync* fields are
+        // written by the backend job only and shown read-only.
         winmaxStockSync: false,
         winmaxStockWarehouseCode: 0,
         winmaxStockZoneId: '',
         winmaxStockFabricationDocType: 'M+',
         winmaxStockLastSyncAt: null,
         winmaxStockLastSyncError: '',
+        winmaxStockLastSyncSummary: '',
         // Daily stock reset (top-level). LastDate / LastResult are written by
         // the backend job only and shown read-only.
         stockDailyReset: false,
@@ -2107,6 +2243,103 @@ export default {
         return []
       }
       return this.languages.filter((lang) => this.restaurantData.supportedLanguages.includes(lang.value))
+    },
+    /**
+     * "Use Winmax for stock": the database name the backend expects for this
+     * outlet — "Winmax4_" + its Winmax company — or '' without a company.
+     */
+    winmaxStockExpectedDatabase() {
+      const company = String(this.restaurantData.winmaxConfig?.company ?? '').trim()
+      return company ? `Winmax4_${company}` : ''
+    },
+    /**
+     * The database name the backend expects when the stored Winmax Database is
+     * a well-formed name but another company's, else '' (no company, an empty
+     * or malformed name, or a match in any letter case). The one rule for every
+     * SQL read of the outlet's database (backend winmaxStock.math
+     * winmaxDatabaseProblem): the stock sync and the table counter's read of
+     * the tables open at the till. Switch-neutral — each card words its own
+     * warning from it.
+     */
+    winmaxDatabaseMismatch() {
+      const database = String(this.restaurantData.winmaxSqlDatabase ?? '').trim()
+      const expected = this.winmaxStockExpectedDatabase
+      if (!expected || !WINMAX_DATABASE_NAME.test(database)) return ''
+      return database.toLowerCase() === expected.toLowerCase() ? '' : expected
+    },
+    /**
+     * Red line under the card's Winmax Database input, or '': the backend only
+     * syncs against the outlet's own company database (any letter case) and
+     * leaves the outlet idle on another name. A warning, not a save guard.
+     */
+    winmaxStockDatabaseWarning() {
+      const expected = this.winmaxDatabaseMismatch
+      if (!expected) return ''
+      return `Not the database of this outlet's Winmax company (${expected}): the stock sync stays idle until the two match.`
+    },
+    /**
+     * Red line under "Table numbers: skip tables still in use" while it is on,
+     * or '': why the backend would not read the tables open at the till — no
+     * Winmax Database, a name it cannot open, no Winmax company, or another
+     * company's database (the same four refusals as winmaxDatabaseProblem) —
+     * and what that costs: only Stella's own orders are passed over then. A
+     * warning, not a save guard: the Stella half works without it.
+     */
+    skipTablesInUseHint() {
+      if (this.restaurantData.pos !== 'winmax' || this.restaurantData.skipTablesInUse !== true) return ''
+      const database = String(this.restaurantData.winmaxSqlDatabase ?? '').trim()
+      const cost = "only Stella's own orders are passed over — tables the till opened by hand are not seen."
+      if (!database) return `Without the Winmax Database field ${cost}`
+      if (!WINMAX_DATABASE_NAME.test(database)) {
+        return `"${database}" is not a database name Stella can open (letters, digits and underscore only): ${cost}`
+      }
+      if (!this.winmaxStockExpectedDatabase) return `Without the Company field above ${cost}`
+      const expected = this.winmaxDatabaseMismatch
+      if (expected) return `Not the database of this outlet's Winmax company (${expected}): ${cost}`
+      return ''
+    },
+    /**
+     * "02/10/2026, 14:03:11 — 8 items: 6 in sync, 2 not Fabrication in Winmax
+     * (A-040, A-044)": when the stock sync last ran through
+     * (winmaxStockLastSyncAt; 'never' before the first time) and the backend's
+     * one-line summary of it (winmaxStockLastSyncSummary — absent until the
+     * backend writes one). The last error is shown after it, in red.
+     */
+    winmaxStockLastSyncText() {
+      const at = this.restaurantData.winmaxStockLastSyncAt ? new Date(this.restaurantData.winmaxStockLastSyncAt) : null
+      const when = at && !Number.isNaN(at.getTime()) ? at.toLocaleString() : 'never'
+      const summary = this.restaurantData.winmaxStockLastSyncSummary
+      return typeof summary === 'string' && summary.trim() ? `${when} — ${summary.trim()}` : when
+    },
+    /**
+     * What "Use Winmax for stock" still lacks to be saved switched on, or '':
+     * without a warehouse code, a stock zone and the outlet's Winmax database
+     * name the backend leaves the outlet idle. Only while the switch is on and
+     * its card is on screen (POS = Winmax).
+     */
+    winmaxStockSyncProblem() {
+      if (this.restaurantData.pos !== 'winmax' || this.restaurantData.winmaxStockSync !== true) return ''
+      const missing = []
+      if (!(Number(this.restaurantData.winmaxStockWarehouseCode) > 0)) missing.push('the Winmax warehouse code')
+      if (!this.restaurantData.winmaxStockZoneId) {
+        missing.push(
+          this.stockZoneOptions.length
+            ? 'the stock zone'
+            : 'the stock zone (none to choose from yet: add a delivery zone to this outlet first)',
+        )
+      }
+      const database = String(this.restaurantData.winmaxSqlDatabase ?? '').trim()
+      if (!database) {
+        missing.push('the Winmax database name')
+      } else if (!WINMAX_DATABASE_NAME.test(database)) {
+        missing.push('a valid Winmax database name (letters, digits and underscore only)')
+      }
+      return joinWithAnd(missing)
+    },
+    /** Red helper under the switch while it is on with something missing: why the save is blocked. */
+    winmaxStockSyncHint() {
+      const problem = this.winmaxStockSyncProblem
+      return problem ? `Still needed below: ${problem}. Until then the outlet cannot be saved with this switch on.` : ''
     },
     /**
      * "01/10/2026, 05:00:12 — 12 of 14 items reset, 3 pre-ordered portions
@@ -2593,6 +2826,12 @@ export default {
             res.posSalesMode = res.posSalesMode === 'document' ? 'document' : 'table'
             res.posSaleDocumentTypeCode = res.posSaleDocumentTypeCode || ''
             res.posQuickMenuOffers = res.posQuickMenuOffers === true
+            // Pre-order dispatch: outlets saved before the field existed have no
+            // key; absent (or anything else) means the historical "before pickup".
+            res.futureOrderDispatch = res.futureOrderDispatch === 'paidOrOpening' ? 'paidOrOpening' : 'pickupLead'
+            // Skip tables still in use: outlets saved before the field existed
+            // have no key; absent (or anything but true) means off.
+            res.skipTablesInUse = res.skipTablesInUse === true
             res.posReceiptHeader = res.posReceiptHeader || ''
             res.posReceiptFooter = res.posReceiptFooter || ''
             res.posReceiptVatPercent =
@@ -2616,6 +2855,8 @@ export default {
             res.winmaxStockFabricationDocType = res.winmaxStockFabricationDocType || 'M+'
             res.winmaxStockLastSyncAt = res.winmaxStockLastSyncAt || null
             res.winmaxStockLastSyncError = res.winmaxStockLastSyncError || ''
+            res.winmaxStockLastSyncSummary =
+              typeof res.winmaxStockLastSyncSummary === 'string' ? res.winmaxStockLastSyncSummary : ''
             // Daily stock reset: outlets saved before these fields existed have no keys.
             res.stockDailyReset = res.stockDailyReset === true
             res.stockDailyResetTime = normaliseResetTime(res.stockDailyResetTime) || STOCK_DAILY_RESET_TIME_DEFAULT
@@ -2710,6 +2951,8 @@ export default {
             this.snapshotCustomerAppSettings()
             this.snapshotStockDailyReset()
             this.snapshotOrderingHours()
+            this.snapshotFutureOrderDispatch()
+            this.snapshotSkipTablesInUse()
             this.fetchNewProductsCategories()
           }
           this.loading = false
@@ -2808,6 +3051,42 @@ export default {
       })
       return changed
     },
+    /** The pre-order dispatch rule as the save sends it (anything but "paidOrOpening" is "pickupLead"). */
+    currentFutureOrderDispatch() {
+      return this.restaurantData.futureOrderDispatch === 'paidOrOpening' ? 'paidOrOpening' : 'pickupLead'
+    },
+    /** Re-taken after every load and every successful save, like the ordering-hours snapshot. */
+    snapshotFutureOrderDispatch() {
+      this.futureOrderDispatchSnapshot = this.currentFutureOrderDispatch()
+    },
+    /**
+     * `{ futureOrderDispatch }` when the select changed since the snapshot, else
+     * `{}`: an outlet whose admin never touches it saves exactly the payload it
+     * did before (the backend reads a missing key as "pickupLead", and a changed
+     * value makes it move the pre-orders already waiting in the Winmax queue).
+     */
+    changedFutureOrderDispatch() {
+      const current = this.currentFutureOrderDispatch()
+      return current === this.futureOrderDispatchSnapshot ? {} : { futureOrderDispatch: current }
+    },
+    /** "Skip tables still in use" as the save sends it (anything but true is off). */
+    currentSkipTablesInUse() {
+      return this.restaurantData.skipTablesInUse === true
+    },
+    /** Re-taken after every load and every successful save, like the pre-order dispatch snapshot. */
+    snapshotSkipTablesInUse() {
+      this.skipTablesInUseSnapshot = this.currentSkipTablesInUse()
+    },
+    /**
+     * `{ skipTablesInUse }` when the switch changed since the snapshot, else `{}`:
+     * an outlet whose admin never touches it saves exactly the payload it did
+     * before, so other brands' saved outlets never get the key (the backend
+     * reads a missing key as off and hands out table numbers as it always has).
+     */
+    changedSkipTablesInUse() {
+      const current = this.currentSkipTablesInUse()
+      return current === this.skipTablesInUseSnapshot ? {} : { skipTablesInUse: current }
+    },
     /**
      * Save guard: false (with a toast) while "refuse online orders" is on but the
      * Opening Times restrict nothing — saved like that the outlet would take
@@ -2818,6 +3097,21 @@ export default {
       if (this.restaurantData.enforceOpeningTimes !== true || !this.enforceOpeningTimesProblem) return true
       this.init({
         message: `Not saved: "Refuse online orders outside these hours" is on without opening hours. ${this.enforceOpeningTimesProblem}, or switch it off.`,
+        color: 'danger',
+      })
+      return false
+    },
+    /**
+     * Save guard: false (with a toast) while "Use Winmax for stock" is on without
+     * a warehouse code, a stock zone or a usable Winmax database name — saved
+     * like that the backend would leave the outlet idle. Switching it off always
+     * passes, and an outlet with it off is never checked: its save is as before.
+     */
+    winmaxStockSyncSaveAllowed() {
+      const problem = this.winmaxStockSyncProblem
+      if (!problem) return true
+      this.init({
+        message: `Not saved: "Use Winmax for stock" is on without ${problem}. Fill that in under the switch, or switch it off.`,
         color: 'danger',
       })
       return false
@@ -2945,7 +3239,8 @@ export default {
         winmaxRetailLoyaltyRedeemArticleCode: (this.restaurantData.winmaxRetailLoyaltyRedeemArticleCode || '').trim(),
         winmaxRetailLoyaltyPointsPerCreditEuro:
           Number(this.restaurantData.winmaxRetailLoyaltyPointsPerCreditEuro) || 50,
-        // Use Winmax for stock (last-sync fields are written by the backend job only)
+        // Use Winmax for stock (last-sync fields are written by the backend job
+        // only; the document type has no input any more and goes back as loaded)
         winmaxStockSync: this.restaurantData.winmaxStockSync === true,
         winmaxStockWarehouseCode: Number(this.restaurantData.winmaxStockWarehouseCode) || 0,
         winmaxStockZoneId: this.restaurantData.winmaxStockZoneId || null,
@@ -3230,6 +3525,7 @@ export default {
     async createRestaurant() {
       if (this.$refs.form.validate()) {
         if (!this.enforceOpeningTimesSaveAllowed()) return
+        if (!this.winmaxStockSyncSaveAllowed()) return
         const data = removeNulls(this.createPayload())
         // Customer-app settings only when the user touched them on the create form.
         Object.assign(data, this.changedCustomerAppSettings())
@@ -3237,6 +3533,10 @@ export default {
         Object.assign(data, this.changedStockDailyReset())
         // Public holidays / enforce opening times likewise (none / off = not sent).
         Object.assign(data, this.changedOrderingHours())
+        // Pre-order dispatch likewise ("before pickup" = not sent).
+        Object.assign(data, this.changedFutureOrderDispatch())
+        // Skip tables still in use likewise (off = not sent).
+        Object.assign(data, this.changedSkipTablesInUse())
         const url = import.meta.env.VITE_API_BASE_URL
         console.log(url)
         try {
@@ -3254,6 +3554,7 @@ export default {
     async updateRestaurant() {
       if (this.$refs.form.validate()) {
         if (!this.enforceOpeningTimesSaveAllowed()) return
+        if (!this.winmaxStockSyncSaveAllowed()) return
         const data = removeNulls(this.createPayload())
         const url = import.meta.env.VITE_API_BASE_URL
         delete data.name
@@ -3265,6 +3566,12 @@ export default {
         Object.assign(data, this.changedStockDailyReset())
         // Public holidays (cleaned) / enforceOpeningTimes: each only when changed.
         Object.assign(data, this.changedOrderingHours())
+        // Pre-order dispatch: only when changed (the backend then reschedules
+        // this outlet's waiting pre-orders).
+        Object.assign(data, this.changedFutureOrderDispatch())
+        // Skip tables still in use: only when changed, so other brands' saved
+        // outlets never get the key.
+        Object.assign(data, this.changedSkipTablesInUse())
 
         let response
         try {
@@ -3283,6 +3590,8 @@ export default {
           this.snapshotCustomerAppSettings()
           this.snapshotStockDailyReset()
           this.snapshotOrderingHours()
+          this.snapshotFutureOrderDispatch()
+          this.snapshotSkipTablesInUse()
           if (this.$route.name === 'admin-update-outlet') {
             this.$router.push({ name: 'list' })
           }
