@@ -229,7 +229,8 @@
                    other sends today's pre-orders at once, like a normal order
                    (the ticket keeps its FUTURE line and pickup time), and a later
                    day's at this outlet's opening time on that day (Opening Times,
-                   Cyprus time). Top-level outlet field sent only when changed:
+                   Cyprus time) — as it does a same-day one paid before the outlet
+                   has opened that day. Top-level outlet field sent only when changed:
                    absent = before pickup, so an outlet left alone never gets the
                    key. Changing it also moves the pre-orders already waiting. -->
               <div v-if="restaurantData.pos == 'winmax'" class="w-full mt-4">
@@ -246,8 +247,11 @@
                   Before pickup: a pre-order reaches the kitchen the zone's lead time before its pickup time (as today).
                   Same day / later days: a pre-order for today is sent the moment it is paid, like a normal order, with
                   its FUTURE line and pickup time on the ticket; one for a later day is sent at this outlet's opening
-                  time on that day (Opening Times, Cyprus time; a day without hours uses the lead time). Switching moves
-                  the pre-orders already waiting to the new times.
+                  time on that day (Opening Times, Cyprus time; a day without hours uses the lead time). A pre-order
+                  for today that is paid before the outlet has opened that day (after midnight, while it is still
+                  closed) waits and is sent at that day's opening time. In both cases a pickup sooner after opening
+                  than the zone's lead time is sent the lead time before the pickup. Switching moves the pre-orders
+                  already waiting to the new times.
                 </div>
               </div>
               <!-- Skip tables still in use: before the zone counter hands a paid
@@ -1728,7 +1732,7 @@ export default {
     // rule: the pickup time minus the delivery zone's lead time.
     const futureOrderDispatchModes = [
       { text: "Before pickup (the zone's lead time)", value: 'pickupLead' },
-      { text: 'Same day: when paid; later days: at opening time', value: 'paidOrOpening' },
+      { text: 'Same day: when paid (before opening: at opening); later days: at opening time', value: 'paidOrOpening' },
     ]
     const loyaltyTriggerOptions = [
       { text: 'On order (Winmax dispatch)', value: 'order' },
