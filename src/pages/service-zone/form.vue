@@ -1535,6 +1535,81 @@
                   :helper-text="t('outletForm.customerApp.senderNameHelp')"
                 />
               </div>
+
+              <!-- Firebase service account: which key signs this outlet's pushes.
+                   Every brand app has its own Firebase project, so the key is
+                   per outlet: panel upload > src/firebase/<slug>.json on the
+                   server > the server's default key. Separate endpoints
+                   (/outlets/:id/push/service-account), not part of the outlet
+                   save; the key is never returned. -->
+              <div
+                v-if="restaurantData.pushSettings.enabled"
+                class="mt-6 p-4 rounded"
+                style="border: 1px solid var(--va-background-border)"
+              >
+                <div class="font-bold text-sm mb-1">{{ t('outletForm.customerApp.serviceAccount') }}</div>
+                <div class="text-sm opacity-70 mb-3">{{ t('outletForm.customerApp.serviceAccountHelp') }}</div>
+                <div v-if="!restaurantId" class="text-sm">{{ t('outletForm.customerApp.serviceAccountCreateHint') }}</div>
+                <div v-else-if="pushCredentials.loading" class="text-sm">
+                  {{ t('outletForm.customerApp.serviceAccountLoading') }}
+                </div>
+                <template v-else>
+                  <div class="text-sm mb-3">
+                    <span class="font-bold">{{ t('outletForm.customerApp.serviceAccountStatus') }}:</span>
+                    {{ pushCredentialsSummary }}
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <input
+                      ref="serviceAccountFile"
+                      type="file"
+                      accept=".json,application/json"
+                      class="hidden"
+                      @change="onServiceAccountFileChosen"
+                    />
+                    <VaButton
+                      size="small"
+                      preset="primary"
+                      :loading="pushCredentials.busy"
+                      @click="$refs.serviceAccountFile.click()"
+                    >
+                      {{
+                        pushCredentials.status && pushCredentials.status.upload && pushCredentials.status.upload.present
+                          ? t('outletForm.customerApp.serviceAccountReplace')
+                          : t('outletForm.customerApp.serviceAccountUpload')
+                      }}
+                    </VaButton>
+                    <VaButton
+                      size="small"
+                      preset="secondary"
+                      :disabled="!pushCredentials.status || !pushCredentials.status.configured || pushCredentials.busy"
+                      @click="testPushServiceAccount"
+                    >
+                      {{ t('outletForm.customerApp.serviceAccountTest') }}
+                    </VaButton>
+                    <VaButton
+                      v-if="pushCredentials.status && pushCredentials.status.upload && pushCredentials.status.upload.present"
+                      size="small"
+                      preset="secondary"
+                      color="danger"
+                      :disabled="pushCredentials.busy"
+                      @click="removePushServiceAccount"
+                    >
+                      {{ t('outletForm.customerApp.serviceAccountRemove') }}
+                    </VaButton>
+                  </div>
+                  <div
+                    v-if="pushCredentials.testResult"
+                    class="text-sm mt-3"
+                    :style="{ color: pushCredentials.testResult.ok ? 'var(--va-success)' : 'var(--va-danger)' }"
+                  >
+                    {{
+                      pushCredentials.testResult.ok
+                        ? t('outletForm.customerApp.serviceAccountTestOk', { project: pushCredentials.testResult.projectId })
+                        : t('outletForm.customerApp.serviceAccountTestFailed', { error: pushCredentials.testResult.error })
+                    }}
+                  </div>
+                </template>
+              </div>
             </div>
           </div>
         </VaCardContent>
@@ -1821,6 +1896,10 @@ export default {
       // create); the save sends only what differs from these.
       customerSettingsSnapshot: JSON.stringify(normaliseCustomerSettings(customerSettingsDefaults())),
       pushSettingsSnapshot: JSON.stringify(normalisePushSettings(pushSettingsDefaults())),
+      // Firebase service account of the push, loaded with the outlet
+      // (GET /outlets/:id/push/service-account): provenance and project only,
+      // the key never comes back. Managed by its own buttons, not by the save.
+      pushCredentials: { loading: false, busy: false, status: null, testResult: null },
       // Daily stock reset { stockDailyReset, stockDailyResetTime } as loaded (or
       // defaulted on create); the save sends the pair only when it differs.
       stockDailyResetSnapshot: JSON.stringify({
@@ -2239,6 +2318,28 @@ export default {
     galleryType() {
       return this.isGalleryViewEnabled ? 'gallery' : 'list'
     },
+    /** One line on which key signs this outlet's pushes (upload / server file / server default / none). */
+    pushCredentialsSummary() {
+      const s = this.pushCredentials.status
+      if (!s) return this.t('outletForm.customerApp.serviceAccountUnknown')
+      if (!s.configured) return this.t('outletForm.customerApp.serviceAccountNone')
+      let source
+      if (s.source === 'upload') {
+        const at = s.uploadedAt ? new Date(s.uploadedAt) : null
+        source = this.t('outletForm.customerApp.serviceAccountSourceUpload', {
+          file: s.fileName || 'service-account.json',
+          when: at && !Number.isNaN(at.getTime()) ? at.toLocaleString() : '',
+        })
+      } else if (s.source === 'file') {
+        source = this.t('outletForm.customerApp.serviceAccountSourceFile', { file: s.fileName })
+      } else {
+        source = this.t('outletForm.customerApp.serviceAccountSourceEnv')
+      }
+      return `${source} — ${this.t('outletForm.customerApp.serviceAccountProject', {
+        project: s.projectId,
+        email: s.clientEmail,
+      })}`
+    },
     selectedRest() {
       return this.serviceStore.selectedRest
     },
@@ -2444,6 +2545,101 @@ export default {
     this.fetchRestaurantDetails()
   },
   methods: {
+    /**
+     * Firebase service account of this outlet's push notifications. Every
+     * brand app has its own Firebase project, so the key the server signs
+     * with is per outlet: a panel upload, else src/firebase/<slug>.json on
+     * the server, else the server's default key. These calls are separate
+     * from the outlet save (the key never travels with the outlet document).
+     */
+    async loadPushCredentials() {
+      if (!this.restaurantId) return
+      const url = import.meta.env.VITE_API_BASE_URL
+      this.pushCredentials.loading = true
+      this.pushCredentials.testResult = null
+      try {
+        const response = await axios.get(`${url}/outlets/${this.restaurantId}/push/service-account`)
+        this.pushCredentials.status = response.data?.data || null
+      } catch (error) {
+        // e.g. 403 for a non-admin: the block then says the status is unknown.
+        this.pushCredentials.status = null
+      } finally {
+        this.pushCredentials.loading = false
+      }
+    },
+    /** The chosen JSON is read in the browser and sent as text; the backend validates it. */
+    async onServiceAccountFileChosen(event) {
+      const file = event?.target?.files?.[0]
+      if (event?.target) event.target.value = ''
+      if (!file || !this.restaurantId) return
+      const url = import.meta.env.VITE_API_BASE_URL
+      this.pushCredentials.busy = true
+      this.pushCredentials.testResult = null
+      try {
+        const text = await file.text()
+        const response = await axios.put(`${url}/outlets/${this.restaurantId}/push/service-account`, {
+          serviceAccount: text,
+          fileName: file.name,
+        })
+        this.pushCredentials.status = response.data?.data || null
+        this.init({
+          message: this.t('outletForm.customerApp.serviceAccountSaved', {
+            project: this.pushCredentials.status?.projectId || '',
+          }),
+          color: 'success',
+        })
+      } catch (error) {
+        this.init({
+          message: error?.response?.data?.message || this.t('outletForm.customerApp.serviceAccountSaveFailed'),
+          color: 'danger',
+        })
+      } finally {
+        this.pushCredentials.busy = false
+      }
+    },
+    async removePushServiceAccount() {
+      if (!this.restaurantId || !window.confirm(this.t('outletForm.customerApp.serviceAccountRemoveConfirm'))) return
+      const url = import.meta.env.VITE_API_BASE_URL
+      this.pushCredentials.busy = true
+      this.pushCredentials.testResult = null
+      try {
+        const response = await axios.delete(`${url}/outlets/${this.restaurantId}/push/service-account`)
+        this.pushCredentials.status = response.data?.data || null
+        this.init({ message: this.t('outletForm.customerApp.serviceAccountRemoved'), color: 'success' })
+      } catch (error) {
+        this.init({
+          message: error?.response?.data?.message || this.t('outletForm.customerApp.serviceAccountRemoveFailed'),
+          color: 'danger',
+        })
+      } finally {
+        this.pushCredentials.busy = false
+      }
+    },
+    /** Asks the server to prove the credentials against Google (an access token; nothing is sent to phones). */
+    async testPushServiceAccount() {
+      if (!this.restaurantId) return
+      const url = import.meta.env.VITE_API_BASE_URL
+      this.pushCredentials.busy = true
+      this.pushCredentials.testResult = null
+      try {
+        const response = await axios.post(`${url}/outlets/${this.restaurantId}/push/service-account/test`, {})
+        const result = response.data?.data || null
+        this.pushCredentials.testResult = result
+        this.init({
+          message: result?.ok
+            ? this.t('outletForm.customerApp.serviceAccountTestOk', { project: result.projectId })
+            : this.t('outletForm.customerApp.serviceAccountTestFailed', { error: result?.error || '' }),
+          color: result?.ok ? 'success' : 'danger',
+        })
+      } catch (error) {
+        this.init({
+          message: error?.response?.data?.message || this.t('outletForm.customerApp.serviceAccountTestFailed', { error: '' }),
+          color: 'danger',
+        })
+      } finally {
+        this.pushCredentials.busy = false
+      }
+    },
     /**
      * Stella POS receipt header ← Winmax: reads the Winmax service zone whose
      * POSSaleDocumentTypeCode matches the SAVED sales document type and drops
@@ -2952,6 +3148,7 @@ export default {
           this.restaurantData = res
           if (res) {
             this.loadStockZoneOptions()
+            this.loadPushCredentials()
             this.snapshotCustomerAppSettings()
             this.snapshotStockDailyReset()
             this.snapshotOrderingHours()
