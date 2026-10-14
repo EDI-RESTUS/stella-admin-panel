@@ -354,7 +354,11 @@
       "group": "E-shop",
       "settings": "Settings",
       "stock": "Stock",
-      "weights": "Weights"
+      "weights": "Weights",
+      "orders": "Orders",
+      "holds": "Stock holds",
+      "rates": "Courier fees",
+      "shipping": "Delivery costs"
     },
     "common": {
       "selectOutlet": "Select an outlet from the top navigation bar.",
@@ -380,11 +384,61 @@
         "disabled": "the e-shop is switched off (E-shop › Settings)",
         "problems": "the e-shop settings have problems (E-shop › Settings lists them)",
         "busy": "another read is running — try again in a minute"
+      },
+      "eshopStatus": {
+        "PendingPayment": "Waiting for payment",
+        "PaymentConfirmed": "Paid",
+        "Allocated": "To prepare",
+        "Processing": "Preparing",
+        "ReadyForPickup": "Ready for pickup",
+        "ReadyForDispatch": "Ready for the courier",
+        "Dispatched": "With the courier",
+        "Completed": "Completed",
+        "Cancelled": "Cancelled",
+        "Exception": "Exception"
+      },
+      "paymentStatus": {
+        "Pending": "Not paid yet",
+        "Successful": "Paid",
+        "Failed": "Payment failed",
+        "Cancelled": "Payment cancelled",
+        "Expired": "Not paid in time",
+        "Refunded": "Refunded"
+      },
+      "method": {
+        "delivery": "Delivery",
+        "pickup": "Pickup",
+        "digital": "Digital"
+      },
+      "fulfilmentMethod": {
+        "pickup": "Pickup at the shop",
+        "courier": "Courier",
+        "digital": "Codes by e-mail"
+      },
+      "provider": {
+        "acs": "ACS",
+        "boxnow": "BOX NOW"
+      },
+      "winmax": {
+        "NotQueued": "Not sent",
+        "Queued": "Waiting to send",
+        "Sending": "Sending",
+        "Sent": "Sent",
+        "Failed": "Failed",
+        "Skipped": "Not sent (skipped)"
+      },
+      "holdStatus": {
+        "pending": "Being taken",
+        "active": "Held, waiting for payment",
+        "confirmed": "Paid, held until posted",
+        "consumed": "Posted in Winmax",
+        "released": "Given back",
+        "expired": "Expired, not paid in time"
       }
     },
     "settings": {
       "title": "E-shop settings",
-      "intro": "How the web shop sells from the shops' own Winmax stock: which shops take part, which shop serves each region first, and how shipping weights are read. Checkout and couriers come in later phases.",
+      "intro": "How the web shop sells from the shops' own Winmax stock: which shops take part, which shop serves each region first, how shipping weights are read and which couriers deliver. Checkout comes in a later phase.",
       "unsaved": "Unsaved changes",
       "check": "Check against Winmax",
       "save": "Save",
@@ -500,6 +554,23 @@
         "empty": "No exceptions.",
         "add": "Add postcode"
       },
+      "couriers": {
+        "title": "Couriers",
+        "help": "The couriers the website offers for delivery. Their prices are the fee tables under E-shop › Courier fees.",
+        "notOnServer": "This server has no courier settings yet.",
+        "acsTitle": "ACS, door to door",
+        "acsEnabled": "ACS on",
+        "acsService": "ACS fee table",
+        "acsServiceHelp": "The fee table ACS is priced with: D2D unless told otherwise.",
+        "unsupported": "Districts ACS does not serve",
+        "unsupportedHelp": "Customers there are not offered ACS.",
+        "boxnowTitle": "BOX NOW, lockers",
+        "boxnowEnabled": "BOX NOW on",
+        "boxnowService": "BOX NOW fee table",
+        "boxnowServiceHelp": "The fee table BOX NOW is priced with: LOCKER unless told otherwise.",
+        "maxKg": "Heaviest parcel (kg)",
+        "maxKgHelp": "A heavier parcel is not offered BOX NOW."
+      },
       "errors": {
         "reservationMinutes": "Reservation minutes must be a whole number from 1 to 60.",
         "tareGrams": "Packaging must be a whole number of grams from 0 to 100000.",
@@ -519,7 +590,11 @@
         "postcode": "{value} is not a 4-digit postcode.",
         "postcodeTwice": "Postcode {value} is listed twice.",
         "postcodeRegion": "Postcode {value} has no region.",
-        "postcodesCount": "At most 2000 postcode exceptions."
+        "postcodesCount": "At most 2000 postcode exceptions.",
+        "acsService": "ACS: the fee table name must be 1 to 20 letters, digits, - or _.",
+        "acsDistricts": "ACS: at most 10 districts not served.",
+        "boxnowService": "BOX NOW: the fee table name must be 1 to 20 letters, digits, - or _.",
+        "boxnowMaxKg": "BOX NOW: the heaviest parcel must be a weight in kg above 0, with at most 3 decimals (at most 1000 kg)."
       }
     },
     "stock": {
@@ -620,6 +695,290 @@
       },
       "toast": {
         "loadFailed": "Could not load the weights report"
+      }
+    },
+    "orders": {
+      "title": "E-shop orders",
+      "intro": "The web shop's orders, newest first. Each order has one part per shop that supplies it: move each part on, step by step. An order in Exception is not sent to Winmax until an admin resolves it.",
+      "filters": {
+        "status": "Status",
+        "allStatuses": "All statuses",
+        "shop": "Shop",
+        "allShops": "All shops",
+        "inactiveShop": "inactive",
+        "from": "From",
+        "to": "To",
+        "search": "Order number",
+        "searchPlaceholder": "Starts with",
+        "attention": "Needs a hand",
+        "attentionHelp": "Needs a hand: the order is in Exception, or one of its parts is.",
+        "badRange": "The end date is before the start date."
+      },
+      "columns": {
+        "order": "Order",
+        "date": "Date",
+        "status": "Status",
+        "payment": "Payment",
+        "method": "Method",
+        "courier": "Courier",
+        "shipping": "Delivery fee",
+        "total": "Total",
+        "winmax": "Winmax"
+      },
+      "details": "Show or hide the order",
+      "partInException": "A part is in Exception",
+      "empty": "No e-shop order matches.",
+      "total": "{n} order(s)",
+      "noFulfilments": "This order has no parts.",
+      "orderHistory": "Order history ({n})",
+      "refused": "Refused: {message}",
+      "notEmailed": "{key} at {shop} is ready for pickup, but the customer was NOT e-mailed (no e-mail address, or the e-mail failed). Tell them another way.",
+      "retryNotQueued": "The stock is held again, but the order could not be handed to Winmax. Check its Winmax state.",
+      "detail": {
+        "customer": "Customer",
+        "noDestination": "No address: a pickup or digital order.",
+        "apt": "flat {n}",
+        "floor": "floor {n}",
+        "locker": "BOX NOW locker: {name} ({id})",
+        "facts": "Order",
+        "region": "Region {region}, postcode {postcode}",
+        "paymentMode": "Payment: {mode}",
+        "holdUntil": "Stock held until {when}.",
+        "cost": "{courier} costs POW {cost} (margin {margin})."
+      },
+      "fulfilment": {
+        "weight": "Parcel weight: {kg}",
+        "noWeight": "Parcel weight: not known",
+        "carriesFee": "Carries the delivery fee: {amount}",
+        "winmaxDoc": "Winmax document: {doc}",
+        "noWinmaxDoc": "Not in Winmax yet",
+        "code": "Article",
+        "qty": "Qty",
+        "unitWeight": "Weight each",
+        "kind": "Kind",
+        "kinds": {
+          "stock": "from stock",
+          "nonstock": "no stock",
+          "digital": "code by e-mail"
+        },
+        "history": "Status history"
+      },
+      "steps": {
+        "Processing": "Start preparing",
+        "ProcessingAgain": "Back to preparing",
+        "ReadyForPickup": "Ready for pickup",
+        "ReadyForDispatch": "Ready for the courier",
+        "Dispatched": "Handed to the courier",
+        "Completed": "Completed",
+        "Exception": "Exception"
+      },
+      "stepHelp": {
+        "Processing": "The shop starts picking the items.",
+        "ProcessingAgain": "The problem is sorted out: this part goes back to preparing.",
+        "ReadyForPickup": "The items are packed at the shop. The customer is e-mailed that the order is ready to collect.",
+        "ReadyForDispatch": "The parcel is packed and waits for the courier.",
+        "Dispatched": "The courier has taken the parcel.",
+        "CompletedPickup": "The customer has collected the order.",
+        "CompletedCourier": "The parcel has been delivered.",
+        "Completed": "This part is done.",
+        "Exception": "Something is wrong with this part (an item missing, a damaged parcel…). Say what went wrong. The order's other parts and its Winmax documents are not held back."
+      },
+      "noStep": {
+        "PendingPayment": "No steps until the order is paid.",
+        "Exception": "No steps until the order's Exception is resolved.",
+        "Cancelled": "The order is cancelled.",
+        "Completed": "Done."
+      },
+      "dialog": {
+        "stepTitle": "{ref}, {key} at {shop}: {step}?",
+        "note": "Note (optional)",
+        "reason": "What went wrong (needed)",
+        "reasonNeeded": "Say what went wrong to save this step."
+      },
+      "exception": {
+        "title": "Exception: this order is not sent to Winmax until it is resolved.",
+        "since": "Since {when}",
+        "codes": {
+          "LATE_PAYMENT_NO_STOCK": "The customer paid after the stock hold ran out, and the items were gone by then.",
+          "PAID_AFTER_CANCEL": "The payment arrived after the order was cancelled.",
+          "HOLD_NOT_CONFIRMED": "The order is paid, but its stock hold could not be confirmed.",
+          "CONFIRM_FAILED": "The order is paid, but an error stopped Stella from confirming its stock hold.",
+          "UNVERIFIED_PAYMENT": "The order was marked paid, but Stella has no verified card payment (PBT) for it."
+        },
+        "retry": "Take the stock again",
+        "refunded": "Refunded",
+        "none": "Nothing can be done for this order from here.",
+        "adminOnly": "Only an admin can resolve an Exception.",
+        "retryTitle": "Take the stock again?",
+        "retryText": "Stella holds the same items again, in the same shops. If they are there, the order goes to Winmax like any paid order. If not, nothing changes: refund the customer, or wait for stock and try again.",
+        "retryOk": "Take the stock again",
+        "retryCheckPbt": "Do this only after checking in the PBT portal that the money really arrived.",
+        "refundTitle": "Mark the order as refunded?",
+        "refundText": "First give the money back in the PBT portal. This button refunds nothing: it only closes the order in Stella (cancelled, payment refunded).",
+        "refundOk": "It is refunded"
+      },
+      "toast": {
+        "loadFailed": "Could not load the e-shop orders",
+        "stepDone": "{ref}: {key} is now {status}",
+        "readyEmailed": "{ref}: {key} is ready for pickup; the customer was e-mailed",
+        "notEmailed": "{ref}: the customer was NOT e-mailed",
+        "stepFailed": "Could not change the status",
+        "retried": "{ref}: stock taken again; the order goes to Winmax",
+        "refunded": "{ref}: closed as refunded",
+        "resolveFailed": "Could not resolve the order"
+      }
+    },
+    "holds": {
+      "title": "Stock holds",
+      "intro": "Stock kept for e-shop orders, newest first. A hold keeps the items for the customer while they pay; once paid it stays until the order's Winmax documents take the stock. An unpaid hold goes back when its time is up.",
+      "status": "Hold status",
+      "allStatuses": "All",
+      "limit": "Show",
+      "limitOption": "the last {n}",
+      "warehouse": "warehouse {n}",
+      "empty": "No stock hold matches.",
+      "shown": "{n} hold(s) shown",
+      "columns": {
+        "order": "Order",
+        "orderStatus": "Order, e-shop, payment",
+        "attempt": "Try",
+        "status": "Hold",
+        "reason": "Why it ended",
+        "expires": "Expires",
+        "created": "Taken",
+        "lines": "Items held"
+      },
+      "reasons": {
+        "expired": "Not paid in time.",
+        "stalePending": "A checkout that never finished.",
+        "retryLost": "Another try took the stock first.",
+        "retryOrderChanged": "The order changed during the try.",
+        "replaced": "The customer started a new checkout.",
+        "superseded": "A newer hold replaced it.",
+        "orderCancelled": "The order was cancelled.",
+        "conflict": "Not enough stock of {code} when it was taken."
+      },
+      "toast": {
+        "loadFailed": "Could not load the stock holds"
+      }
+    },
+    "shipping": {
+      "title": "Delivery costs",
+      "intro": "What customers paid for delivery against what the parcels cost POW, for paid e-shop orders that are not cancelled. A split order costs one parcel per shop while the customer pays for one: the difference is the split extra.",
+      "from": "From",
+      "to": "To",
+      "pickDates": "Pick both dates.",
+      "badRange": "The end date is before the start date.",
+      "tooLong": "Choose a period of at most a year.",
+      "counts": {
+        "orders": "Orders",
+        "charged": "Charged to customers",
+        "cost": "Courier cost",
+        "splitExtra": "Split extra",
+        "margin": "Margin"
+      },
+      "unknownCosts": "{n} courier order(s) have no known cost: they are left out of the cost and the margin.",
+      "capped": "Only the first {n} orders are counted: choose a shorter period.",
+      "costHelp": "Cost: what the fee tables said the couriers charge POW when the order was placed. Where a table has no cost price, the customer price is counted as the cost.",
+      "notKnown": "not known",
+      "empty": "No paid e-shop order in this period.",
+      "columns": {
+        "order": "Order",
+        "date": "Date",
+        "method": "Method",
+        "courier": "Courier",
+        "parcels": "Parcels",
+        "charged": "Charged",
+        "cost": "Cost",
+        "splitExtra": "Split extra",
+        "margin": "Margin"
+      },
+      "toast": {
+        "loadFailed": "Could not load the delivery costs"
+      }
+    },
+    "rates": {
+      "title": "Courier fees",
+      "intro": "What a parcel costs by its weight, per courier: what the customer pays and, when you type it, what the courier charges POW. The website charges the customer price; the cost price only feeds the Delivery costs report.",
+      "readOnly": "Only an admin can change the fee tables.",
+      "acsTitle": "ACS, door to door",
+      "boxnowTitle": "BOX NOW, lockers",
+      "service": "(table {service})",
+      "noTable": "No fee table yet: this courier cannot be offered until one is saved.",
+      "version": "Version {version}, saved {when} by {by}",
+      "source": "source: {source}",
+      "sources": {
+        "manual": "typed in",
+        "acs_public_2026": "ACS public prices of 1/1/2026"
+      },
+      "onInSettings": "{courier} is on in the e-shop settings.",
+      "offInSettings": "{courier} is off in the e-shop settings: customers are not offered it.",
+      "serviceMismatch": "The e-shop settings price {courier} with the {service} table, not this one: this table is not used until the setting says so.",
+      "columns": {
+        "upTo": "Up to (kg)",
+        "customer": "Customer pays (€)",
+        "cost": "POW pays (€)"
+      },
+      "bandField": {
+        "upTo": "Band {n}: up to (kg)",
+        "customer": "Band {n}: customer pays (€)",
+        "cost": "Band {n}: POW pays (€)"
+      },
+      "costOptional": "optional",
+      "addBand": "Add band",
+      "removeBand": "Remove band",
+      "overflowTitle": "Above the last band",
+      "perKgCustomer": "Each extra kg, customer pays (€)",
+      "perKgCost": "Each extra kg, POW pays (€)",
+      "maxKg": "Heaviest parcel (kg)",
+      "overflowHelp": "Each started kg above the last band costs the extra amount (0: nothing heavier than the last band is taken). A parcel heavier than the heaviest is not offered this courier.",
+      "save": "Save",
+      "undo": "Undo changes",
+      "unsaved": "Unsaved changes",
+      "prefill": "Fill with ACS public prices",
+      "prefillTitle": "Use ACS's public prices?",
+      "prefillMessage": "This replaces the ACS door-to-door table with ACS's public Cyprus price list of 1/1/2026 (VAT and fuel surcharge included, no cost prices). The table now in use is kept in its history. Replace it with POW's contract prices when you have them.",
+      "prefillOk": "Fill the table",
+      "discardTitle": "Discard the changes?",
+      "discardMessage": "Reload the saved fee tables and lose the changes made on this page?",
+      "discardOk": "Discard",
+      "errorsTitle": "Not saved, please correct:",
+      "refusedTitle": "Not saved, the server refused it:",
+      "errors": {
+        "noBands": "At least one weight band is needed.",
+        "tooManyBands": "At most 200 bands.",
+        "bandWeight": "Band {n}: the weight must be in kg, above 0, with at most 3 decimals (at most 1000 kg).",
+        "bandCustomer": "Band {n}: the customer price must be an amount from 0 to 10000, with at most 2 decimals.",
+        "bandCost": "Band {n}: the cost price must be empty, or an amount from 0 to 10000 with at most 2 decimals.",
+        "bandTwice": "Two bands end at {kg} kg.",
+        "perKgCustomer": "Each extra kg, customer: an amount from 0 to 1000, with at most 2 decimals.",
+        "perKgCost": "Each extra kg, POW: empty, or an amount from 0 to 1000 with at most 2 decimals.",
+        "maxKg": "The heaviest parcel must be a weight in kg above 0, with at most 3 decimals (at most 1000 kg).",
+        "maxBelowBand": "The heaviest parcel cannot be lighter than the last band."
+      },
+      "preview": {
+        "title": "Price a parcel",
+        "help": "What a weight costs with the SAVED tables (unsaved changes are not used).",
+        "courier": "Courier",
+        "weight": "Weight (kg)",
+        "run": "Price it",
+        "result": "A {kg} kg parcel costs the customer {customer} and POW {cost}.",
+        "notPriced": "A {kg} kg parcel cannot go by {courier}: {reason}.",
+        "band": "Band: {band}",
+        "badWeight": "Type a weight in kg, above 0 (at most 3 decimals).",
+        "codes": {
+          "NO_TARIFF": "there is no fee table yet",
+          "TOO_HEAVY": "it is too heavy",
+          "INVALID_WEIGHT": "the weight is not valid"
+        }
+      },
+      "toast": {
+        "loadFailed": "Could not load the fee tables",
+        "saved": "{courier} fee table saved (version {version})",
+        "saveFailed": "Could not save the fee table",
+        "prefilled": "ACS table filled with the public prices (version {version})",
+        "prefillFailed": "Could not fill the table",
+        "previewFailed": "Could not price the weight"
       }
     }
   },

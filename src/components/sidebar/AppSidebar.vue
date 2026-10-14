@@ -296,6 +296,33 @@
 
         <Transition name="fade">
           <div v-if="eshopOpen" class="flex flex-col gap-y-1">
+            <!-- Orders and stock holds: admins and supervisors (resolving an Exception is admin-only on the page) -->
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopOrders'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/orders"
+            >
+              <VaIcon name="mso-receipt_long" class="mr-2" />
+              {{ t('eshop.nav.orders') }}
+            </RouterLink>
+
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopHolds'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/holds"
+            >
+              <VaIcon name="mso-lock_clock" class="mr-2" />
+              {{ t('eshop.nav.holds') }}
+            </RouterLink>
+
             <RouterLink
               v-if="userRole.includes('admin')"
               :class="[
@@ -334,6 +361,33 @@
             >
               <VaIcon name="mso-weight" class="mr-2" />
               {{ t('eshop.nav.weights') }}
+            </RouterLink>
+
+            <!-- Courier fees (saving: admins) and delivery costs: admins and supervisors -->
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopRates'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/courier-fees"
+            >
+              <VaIcon name="mso-local_shipping" class="mr-2" />
+              {{ t('eshop.nav.rates') }}
+            </RouterLink>
+
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopShipping'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/delivery-costs"
+            >
+              <VaIcon name="mso-request_quote" class="mr-2" />
+              {{ t('eshop.nav.shipping') }}
             </RouterLink>
           </div>
         </Transition>

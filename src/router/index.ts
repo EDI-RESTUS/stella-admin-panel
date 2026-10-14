@@ -112,6 +112,34 @@ const routes: Array<RouteRecordRaw> = [
         meta: { roles: ['admin', 'super-admin', 'supervisor'] },
       },
       {
+        // E-shop operations, readable by supervisors too (the backend's staff
+        // roles): orders with their fulfilment steps, stock holds, courier fee
+        // tables, delivery costs. Resolving an order's Exception and saving or
+        // filling a fee table stay admin-only on the pages, as on the backend.
+        name: 'eshopOrders',
+        path: 'eshop/orders',
+        component: () => import('../pages/eshop/orders.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
+        name: 'eshopHolds',
+        path: 'eshop/holds',
+        component: () => import('../pages/eshop/holds.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
+        name: 'eshopRates',
+        path: 'eshop/courier-fees',
+        component: () => import('../pages/eshop/rates.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
+        name: 'eshopShipping',
+        path: 'eshop/delivery-costs',
+        component: () => import('../pages/eshop/shipping.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
         name: 'deliveryZone',
         path: 'deliveryZone',
         component: () => import('../pages/deliveryZone/index.vue'),

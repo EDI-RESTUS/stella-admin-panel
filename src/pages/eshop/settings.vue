@@ -3,9 +3,12 @@
 // GET /eshop/settings/:outletId loads them (defaults when the outlet has none)
 // with their problems, the outlet's zones and the Cyprus districts; Save PUTs
 // the WHOLE settings object: the loaded one with the edited keys replaced, so
-// whatever this page does not show (a later phase's couriers …) goes back
-// unchanged (eshopHelpers.settingsPayloadFromForm). Checkout mode and order
-// splitting are shown but not editable yet (later phases): saved as loaded.
+// whatever this page does not show (a later phase's courier booking fields …)
+// goes back unchanged (eshopHelpers.settingsPayloadFromForm). Checkout mode and
+// order splitting are shown but not editable yet (later phases): saved as
+// loaded. Couriers: ACS and BOX NOW on/off, the fee table each is priced with,
+// the districts ACS does not serve and BOX NOW's heaviest parcel (kg here,
+// grams stored); a server without a couriers block gets none back.
 import { ref, reactive, computed, watch } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
@@ -148,6 +151,12 @@ function shopOptionsFor(region: EshopRegionRow) {
     .filter((s) => !listed.has(s.zoneId))
     .map((s) => ({ text: shopLabel(s.zoneId), value: s.zoneId }))
 }
+
+/** ACS's "not served" boxes: the districts, then any other name the server returned (shown, to be unticked). */
+const acsDistrictOptions = computed(() => {
+  const chosen = form.value?.couriers?.acs.unsupportedDistricts || []
+  return [...districts.value, ...chosen.filter((d) => !districts.value.includes(d))]
+})
 
 /* ---------------- Loading ---------------- */
 function resetPage() {
@@ -820,6 +829,73 @@ async function runCheck() {
               <VaButton preset="secondary" size="small" icon="add" @click="addPostcode">
                 {{ t('eshop.settings.postcodes.add') }}
               </VaButton>
+            </div>
+          </div>
+        </VaCardContent>
+      </VaCard>
+
+      <!-- Couriers: ACS door to door and BOX NOW lockers; their prices are the fee tables (E-shop › Courier fees) -->
+      <VaCard>
+        <VaCardContent>
+          <h2 class="va-h6">{{ t('eshop.settings.couriers.title') }}</h2>
+          <p class="va-text-secondary text-xs mt-1">{{ t('eshop.settings.couriers.help') }}</p>
+          <div v-if="!form.couriers" class="text-sm text-slate-500 mt-3">
+            {{ t('eshop.settings.couriers.notOnServer') }}
+          </div>
+          <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+            <div class="border border-slate-200 rounded-lg p-3">
+              <div class="flex items-center justify-between gap-2 flex-wrap">
+                <h3 class="font-semibold text-sm">{{ t('eshop.settings.couriers.acsTitle') }}</h3>
+                <VaSwitch
+                  v-model="form.couriers.acs.enabled"
+                  :label="t('eshop.settings.couriers.acsEnabled')"
+                  left-label
+                  size="small"
+                />
+              </div>
+              <VaInput
+                v-model="form.couriers.acs.service"
+                maxlength="20"
+                class="mt-3"
+                :label="t('eshop.settings.couriers.acsService')"
+                :messages="t('eshop.settings.couriers.acsServiceHelp')"
+              />
+              <div class="text-sm font-semibold mt-4">{{ t('eshop.settings.couriers.unsupported') }}</div>
+              <div class="flex flex-wrap gap-x-5 gap-y-2 mt-2">
+                <VaCheckbox
+                  v-for="d in acsDistrictOptions"
+                  :key="d"
+                  v-model="form.couriers.acs.unsupportedDistricts"
+                  :array-value="d"
+                  :label="d"
+                />
+              </div>
+              <div class="va-text-secondary text-xs mt-1">{{ t('eshop.settings.couriers.unsupportedHelp') }}</div>
+            </div>
+            <div class="border border-slate-200 rounded-lg p-3">
+              <div class="flex items-center justify-between gap-2 flex-wrap">
+                <h3 class="font-semibold text-sm">{{ t('eshop.settings.couriers.boxnowTitle') }}</h3>
+                <VaSwitch
+                  v-model="form.couriers.boxnow.enabled"
+                  :label="t('eshop.settings.couriers.boxnowEnabled')"
+                  left-label
+                  size="small"
+                />
+              </div>
+              <VaInput
+                v-model="form.couriers.boxnow.service"
+                maxlength="20"
+                class="mt-3"
+                :label="t('eshop.settings.couriers.boxnowService')"
+                :messages="t('eshop.settings.couriers.boxnowServiceHelp')"
+              />
+              <VaInput
+                v-model="form.couriers.boxnow.maxKg"
+                inputmode="decimal"
+                class="mt-3"
+                :label="t('eshop.settings.couriers.maxKg')"
+                :messages="t('eshop.settings.couriers.maxKgHelp')"
+              />
             </div>
           </div>
         </VaCardContent>
