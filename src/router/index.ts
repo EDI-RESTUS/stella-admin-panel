@@ -89,6 +89,29 @@ const routes: Array<RouteRecordRaw> = [
         meta: { roles: ['admin', 'super-admin', 'editor'] },
       },
       {
+        // POW e-shop (outlet.eshopFulfilment). The sidebar lists these for an
+        // outlet that has an e-shop, and for a super-admin on any outlet (who
+        // writes the first settings); on another outlet each page only says
+        // so. Roles = the backend's: settings for admins, stock and weights
+        // readable by supervisors too.
+        name: 'eshopSettings',
+        path: 'eshop/settings',
+        component: () => import('../pages/eshop/settings.vue'),
+        meta: { roles: ['admin', 'super-admin'] },
+      },
+      {
+        name: 'eshopStock',
+        path: 'eshop/stock',
+        component: () => import('../pages/eshop/stock.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
+        name: 'eshopWeights',
+        path: 'eshop/weights',
+        component: () => import('../pages/eshop/weights.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
         name: 'deliveryZone',
         path: 'deliveryZone',
         component: () => import('../pages/deliveryZone/index.vue'),
