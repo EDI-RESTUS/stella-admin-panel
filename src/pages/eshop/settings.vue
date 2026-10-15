@@ -479,19 +479,18 @@ async function runCheck() {
                 :label="t('eshop.settings.general.checkout')"
                 left-label
                 size="small"
-                disabled
+                @update:modelValue="(v: boolean) => (form.checkoutMode = v ? 'on' : 'off')"
               />
-              <div class="va-text-secondary text-xs mt-1">{{ t('eshop.settings.general.laterPhase') }}</div>
+              <div class="va-text-secondary text-xs mt-1">{{ t('eshop.settings.general.checkoutHelp') }}</div>
             </div>
             <div>
               <VaSwitch
-                :model-value="form.allowSplit"
+                v-model="form.allowSplit"
                 :label="t('eshop.settings.general.allowSplit')"
                 left-label
                 size="small"
-                disabled
               />
-              <div class="va-text-secondary text-xs mt-1">{{ t('eshop.settings.general.laterPhase') }}</div>
+              <div class="va-text-secondary text-xs mt-1">{{ t('eshop.settings.general.allowSplitHelp') }}</div>
             </div>
           </div>
 
