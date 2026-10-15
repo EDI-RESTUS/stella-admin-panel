@@ -394,17 +394,36 @@ export function settingsPayloadFromForm(
 /** A fee table's name, as PUT /eshop/rates/:outletId/:provider/:service takes it. */
 export const SERVICE_NAME = /^[A-Za-z0-9_-]{1,20}$/
 
+/** BOX NOW's locker sizes (the compartment a parcel is declared for). */
+export const BOXNOW_SIZES = [1, 2, 3] as const
+/** POW's BOX NOW contract: at most 20 kg and EUR 100 a parcel (settings may only lower them). */
+export const BOXNOW_MAX_GRAMS = 20000
+export const BOXNOW_MAX_VALUE = 100
+
 export type EshopCouriersForm = {
   acs: { enabled: boolean; service: string; unsupportedDistricts: string[]; kept: Kept }
-  /** maxKg: the heaviest parcel in kg as typed (stored in grams). */
-  boxnow: { enabled: boolean; service: string; maxKg: string; kept: Kept }
+  /**
+   * maxKg: the heaviest parcel in kg as typed (stored in grams); maxValue:
+   * the most a parcel may be worth in euros as typed; compartmentSize: the
+   * locker size parcels are booked in (1 small, 2 medium, 3 large);
+   * anyApmOriginId: the "any locker" origin of POW's BOX NOW account.
+   */
+  boxnow: {
+    enabled: boolean
+    service: string
+    maxKg: string
+    maxValue: string
+    compartmentSize: number
+    anyApmOriginId: string
+    kept: Kept
+  }
   /** Every other key of the loaded couriers block. */
   kept: Kept
 }
 
 const COURIERS_KEYS = ['acs', 'boxnow']
 const ACS_KEYS = ['enabled', 'service', 'unsupportedDistricts']
-const BOXNOW_KEYS = ['enabled', 'service', 'maxGrams']
+const BOXNOW_KEYS = ['enabled', 'service', 'maxGrams', 'maxParcelValue', 'compartmentSize', 'anyApmOriginId']
 
 /** The form of the loaded `couriers` block; null when the server returned none (it has no courier settings). */
 function couriersFormOf(c: unknown): EshopCouriersForm | null {
@@ -412,6 +431,8 @@ function couriersFormOf(c: unknown): EshopCouriersForm | null {
   const acs = isPlainObject(c.acs) ? c.acs : {}
   const boxnow = isPlainObject(c.boxnow) ? c.boxnow : {}
   const maxGrams = finite(boxnow.maxGrams)
+  const maxValue = finite(boxnow.maxParcelValue)
+  const size = Number(boxnow.compartmentSize)
   return {
     acs: {
       enabled: acs.enabled === true,
@@ -425,7 +446,14 @@ function couriersFormOf(c: unknown): EshopCouriersForm | null {
     boxnow: {
       enabled: boxnow.enabled === true,
       service: text(boxnow.service).trim() || 'LOCKER',
-      maxKg: gramsToKgText(maxGrams !== undefined && maxGrams > 0 ? maxGrams : 20000),
+      maxKg: gramsToKgText(
+        maxGrams !== undefined && maxGrams > 0 ? Math.min(maxGrams, BOXNOW_MAX_GRAMS) : BOXNOW_MAX_GRAMS,
+      ),
+      maxValue: moneyText(
+        maxValue !== undefined && maxValue > 0 ? Math.min(maxValue, BOXNOW_MAX_VALUE) : BOXNOW_MAX_VALUE,
+      ),
+      compartmentSize: (BOXNOW_SIZES as readonly number[]).includes(size) ? size : 2,
+      anyApmOriginId: text(boxnow.anyApmOriginId).trim(),
       kept: keptOf(boxnow, BOXNOW_KEYS),
     },
     kept: keptOf(c, COURIERS_KEYS),
@@ -453,12 +481,28 @@ function couriersPayloadOf(
   const boxnowService = text(c.boxnow.service).trim()
   if (!SERVICE_NAME.test(boxnowService)) errors.push(t('eshop.settings.errors.boxnowService'))
   const maxGrams = kgTextToGrams(c.boxnow.maxKg)
-  if (!(maxGrams >= 1 && maxGrams <= 1000000)) errors.push(t('eshop.settings.errors.boxnowMaxKg'))
+  if (!(maxGrams >= 1 && maxGrams <= BOXNOW_MAX_GRAMS)) errors.push(t('eshop.settings.errors.boxnowMaxKg'))
+  const maxParcelValue = moneyFromText(c.boxnow.maxValue)
+  if (!(maxParcelValue > 0 && maxParcelValue <= BOXNOW_MAX_VALUE))
+    errors.push(t('eshop.settings.errors.boxnowMaxValue'))
+  const compartmentSize = (BOXNOW_SIZES as readonly number[]).includes(Number(c.boxnow.compartmentSize))
+    ? Number(c.boxnow.compartmentSize)
+    : 2
+  const anyApmOriginId = text(c.boxnow.anyApmOriginId).trim()
+  if (anyApmOriginId.length > 40) errors.push(t('eshop.settings.errors.boxnowOrigin'))
   return {
     couriers: {
       ...c.kept,
       acs: { ...c.acs.kept, enabled: c.acs.enabled === true, service: acsService, unsupportedDistricts },
-      boxnow: { ...c.boxnow.kept, enabled: c.boxnow.enabled === true, service: boxnowService, maxGrams },
+      boxnow: {
+        ...c.boxnow.kept,
+        enabled: c.boxnow.enabled === true,
+        service: boxnowService,
+        maxGrams,
+        maxParcelValue,
+        compartmentSize,
+        anyApmOriginId,
+      },
     },
     errors,
   }

@@ -570,7 +570,16 @@
         "boxnowService": "BOX NOW fee table",
         "boxnowServiceHelp": "The fee table BOX NOW is priced with: LOCKER unless told otherwise.",
         "maxKg": "Heaviest parcel (kg)",
-        "maxKgHelp": "A heavier parcel is not offered BOX NOW."
+        "maxKgHelp": "BOX NOW takes at most 20 kg. A heavier parcel is not offered BOX NOW.",
+        "maxValue": "Most a parcel may be worth (€)",
+        "maxValueHelp": "BOX NOW takes parcels worth up to €100 (POW's contract). A dearer parcel is not offered BOX NOW.",
+        "size": "Locker size parcels are booked in",
+        "sizeHelp": "Medium fits most parcels. A parcel that does not fit can be booked again as large.",
+        "sizeSmall": "Small (8 × 45 × 60 cm)",
+        "sizeMedium": "Medium (17 × 45 × 60 cm)",
+        "sizeLarge": "Large (36 × 45 × 60 cm)",
+        "origin": "Any-locker origin id",
+        "originHelp": "From POW's BOX NOW account: staff drop parcels into any BOX NOW locker. Leave empty until the account is set up (test bookings work without it)."
       },
       "errors": {
         "reservationMinutes": "Reservation minutes must be a whole number from 1 to 60.",
@@ -595,7 +604,9 @@
         "acsService": "ACS: the fee table name must be 1 to 20 letters, digits, - or _.",
         "acsDistricts": "ACS: at most 10 districts not served.",
         "boxnowService": "BOX NOW: the fee table name must be 1 to 20 letters, digits, - or _.",
-        "boxnowMaxKg": "BOX NOW: the heaviest parcel must be a weight in kg above 0, with at most 3 decimals (at most 1000 kg)."
+        "boxnowMaxKg": "BOX NOW: the heaviest parcel must be a weight in kg above 0 and at most 20 kg, with at most 3 decimals.",
+        "boxnowMaxValue": "BOX NOW: the most a parcel may be worth must be an amount above €0 and at most €100.",
+        "boxnowOrigin": "BOX NOW: the origin id is longer than 40 characters."
       }
     },
     "stock": {

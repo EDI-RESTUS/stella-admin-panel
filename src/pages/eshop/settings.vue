@@ -140,6 +140,11 @@ const regionOptions = computed(() => [
 ])
 
 const priceLevelOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+const boxnowSizeOptions = computed(() => [
+  { text: t('eshop.settings.couriers.sizeSmall'), value: 1 },
+  { text: t('eshop.settings.couriers.sizeMedium'), value: 2 },
+  { text: t('eshop.settings.couriers.sizeLarge'), value: 3 },
+])
 const unitOptions = computed(() => [
   { text: t('eshop.settings.general.unitKg'), value: 'kg' },
   { text: t('eshop.settings.general.unitG'), value: 'g' },
@@ -894,6 +899,29 @@ async function runCheck() {
                 class="mt-3"
                 :label="t('eshop.settings.couriers.maxKg')"
                 :messages="t('eshop.settings.couriers.maxKgHelp')"
+              />
+              <VaInput
+                v-model="form.couriers.boxnow.maxValue"
+                inputmode="decimal"
+                class="mt-3"
+                :label="t('eshop.settings.couriers.maxValue')"
+                :messages="t('eshop.settings.couriers.maxValueHelp')"
+              />
+              <VaSelect
+                v-model="form.couriers.boxnow.compartmentSize"
+                :options="boxnowSizeOptions"
+                value-by="value"
+                text-by="text"
+                class="mt-3"
+                :label="t('eshop.settings.couriers.size')"
+                :messages="t('eshop.settings.couriers.sizeHelp')"
+              />
+              <VaInput
+                v-model="form.couriers.boxnow.anyApmOriginId"
+                maxlength="40"
+                class="mt-3"
+                :label="t('eshop.settings.couriers.origin')"
+                :messages="t('eshop.settings.couriers.originHelp')"
               />
             </div>
           </div>
