@@ -1358,6 +1358,37 @@
                 class="w-full"
               />
             </div>
+
+            <!-- Welcome SMS: no defaults on purpose, so an outlet whose staff never
+                 touch it saves exactly what it stored before. -->
+            <div v-if="restaurantData.smsSettings.enabled" class="w-full mt-6">
+              <VaSwitch
+                v-model="restaurantData.smsSettings.welcomeEnabled"
+                label="Send a welcome SMS when a customer registers"
+                left-label
+                size="small"
+              />
+              <div class="text-sm mt-2 opacity-70">
+                Sent from this outlet's own SMS account once the customer's account is created: website and app, and
+                e-mail registration when a phone was given.
+              </div>
+              <template v-if="restaurantData.smsSettings.welcomeEnabled">
+                <VaTextarea
+                  v-model="restaurantData.smsSettings.welcomeTemplate"
+                  label="Welcome SMS"
+                  name="smsWelcomeTemplate"
+                  :min-rows="4"
+                  :max-rows="10"
+                  :rules="[welcomeSmsRule]"
+                  class="w-full mt-3"
+                />
+                <div class="text-xs mt-1 opacity-70">
+                  Use <span v-pre>{{ firstName }}</span> for the customer's first name,
+                  <span v-pre>{{ name }}</span> for the full name and <span v-pre>{{ brand }}</span> for the outlet
+                  name. {{ welcomeSmsSize }}
+                </div>
+              </template>
+            </div>
           </div>
         </VaCardContent>
       </VaCard>
@@ -1770,6 +1801,21 @@ const isOpeningTimeOfDay = (value) => {
 // "Use Winmax for stock": a database name the backend can open at all
 // (winmaxSql.service) — letters, digits and underscore.
 const WINMAX_DATABASE_NAME = /^[A-Za-z0-9_]+$/
+// SMS size: the GSM 7-bit alphabet (the extension characters take two places);
+// anything else (Greek lower case, emoji, curly quotes) makes the whole SMS
+// Unicode — 70 characters, or 67 per part when it is split, instead of 160/153.
+const GSM_BASIC =
+  '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà'
+const GSM_EXTENDED = '^{}\\[~]|€'
+const smsSizeOf = (text) => {
+  const chars = Array.from(String(text ?? ''))
+  if (chars.every((c) => GSM_BASIC.includes(c) || GSM_EXTENDED.includes(c))) {
+    const length = chars.reduce((n, c) => n + (GSM_EXTENDED.includes(c) ? 2 : 1), 0)
+    return { unicode: false, length, parts: length <= 160 ? 1 : Math.ceil(length / 153) }
+  }
+  const length = String(text ?? '').length // UTF-16 units: an emoji takes two
+  return { unicode: true, length, parts: length <= 70 ? 1 : Math.ceil(length / 67) }
+}
 // 'a', 'a and b', 'a, b and c'.
 const joinWithAnd = (parts) =>
   parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
@@ -2318,6 +2364,20 @@ export default {
     galleryType() {
       return this.isGalleryViewEnabled ? 'gallery' : 'list'
     },
+    /** "About 4 SMS per customer …" for the welcome SMS as typed. */
+    welcomeSmsSize() {
+      const text = String(this.restaurantData?.smsSettings?.welcomeTemplate ?? '').trim()
+      if (!text) return ''
+      const size = smsSizeOf(text)
+      if (size.unicode) {
+        return size.parts === 1
+          ? 'About 1 SMS per customer (a Unicode SMS: up to 70 characters).'
+          : `About ${size.parts} SMS per customer: emoji or Greek letters make it a Unicode SMS (67 characters per part).`
+      }
+      return size.parts === 1
+        ? 'About 1 SMS per customer (up to 160 characters).'
+        : `About ${size.parts} SMS per customer (153 characters per part).`
+    },
     /** One line on which key signs this outlet's pushes (upload / server file / server default / none). */
     pushCredentialsSummary() {
       const s = this.pushCredentials.status
@@ -2545,6 +2605,12 @@ export default {
     this.fetchRestaurantDetails()
   },
   methods: {
+    /** The welcome SMS: needed while the switch is on; at most 480 characters (the server's limit). */
+    welcomeSmsRule(value) {
+      const text = String(value ?? '').trim()
+      if (!text) return 'Type the welcome SMS, or switch it off.'
+      return text.length <= 480 || 'At most 480 characters.'
+    },
     /**
      * Firebase service account of this outlet's push notifications. Every
      * brand app has its own Firebase project, so the key the server signs
