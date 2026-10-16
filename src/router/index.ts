@@ -140,6 +140,14 @@ const routes: Array<RouteRecordRaw> = [
         meta: { roles: ['admin', 'super-admin', 'supervisor'] },
       },
       {
+        // POW on the Fetch marketplace: the stock and price feed's settings
+        // and keys, admins only (the backend's roles).
+        name: 'eshopFetch',
+        path: 'eshop/fetch',
+        component: () => import('../pages/eshop/fetch.vue'),
+        meta: { roles: ['admin', 'super-admin'] },
+      },
+      {
         name: 'deliveryZone',
         path: 'deliveryZone',
         component: () => import('../pages/deliveryZone/index.vue'),

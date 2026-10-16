@@ -389,6 +389,21 @@
               <VaIcon name="mso-request_quote" class="mr-2" />
               {{ t('eshop.nav.shipping') }}
             </RouterLink>
+
+            <!-- Fetch marketplace feed (its settings and keys): admins -->
+            <RouterLink
+              v-if="userRole.includes('admin')"
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopFetch'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/fetch"
+            >
+              <VaIcon name="mso-sync_alt" class="mr-2" />
+              {{ t('eshop.nav.fetch') }}
+            </RouterLink>
           </div>
         </Transition>
       </div>
