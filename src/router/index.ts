@@ -148,6 +148,14 @@ const routes: Array<RouteRecordRaw> = [
         meta: { roles: ['admin', 'super-admin'] },
       },
       {
+        // Prepaid codes (ContentCard gift cards / game codes): the switch,
+        // limits, voucher zone and the ContentCard access — admins only.
+        name: 'eshopPrepaid',
+        path: 'eshop/prepaid-codes',
+        component: () => import('../pages/eshop/prepaid-codes.vue'),
+        meta: { roles: ['admin', 'super-admin'] },
+      },
+      {
         name: 'deliveryZone',
         path: 'deliveryZone',
         component: () => import('../pages/deliveryZone/index.vue'),
