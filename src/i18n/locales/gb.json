@@ -482,6 +482,8 @@
         "allowSplit": "Split orders between shops",
         "checkoutHelp": "On: the website takes orders through the e-shop — delivery by courier from the shops, collection from a shop, codes by e-mail — paid online by card. Off: the old checkout.",
         "allowSplitHelp": "On: when no single shop has everything, the order is shared between shops (a parcel from each; the customer pays one delivery fee). Off: such an order is refused.",
+        "testPayments": "Test payments (cash counts as paid)",
+        "testPaymentsHelp": "TESTING ONLY. On: the website also offers cash, and a cash order counts as paid at once — it goes to Winmax and the couriers like a paid order. It only works on a test server (ESHOP_TEST_PAYMENTS); on a live server the switch has no effect.",
         "reservationMinutes": "Reservation minutes",
         "reservationMinutesHelp": "How long stock is held for a customer while paying (1 to 60).",
         "tareGrams": "Packaging (grams)",

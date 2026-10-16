@@ -129,6 +129,8 @@ export type EshopSettingsForm = {
   /** Shown, never edited here (checkout comes in a later phase): saved back as loaded. */
   checkoutMode: 'off' | 'on'
   allowSplit: boolean
+  /** Test payments: a cash order counts as paid — the server allows it only where it is a test server. */
+  testPayments: boolean
   shops: EshopShopRow[]
   regions: EshopRegionRow[]
   /** district → region key, NO_REGION for none. */
@@ -152,6 +154,7 @@ const SETTINGS_KEYS = [
   'enabled',
   'checkoutMode',
   'allowSplit',
+  'testPayments',
   'shops',
   'regions',
   'districtRegions',
@@ -221,6 +224,7 @@ export function formFromSettings(s: any, districts: string[] = CYPRUS_DISTRICTS)
     enabled: src.enabled === true,
     checkoutMode: src.checkoutMode === 'on' ? 'on' : 'off',
     allowSplit: src.allowSplit === true,
+    testPayments: src.testPayments === true,
     // The PUT only ever stores 24-hex zone ids; anything else could not be saved back.
     shops: (Array.isArray(src.shops) ? src.shops : [])
       .filter((sh: any) => HEX24.test(text(sh?.zoneId)))
@@ -367,6 +371,7 @@ export function settingsPayloadFromForm(
       enabled: form.enabled === true,
       checkoutMode: form.checkoutMode === 'on' ? 'on' : 'off',
       allowSplit: form.allowSplit === true,
+      testPayments: form.testPayments === true,
       shops,
       regions,
       districtRegions,

@@ -497,6 +497,16 @@ async function runCheck() {
               />
               <div class="va-text-secondary text-xs mt-1">{{ t('eshop.settings.general.allowSplitHelp') }}</div>
             </div>
+            <div>
+              <VaSwitch
+                v-model="form.testPayments"
+                :label="t('eshop.settings.general.testPayments')"
+                color="danger"
+                left-label
+                size="small"
+              />
+              <div class="va-text-secondary text-xs mt-1">{{ t('eshop.settings.general.testPaymentsHelp') }}</div>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
