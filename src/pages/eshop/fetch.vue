@@ -55,9 +55,23 @@ type KeyView = {
   storeIds: string[]
   storesSeen: FetchStore[]
 }
-type Credentials = { keyState: string; liveCallsAllowed: boolean; test: KeyView[]; live: KeyView[] }
-/** What Load stores said about one saved key. */
-type StoreKeyLine = { clientIdMasked: string; label: string; ok: boolean; message: string; stores: number }
+type Credentials = {
+  keyState: string
+  liveCallsAllowed: boolean
+  /** The test system runs on Fetch's own API: test keys are used for sandbox stores only. */
+  testSandboxOnly: boolean
+  test: KeyView[]
+  live: KeyView[]
+}
+/** What Load stores said about one saved key (clientId = the public Partner ID). */
+type StoreKeyLine = {
+  clientId: string
+  clientIdMasked: string
+  label: string
+  ok: boolean
+  message: string
+  stores: number
+}
 type Shop = { zoneId: string; name: string; active: boolean }
 type Note = { ok: boolean; text: string }
 type RunAnswer = { title: string; at: string; color: 'success' | 'warning' | 'danger'; lines: string[] }
@@ -140,6 +154,7 @@ function keyViewsOf(v: unknown): KeyView[] {
 
 function storeKeyLinesOf(v: unknown): StoreKeyLine[] {
   return (Array.isArray(v) ? v : []).map((k: any) => ({
+    clientId: text(k?.clientId).trim(),
     clientIdMasked: text(k?.clientIdMasked),
     label: text(k?.label).trim(),
     ok: k?.ok === true,
@@ -257,6 +272,7 @@ function takeView(d: any, takeForm: boolean) {
     credentials.value = {
       keyState: text(c.keyState),
       liveCallsAllowed: c.liveCallsAllowed === true,
+      testSandboxOnly: c.testSandboxOnly === true,
       test: keyViewsOf(c.test),
       live: keyViewsOf(c.live),
     }
@@ -1046,7 +1062,7 @@ watch(
                 : t('eshop.fetch.keys.serverKeyMissing')
             }}
           </VaAlert>
-          <VaAlert v-if="liveOffHere" color="info" border="left" class="mt-3">
+          <VaAlert v-if="credentials && credentials.testSandboxOnly" color="info" border="left" class="mt-3">
             {{ t('eshop.fetch.keys.sandboxOnly') }}
           </VaAlert>
 
@@ -1333,8 +1349,8 @@ watch(
           </div>
           <ul v-if="storeList && storeList.keys.length" class="text-xs mt-1 list-disc pl-5">
             <li
-              v-for="k in storeList.keys"
-              :key="k.clientIdMasked"
+              v-for="(k, i) in storeList.keys"
+              :key="k.clientId || i"
               class="break-words"
               :class="k.ok ? 'text-slate-600' : 'text-danger'"
             >

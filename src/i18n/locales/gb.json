@@ -1039,7 +1039,7 @@
         "serverKeyMissing": "This server has no FETCH_SECRET_KEY. It needs one before Fetch keys can be saved, because the API key is stored locked with it.",
         "serverKeyInvalid": "This server's FETCH_SECRET_KEY is not valid (it must be base64 of exactly 32 bytes): Fetch keys cannot be saved or used until it is fixed.",
         "liveOff": "Live calls to Fetch are switched off on this server: live keys cannot be saved, tested or used here — save them on the live server.",
-        "sandboxOnly": "This server keeps to Fetch's sandbox: a test key is used only for the sandbox stores it lists, and a key that lists other stores (a staging or live key) is refused.",
+        "sandboxOnly": "The test system talks to Fetch's own API, so a test key is used only for the sandbox stores it lists; a key that lists other stores is a live key — it is refused here and belongs under the live system.",
         "none": "No key saved for this system yet.",
         "secretEnding": "…{last4}",
         "saved": "Saved",
