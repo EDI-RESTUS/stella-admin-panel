@@ -247,11 +247,11 @@
                   Before pickup: a pre-order reaches the kitchen the zone's lead time before its pickup time (as today).
                   Same day / later days: a pre-order for today is sent the moment it is paid, like a normal order, with
                   its FUTURE line and pickup time on the ticket; one for a later day is sent at this outlet's opening
-                  time on that day (Opening Times, Cyprus time; a day without hours uses the lead time). A pre-order
-                  for today that is paid before the outlet has opened that day (after midnight, while it is still
-                  closed) waits and is sent at that day's opening time. In both cases a pickup sooner after opening
-                  than the zone's lead time is sent the lead time before the pickup. Switching moves the pre-orders
-                  already waiting to the new times.
+                  time on that day (Opening Times, Cyprus time; a day without hours uses the lead time). A pre-order for
+                  today that is paid before the outlet has opened that day (after midnight, while it is still closed)
+                  waits and is sent at that day's opening time. In both cases a pickup sooner after opening than the
+                  zone's lead time is sent the lead time before the pickup. Switching moves the pre-orders already
+                  waiting to the new times.
                 </div>
               </div>
               <!-- Skip tables still in use: before the zone counter hands a paid
@@ -1580,7 +1580,9 @@
               >
                 <div class="font-bold text-sm mb-1">{{ t('outletForm.customerApp.serviceAccount') }}</div>
                 <div class="text-sm opacity-70 mb-3">{{ t('outletForm.customerApp.serviceAccountHelp') }}</div>
-                <div v-if="!restaurantId" class="text-sm">{{ t('outletForm.customerApp.serviceAccountCreateHint') }}</div>
+                <div v-if="!restaurantId" class="text-sm">
+                  {{ t('outletForm.customerApp.serviceAccountCreateHint') }}
+                </div>
                 <div v-else-if="pushCredentials.loading" class="text-sm">
                   {{ t('outletForm.customerApp.serviceAccountLoading') }}
                 </div>
@@ -1618,7 +1620,9 @@
                       {{ t('outletForm.customerApp.serviceAccountTest') }}
                     </VaButton>
                     <VaButton
-                      v-if="pushCredentials.status && pushCredentials.status.upload && pushCredentials.status.upload.present"
+                      v-if="
+                        pushCredentials.status && pushCredentials.status.upload && pushCredentials.status.upload.present
+                      "
                       size="small"
                       preset="secondary"
                       color="danger"
@@ -1635,8 +1639,12 @@
                   >
                     {{
                       pushCredentials.testResult.ok
-                        ? t('outletForm.customerApp.serviceAccountTestOk', { project: pushCredentials.testResult.projectId })
-                        : t('outletForm.customerApp.serviceAccountTestFailed', { error: pushCredentials.testResult.error })
+                        ? t('outletForm.customerApp.serviceAccountTestOk', {
+                            project: pushCredentials.testResult.projectId,
+                          })
+                        : t('outletForm.customerApp.serviceAccountTestFailed', {
+                            error: pushCredentials.testResult.error,
+                          })
                     }}
                   </div>
                 </template>
@@ -2075,6 +2083,8 @@ export default {
           senderId: '',
           baseUrl: '',
           otpTemplate: '',
+          welcomeEnabled: false,
+          welcomeTemplate: '',
         },
         turnstileSettings: {
           enabled: false,
@@ -2699,7 +2709,8 @@ export default {
         })
       } catch (error) {
         this.init({
-          message: error?.response?.data?.message || this.t('outletForm.customerApp.serviceAccountTestFailed', { error: '' }),
+          message:
+            error?.response?.data?.message || this.t('outletForm.customerApp.serviceAccountTestFailed', { error: '' }),
           color: 'danger',
         })
       } finally {
@@ -2760,7 +2771,9 @@ export default {
           })
         } else if (!lines.length) {
           this.init({
-            message: `No Winmax service zone matches sales document type "${ctx.documentTypeCode || '?'}" — check the Winmax settings and document type, then save and retry.`,
+            message: `No Winmax service zone matches sales document type "${
+              ctx.documentTypeCode || '?'
+            }" — check the Winmax settings and document type, then save and retry.`,
             color: 'warning',
           })
         } else {
@@ -3101,7 +3114,9 @@ export default {
             res.posReceiptHeader = res.posReceiptHeader || ''
             res.posReceiptFooter = res.posReceiptFooter || ''
             res.posReceiptVatPercent =
-              res.posReceiptVatPercent === null || res.posReceiptVatPercent === undefined ? '' : String(res.posReceiptVatPercent)
+              res.posReceiptVatPercent === null || res.posReceiptVatPercent === undefined
+                ? ''
+                : String(res.posReceiptVatPercent)
             // Winmax retail loyalty: outlets saved before these fields existed
             // have no keys; arrays become the comma-separated inputs.
             res.winmaxRetailLoyalty = res.winmaxRetailLoyalty === true
@@ -3148,6 +3163,8 @@ export default {
               senderId: '',
               baseUrl: '',
               otpTemplate: '',
+              welcomeEnabled: false,
+              welcomeTemplate: '',
               ...(res.smsSettings || {}),
             }
             res.turnstileSettings = {
@@ -3539,6 +3556,9 @@ export default {
           senderId: this.restaurantData.smsSettings?.senderId || '',
           baseUrl: this.restaurantData.smsSettings?.baseUrl || '',
           otpTemplate: this.restaurantData.smsSettings?.otpTemplate || '',
+          // the welcome SMS (backend 06e7a7c): without these two the save erased them
+          welcomeEnabled: !!this.restaurantData.smsSettings?.welcomeEnabled,
+          welcomeTemplate: (this.restaurantData.smsSettings?.welcomeTemplate || '').slice(0, 480),
         },
         turnstileSettings: {
           enabled: !!this.restaurantData.turnstileSettings?.enabled,
