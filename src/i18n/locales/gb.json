@@ -1021,7 +1021,7 @@
         "liveOffOption": "Fetch live system (off on this server)",
         "notes": {
           "dryRun": "Dry run: nothing is sent to Fetch. The stores are samples (one per POW shop) and their listings are POW articles, so the whole feed can be tried before Fetch gives us keys.",
-          "test": "Fetch test system: stock and prices go to Fetch's sandbox, not to the real shop. It needs the test Partner ID and API key below.",
+          "test": "Fetch test system: stock and prices go to Fetch's sandbox stores, not to the real shops. It needs the shops' test keys below, tested — Fetch says which stores each key can use.",
           "live": "Fetch live system: stock and prices go to POW's real stores on Fetch, where customers see them. Only the live server may send to it, with the live Partner ID and API key below."
         },
         "liveOff": "Live calls to Fetch are switched off on this server, so nothing can be sent to the live system from here.",
@@ -1029,18 +1029,18 @@
       },
       "keys": {
         "title": "Fetch keys",
-        "help": "Fetch gives a Partner ID and an API key for its test system, and another pair for its live system. The API key is stored locked on the server and is never shown again, only its last 4 characters.",
+        "help": "Fetch gives one Partner ID and API key PER SHOP (\"Credentials for POW! The Shop Nicosia Mall\" …) for its test system, and new pairs for its live system later. Save each pair here and press Test: Fetch then says which stores that key can use, and the feed sends each linked store with a key that can use it. An API key is stored locked on the server and never shown again, only its last 4 characters.",
         "systems": {
-          "test": "Test system",
+          "test": "Test system (sandbox)",
           "live": "Live system"
         },
+        "count": "— {n} key(s)",
         "inUse": "Used by the mode",
         "serverKeyMissing": "This server has no FETCH_SECRET_KEY. It needs one before Fetch keys can be saved, because the API key is stored locked with it.",
         "serverKeyInvalid": "This server's FETCH_SECRET_KEY is not valid (it must be base64 of exactly 32 bytes): Fetch keys cannot be saved or used until it is fixed.",
-        "liveOff": "Live calls to Fetch are switched off on this server: a live key can be saved here, but not tested or used.",
-        "none": "No key saved.",
-        "partnerId": "Partner ID",
-        "apiKey": "API key",
+        "liveOff": "Live calls to Fetch are switched off on this server: live keys cannot be saved, tested or used here — save them on the live server.",
+        "sandboxOnly": "This server keeps to Fetch's sandbox: a test key is used only for the sandbox stores it lists, and a key that lists other stores (a staging or live key) is refused.",
+        "none": "No key saved for this system yet.",
         "secretEnding": "…{last4}",
         "saved": "Saved",
         "savedBy": "by {name}",
@@ -1048,16 +1048,18 @@
         "testOk": "OK",
         "testFailed": "Failed",
         "storesSeen": "Stores this key can use: {list}",
+        "storesNone": "Not tested yet — press Test so Fetch says which stores this key can use.",
+        "addTitle": "Add a key",
+        "label": "Shop (the name Fetch gave the key)",
+        "labelPlaceholder": "e.g. POW! The Shop Nicosia Mall",
         "clientId": "Partner ID",
-        "clientIdReplace": "New Partner ID",
         "clientSecret": "API key",
-        "clientSecretReplace": "New API key",
-        "inputHelp": "Both fields are needed. Saving replaces the saved pair of this system.",
+        "inputHelp": "Partner ID and API key are needed; the shop name is for this page. A Partner ID saved again gets the new API key and must be tested again.",
         "save": "Save key",
         "test": "Test",
-        "savedNote": "Saved. Press Test to check it with Fetch.",
-        "removeTitle": "Remove the {system} key?",
-        "removeMessage": "The Partner ID and API key are deleted from this server. If the feed sends to this system, nothing more is sent until a key is saved again."
+        "savedNote": "{label} saved. Press Test to check it with Fetch.",
+        "removeTitle": "Remove the key {label}?",
+        "removeMessage": "The Partner ID and API key are deleted from this server. Stores only this key could use are not sent to any more."
       },
       "feed": {
         "title": "What is sent",
@@ -1098,8 +1100,10 @@
         "noneToAdd": "No other store known: press Load stores, or test the key.",
         "add": "Add",
         "load": "Load stores",
-        "addHelp": "The list holds the stores of the mode: Load stores asks Fetch (a dry run gives one sample store per POW shop), and a tested key adds the stores it can use.",
+        "addHelp": "The list holds the stores of the mode: Load stores asks Fetch with every saved key of the mode (a dry run gives one sample store per POW shop), and a tested key adds the stores it can use.",
         "loaded": "{n} store(s) found (mode: {mode}).",
+        "keyLine": "{label}: {n} store(s)",
+        "keyFailed": "{label}: {message}",
         "loadSavedMode": "Load stores asks Fetch in the saved mode ({saved}). Save first to see the stores of the mode picked ({mode})."
       },
       "status": {

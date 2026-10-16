@@ -8,9 +8,11 @@
 // a store can sell from, the state of the keys and each store's last runs.
 // Save PUTs mode + feed + stores (a strict body: exactly those keys); the
 // server refuses a switched-on save while a problem remains. The keys (Partner
-// ID + API key) are per Fetch system (test, live) and write-only: the server
-// never returns the API key, only its last 4 characters. "Load stores", the
-// status buttons and the listings work on the SAVED settings (mode and stores).
+// ID + API key) are ONE PER SHOP, per Fetch system (test, live), and
+// write-only: the server never returns an API key, only its last 4
+// characters. Test asks Fetch which stores a key can use; the feed sends each
+// linked store with a key that can. "Load stores", the status buttons and the
+// listings work on the SAVED settings (mode and stores).
 import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
@@ -38,17 +40,24 @@ type FeedForm = Omit<FeedSettings, 'stockBuffer' | 'unlimitedStock'> & {
   unlimitedMode: 'leave' | 'send'
   unlimitedCount: string | number
 }
+/** One shop's key as the server answers it (never the API key itself). */
 type KeyView = {
+  clientId: string
   clientIdMasked: string
+  label: string
   secretLast4: string
   savedBy: string
   savedAt: string
   lastTestAt: string
   lastTestOk: boolean | null
   lastTestMessage: string
+  /** The stores its last successful test listed: the feed sends those with this key. */
+  storeIds: string[]
   storesSeen: FetchStore[]
 }
-type Credentials = { keyState: string; liveCallsAllowed: boolean; test: KeyView | null; live: KeyView | null }
+type Credentials = { keyState: string; liveCallsAllowed: boolean; test: KeyView[]; live: KeyView[] }
+/** What Load stores said about one saved key. */
+type StoreKeyLine = { clientIdMasked: string; label: string; ok: boolean; message: string; stores: number }
 type Shop = { zoneId: string; name: string; active: boolean }
 type Note = { ok: boolean; text: string }
 type RunAnswer = { title: string; at: string; color: 'success' | 'warning' | 'danger'; lines: string[] }
@@ -108,17 +117,35 @@ function settingsOf(s: any): FeedSettings {
 }
 
 function keyViewOf(v: any): KeyView | null {
-  if (!v || typeof v !== 'object') return null
+  if (!v || typeof v !== 'object' || !text(v.clientId).trim()) return null
   return {
+    clientId: text(v.clientId).trim(),
     clientIdMasked: text(v.clientIdMasked),
+    label: text(v.label).trim(),
     secretLast4: text(v.secretLast4),
     savedBy: text(v.savedBy),
     savedAt: text(v.savedAt),
     lastTestAt: text(v.lastTestAt),
     lastTestOk: typeof v.lastTestOk === 'boolean' ? v.lastTestOk : null,
     lastTestMessage: text(v.lastTestMessage),
+    storeIds: strings(v.storeIds),
     storesSeen: storesOf(v.storesSeen),
   }
+}
+
+/** The keys of one system as answered (a list; anything else = none). */
+function keyViewsOf(v: unknown): KeyView[] {
+  return (Array.isArray(v) ? v : []).map(keyViewOf).filter((k): k is KeyView => !!k)
+}
+
+function storeKeyLinesOf(v: unknown): StoreKeyLine[] {
+  return (Array.isArray(v) ? v : []).map((k: any) => ({
+    clientIdMasked: text(k?.clientIdMasked),
+    label: text(k?.label).trim(),
+    ok: k?.ok === true,
+    message: text(k?.message),
+    stores: Number(k?.stores) || 0,
+  }))
 }
 
 /** A failed call in words; a 404 without the server's own message: this server has no Fetch functions yet. */
@@ -230,8 +257,8 @@ function takeView(d: any, takeForm: boolean) {
     credentials.value = {
       keyState: text(c.keyState),
       liveCallsAllowed: c.liveCallsAllowed === true,
-      test: keyViewOf(c.test),
-      live: keyViewOf(c.live),
+      test: keyViewsOf(c.test),
+      live: keyViewsOf(c.live),
     }
   }
   states.value = Array.isArray(d?.states) ? d.states : []
@@ -379,9 +406,13 @@ const unlimitedOptions = computed(() => [
 
 /* ---------------- Stores ---------------- */
 /** The answer of GET /fetch/stores: the stores of the SAVED mode. */
-const storeList = ref<{ environment: FetchEnvironment; ok: boolean; message: string; stores: FetchStore[] } | null>(
-  null,
-)
+const storeList = ref<{
+  environment: FetchEnvironment
+  ok: boolean
+  message: string
+  stores: FetchStore[]
+  keys: StoreKeyLine[]
+} | null>(null)
 const storesLoading = ref(false)
 const storeToAdd = ref('')
 
@@ -428,7 +459,7 @@ const knownStores = computed<FetchStore[]>(() => {
     }
   }
   if (storeList.value?.environment === environment) add(storeList.value.stores)
-  if (environment !== 'dryRun') add(credentials.value?.[environment]?.storesSeen || [])
+  if (environment !== 'dryRun') for (const k of credentials.value?.[environment] || []) add(k.storesSeen)
   return found
 })
 
@@ -465,8 +496,11 @@ async function loadStores() {
       ok: d.ok === true,
       message: text(d.message),
       stores: storesOf(d.stores),
+      keys: storeKeyLinesOf(d.keys),
     }
     if (d.ok !== true) init({ message: text(d.message) || t('eshop.fetch.toast.storesFailed'), color: 'danger' })
+    // Load stores tests every saved key of the mode: their last test and stores changed too
+    refreshView()
   } catch (err: any) {
     if (id === outletId.value) init({ message: apiError(err, t('eshop.fetch.toast.storesFailed')), color: 'danger' })
   } finally {
@@ -508,17 +542,27 @@ async function removeStore(storeId: string) {
   f.stores = f.stores.filter((s) => s.storeId !== storeId)
 }
 
-/* ---------------- Keys ---------------- */
-const keyInputs = reactive<Record<FetchSystem, { clientId: string; clientSecret: string }>>({
-  test: { clientId: '', clientSecret: '' },
-  live: { clientId: '', clientSecret: '' },
+/* ---------------- Keys (one per shop) ---------------- */
+type KeyInput = { label: string; clientId: string; clientSecret: string }
+const keyInputs = reactive<Record<FetchSystem, KeyInput>>({
+  test: { label: '', clientId: '', clientSecret: '' },
+  live: { label: '', clientId: '', clientSecret: '' },
 })
-const keyBusy = reactive<Record<FetchSystem, '' | 'save' | 'test' | 'remove'>>({ test: '', live: '' })
-/** The last answer of a key action, shown under its buttons. */
+/** Saving is per system (the add form); testing and removing per key ("system:clientId"). */
+const keySaving = reactive<Record<FetchSystem, boolean>>({ test: false, live: false })
+const keyBusy = reactive<Record<string, 'test' | 'remove'>>({})
+/** The last answer of a key action, shown under the system's add form. */
 const keyNotes = reactive<Record<FetchSystem, Note | null>>({ test: null, live: null })
 
-function keyOf(system: FetchSystem): KeyView | null {
-  return credentials.value?.[system] || null
+const keyRef = (system: FetchSystem, clientId: string) => `${system}:${clientId}`
+
+function keysOf(system: FetchSystem): KeyView[] {
+  return credentials.value?.[system] || []
+}
+
+/** The shop name Fetch gave the key, else its masked Partner ID. */
+function keyLabel(k: KeyView): string {
+  return k.label || k.clientIdMasked
 }
 
 function canSaveKey(system: FetchSystem): boolean {
@@ -528,19 +572,31 @@ function canSaveKey(system: FetchSystem): boolean {
 async function saveKey(system: FetchSystem) {
   const id = outletId.value
   const input = keyInputs[system]
+  const label = input.label.trim().slice(0, 120)
   const clientId = input.clientId.trim()
   const clientSecret = input.clientSecret.trim()
-  if (!id || keyBusy[system] || !clientId || !clientSecret) return
-  keyBusy[system] = 'save'
+  if (!id || keySaving[system] || !clientId || !clientSecret) return
+  keySaving[system] = true
   keyNotes[system] = null
   try {
-    const { data } = await axios.put(`${url}/fetch/credentials/${id}`, { environment: system, clientId, clientSecret })
+    const { data } = await axios.put(`${url}/fetch/credentials/${id}`, {
+      environment: system,
+      ...(label ? { label } : {}),
+      clientId,
+      clientSecret,
+    })
     if (id !== outletId.value) return
+    input.label = ''
     input.clientId = ''
     input.clientSecret = ''
     const view = keyViewOf(data?.data)
-    if (view && credentials.value) credentials.value[system] = view
-    keyNotes[system] = { ok: true, text: t('eshop.fetch.keys.savedNote') }
+    if (view && credentials.value) {
+      const list = credentials.value[system]
+      const i = list.findIndex((k) => k.clientId === view.clientId)
+      if (i < 0) list.push(view)
+      else list[i] = view
+    }
+    keyNotes[system] = { ok: true, text: t('eshop.fetch.keys.savedNote', { label: view ? keyLabel(view) : clientId }) }
     init({ message: t('eshop.fetch.toast.keySaved', { system: systemName(system) }), color: 'success' })
     refreshView()
   } catch (err: any) {
@@ -548,28 +604,35 @@ async function saveKey(system: FetchSystem) {
     if (id === outletId.value) keyNotes[system] = { ok: false, text: message }
     init({ message, color: 'danger' })
   } finally {
-    keyBusy[system] = ''
+    keySaving[system] = false
   }
 }
 
-async function testKey(system: FetchSystem) {
+async function testKey(system: FetchSystem, key: KeyView) {
   const id = outletId.value
-  if (!id || keyBusy[system]) return
-  keyBusy[system] = 'test'
+  const ref = keyRef(system, key.clientId)
+  if (!id || keyBusy[ref]) return
+  keyBusy[ref] = 'test'
   keyNotes[system] = null
   try {
-    const { data } = await axios.post(`${url}/fetch/credentials/${id}/test`, { environment: system })
+    const { data } = await axios.post(`${url}/fetch/credentials/${id}/test`, {
+      environment: system,
+      clientId: key.clientId,
+    })
     const d = data?.data || {}
     const ok = d.ok === true
     const message = text(d.message) || (ok ? t('eshop.fetch.keys.testOk') : t('eshop.fetch.keys.testFailed'))
     if (id === outletId.value) {
       // the key's "Last test" shows the answer at once; the settings answer read again below confirms it
-      const view = keyOf(system)
+      const view = keysOf(system).find((k) => k.clientId === key.clientId)
       if (view) {
         view.lastTestAt = new Date().toISOString()
         view.lastTestOk = ok
         view.lastTestMessage = message
-        if (ok) view.storesSeen = storesOf(d.stores)
+        if (ok) {
+          view.storesSeen = storesOf(d.stores)
+          view.storeIds = view.storesSeen.map((s) => s.storeId)
+        }
       }
       refreshView()
     }
@@ -579,30 +642,34 @@ async function testKey(system: FetchSystem) {
     if (id === outletId.value) keyNotes[system] = { ok: false, text: message }
     init({ message, color: 'danger' })
   } finally {
-    keyBusy[system] = ''
+    delete keyBusy[ref]
   }
 }
 
-async function removeKey(system: FetchSystem) {
+async function removeKey(system: FetchSystem, key: KeyView) {
   const id = outletId.value
-  if (!id || keyBusy[system]) return
+  const ref = keyRef(system, key.clientId)
+  if (!id || keyBusy[ref]) return
   const ok = await confirm({
-    title: t('eshop.fetch.keys.removeTitle', { system: systemName(system) }),
+    title: t('eshop.fetch.keys.removeTitle', { label: keyLabel(key) }),
     message: t('eshop.fetch.keys.removeMessage'),
     okText: t('eshop.common.remove'),
     cancelText: t('eshop.common.cancel'),
     size: 'medium',
   })
   if (!ok || id !== outletId.value) return
-  keyBusy[system] = 'remove'
+  keyBusy[ref] = 'remove'
   keyNotes[system] = null
   try {
-    const { data } = await axios.delete(`${url}/fetch/credentials/${id}/${system}`)
+    const { data } = await axios.delete(`${url}/fetch/credentials/${id}/${system}/${encodeURIComponent(key.clientId)}`)
     const removed = data?.data?.removed === true
     const message = removed
       ? t('eshop.fetch.toast.keyRemoved', { system: systemName(system) })
       : t('eshop.fetch.toast.keyNothingRemoved', { system: systemName(system) })
     if (id === outletId.value) {
+      if (removed && credentials.value) {
+        credentials.value[system] = credentials.value[system].filter((k) => k.clientId !== key.clientId)
+      }
       keyNotes[system] = { ok: removed, text: message }
       refreshView()
     }
@@ -612,7 +679,7 @@ async function removeKey(system: FetchSystem) {
     if (id === outletId.value) keyNotes[system] = { ok: false, text: message }
     init({ message, color: 'danger' })
   } finally {
-    keyBusy[system] = ''
+    delete keyBusy[ref]
   }
 }
 
@@ -859,10 +926,13 @@ function resetPage() {
   storeList.value = null
   storeToAdd.value = ''
   for (const s of SYSTEMS) {
+    keyInputs[s].label = ''
     keyInputs[s].clientId = ''
     keyInputs[s].clientSecret = ''
     keyNotes[s] = null
+    keySaving[s] = false
   }
+  for (const k of Object.keys(keyBusy)) delete keyBusy[k]
   runAnswer.value = null
   listStore.value = ''
   listSearch.value = ''
@@ -964,7 +1034,7 @@ watch(
     </VaCard>
 
     <template v-if="outletId && hasEshop && form">
-      <!-- Keys: Partner ID + API key per Fetch system; the API key is never shown again -->
+      <!-- Keys: one Partner ID + API key per shop, per Fetch system; an API key is never shown again -->
       <VaCard>
         <VaCardContent>
           <h2 class="va-h6">{{ t('eshop.fetch.keys.title') }}</h2>
@@ -976,121 +1046,134 @@ watch(
                 : t('eshop.fetch.keys.serverKeyMissing')
             }}
           </VaAlert>
+          <VaAlert v-if="liveOffHere" color="info" border="left" class="mt-3">
+            {{ t('eshop.fetch.keys.sandboxOnly') }}
+          </VaAlert>
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             <div v-for="system in SYSTEMS" :key="system" class="border border-slate-200 rounded-lg p-3 min-w-0">
               <div class="flex items-center justify-between gap-2 flex-wrap">
-                <h3 class="font-semibold text-sm">{{ systemName(system) }}</h3>
+                <h3 class="font-semibold text-sm">
+                  {{ systemName(system) }}
+                  <span class="text-slate-500 font-normal">
+                    {{ t('eshop.fetch.keys.count', { n: keysOf(system).length }) }}
+                  </span>
+                </h3>
                 <VaBadge v-if="form.environment === system" :text="t('eshop.fetch.keys.inUse')" color="primary" />
               </div>
               <p v-if="system === 'live' && liveOffHere" class="text-xs text-warning mt-1">
                 {{ t('eshop.fetch.keys.liveOff') }}
               </p>
 
-              <template v-if="keyOf(system)">
-                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-3 text-sm">
+              <div v-if="!keysOf(system).length" class="text-sm text-slate-500 mt-3">
+                {{ t('eshop.fetch.keys.none') }}
+              </div>
+              <div
+                v-for="key in keysOf(system)"
+                :key="key.clientId"
+                class="border border-slate-200 rounded-lg p-3 mt-3 min-w-0"
+              >
+                <div class="flex items-start justify-between gap-2">
                   <div class="min-w-0">
-                    <dt class="text-xs text-slate-500">{{ t('eshop.fetch.keys.partnerId') }}</dt>
-                    <dd class="font-mono break-all">{{ keyOf(system)?.clientIdMasked || '—' }}</dd>
+                    <div class="font-semibold break-words">{{ keyLabel(key) }}</div>
+                    <div class="text-xs text-slate-500 font-mono break-all">
+                      {{ key.clientIdMasked }}
+                      <span v-if="key.secretLast4">
+                        · {{ t('eshop.fetch.keys.secretEnding', { last4: key.secretLast4 }) }}
+                      </span>
+                    </div>
                   </div>
-                  <div class="min-w-0">
-                    <dt class="text-xs text-slate-500">{{ t('eshop.fetch.keys.apiKey') }}</dt>
-                    <dd class="font-mono">
-                      {{
-                        keyOf(system)?.secretLast4
-                          ? t('eshop.fetch.keys.secretEnding', { last4: keyOf(system)?.secretLast4 })
-                          : '—'
-                      }}
-                    </dd>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <VaButton
+                      preset="secondary"
+                      size="small"
+                      icon="mso-network_check"
+                      :loading="keyBusy[keyRef(system, key.clientId)] === 'test'"
+                      :disabled="!!keyBusy[keyRef(system, key.clientId)] || (system === 'live' && liveOffHere)"
+                      @click="testKey(system, key)"
+                    >
+                      {{ t('eshop.fetch.keys.test') }}
+                    </VaButton>
+                    <VaButton
+                      preset="secondary"
+                      size="small"
+                      color="danger"
+                      icon="mso-delete"
+                      :loading="keyBusy[keyRef(system, key.clientId)] === 'remove'"
+                      :disabled="!!keyBusy[keyRef(system, key.clientId)]"
+                      :aria-label="t('eshop.common.remove')"
+                      @click="removeKey(system, key)"
+                    />
                   </div>
+                </div>
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-2 text-sm">
                   <div class="min-w-0">
                     <dt class="text-xs text-slate-500">{{ t('eshop.fetch.keys.saved') }}</dt>
                     <dd>
-                      {{ formatDateTime(keyOf(system)?.savedAt) || '—' }}
-                      <span v-if="keyOf(system)?.savedBy" class="text-slate-500 break-all">
-                        {{ t('eshop.fetch.keys.savedBy', { name: keyOf(system)?.savedBy }) }}
+                      {{ formatDateTime(key.savedAt) || '—' }}
+                      <span v-if="key.savedBy" class="text-slate-500 break-all">
+                        {{ t('eshop.fetch.keys.savedBy', { name: key.savedBy }) }}
                       </span>
                     </dd>
                   </div>
                   <div class="min-w-0">
                     <dt class="text-xs text-slate-500">{{ t('eshop.fetch.keys.lastTest') }}</dt>
                     <dd class="flex items-center gap-2 flex-wrap">
-                      <template v-if="keyOf(system)?.lastTestAt">
+                      <template v-if="key.lastTestAt">
                         <VaBadge
-                          :text="
-                            keyOf(system)?.lastTestOk ? t('eshop.fetch.keys.testOk') : t('eshop.fetch.keys.testFailed')
-                          "
-                          :color="keyOf(system)?.lastTestOk ? 'success' : 'danger'"
+                          :text="key.lastTestOk ? t('eshop.fetch.keys.testOk') : t('eshop.fetch.keys.testFailed')"
+                          :color="key.lastTestOk ? 'success' : 'danger'"
                         />
-                        <span>{{ formatDateTime(keyOf(system)?.lastTestAt) }}</span>
+                        <span>{{ formatDateTime(key.lastTestAt) }}</span>
                       </template>
                       <span v-else>{{ t('eshop.common.never') }}</span>
                     </dd>
                   </div>
                 </dl>
                 <div
-                  v-if="keyOf(system)?.lastTestAt && keyOf(system)?.lastTestMessage"
+                  v-if="key.lastTestAt && key.lastTestMessage"
                   class="text-xs mt-2 break-words"
-                  :class="keyOf(system)?.lastTestOk ? 'text-success' : 'text-danger'"
+                  :class="key.lastTestOk ? 'text-success' : 'text-danger'"
                 >
-                  {{ keyOf(system)?.lastTestMessage }}
+                  {{ key.lastTestMessage }}
                 </div>
-                <div v-if="keyOf(system)?.storesSeen.length" class="text-xs text-slate-600 mt-1 break-words">
-                  {{
-                    t('eshop.fetch.keys.storesSeen', {
-                      list: (keyOf(system)?.storesSeen || []).map((s) => storeLabel(s)).join(', '),
-                    })
-                  }}
+                <div v-if="key.storesSeen.length" class="text-xs text-slate-600 mt-1 break-words">
+                  {{ t('eshop.fetch.keys.storesSeen', { list: key.storesSeen.map((s) => storeLabel(s)).join(', ') }) }}
                 </div>
-              </template>
-              <div v-else class="text-sm text-slate-500 mt-3">{{ t('eshop.fetch.keys.none') }}</div>
+                <div v-else class="text-xs text-slate-500 mt-1">{{ t('eshop.fetch.keys.storesNone') }}</div>
+              </div>
 
               <form class="flex flex-col gap-3 mt-4" autocomplete="off" @submit.prevent="saveKey(system)">
+                <h4 class="font-semibold text-xs text-slate-600">{{ t('eshop.fetch.keys.addTitle') }}</h4>
+                <VaInput
+                  v-model="keyInputs[system].label"
+                  maxlength="120"
+                  autocomplete="off"
+                  :label="t('eshop.fetch.keys.label')"
+                  :placeholder="t('eshop.fetch.keys.labelPlaceholder')"
+                />
                 <VaInput
                   v-model="keyInputs[system].clientId"
                   maxlength="200"
                   autocomplete="off"
-                  :label="keyOf(system) ? t('eshop.fetch.keys.clientIdReplace') : t('eshop.fetch.keys.clientId')"
+                  :label="t('eshop.fetch.keys.clientId')"
                 />
                 <VaInput
                   v-model="keyInputs[system].clientSecret"
                   type="password"
                   maxlength="500"
                   autocomplete="new-password"
-                  :label="
-                    keyOf(system) ? t('eshop.fetch.keys.clientSecretReplace') : t('eshop.fetch.keys.clientSecret')
-                  "
+                  :label="t('eshop.fetch.keys.clientSecret')"
                 />
                 <div class="flex items-center gap-2 flex-wrap">
                   <VaButton
                     type="submit"
                     size="small"
                     icon="save"
-                    :loading="keyBusy[system] === 'save'"
-                    :disabled="!!keyBusy[system] || !canSaveKey(system)"
+                    :loading="keySaving[system]"
+                    :disabled="keySaving[system] || !canSaveKey(system) || (system === 'live' && liveOffHere)"
                   >
                     {{ t('eshop.fetch.keys.save') }}
-                  </VaButton>
-                  <VaButton
-                    preset="secondary"
-                    size="small"
-                    icon="mso-network_check"
-                    :loading="keyBusy[system] === 'test'"
-                    :disabled="!!keyBusy[system] || !keyOf(system) || (system === 'live' && liveOffHere)"
-                    @click="testKey(system)"
-                  >
-                    {{ t('eshop.fetch.keys.test') }}
-                  </VaButton>
-                  <VaButton
-                    preset="secondary"
-                    size="small"
-                    color="danger"
-                    icon="mso-delete"
-                    :loading="keyBusy[system] === 'remove'"
-                    :disabled="!!keyBusy[system] || !keyOf(system)"
-                    @click="removeKey(system)"
-                  >
-                    {{ t('eshop.common.remove') }}
                   </VaButton>
                 </div>
                 <p class="va-text-secondary text-xs">{{ t('eshop.fetch.keys.inputHelp') }}</p>
@@ -1248,6 +1331,20 @@ watch(
           >
             {{ storeListLine.text }}
           </div>
+          <ul v-if="storeList && storeList.keys.length" class="text-xs mt-1 list-disc pl-5">
+            <li
+              v-for="k in storeList.keys"
+              :key="k.clientIdMasked"
+              class="break-words"
+              :class="k.ok ? 'text-slate-600' : 'text-danger'"
+            >
+              {{
+                k.ok
+                  ? t('eshop.fetch.stores.keyLine', { label: k.label || k.clientIdMasked, n: k.stores })
+                  : t('eshop.fetch.stores.keyFailed', { label: k.label || k.clientIdMasked, message: k.message })
+              }}
+            </li>
+          </ul>
           <div v-if="modeNotSaved && saved" class="text-xs text-warning mt-1">
             {{
               t('eshop.fetch.stores.loadSavedMode', {
