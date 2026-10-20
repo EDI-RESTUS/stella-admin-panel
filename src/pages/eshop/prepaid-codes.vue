@@ -365,11 +365,12 @@ const authOptions = computed(() => [
   { text: t('eshop.prepaid.access.authQuery'), value: 'query' },
 ])
 
-/** The test host's test-case endpoint takes the login in the URL: pick it with one click. */
+/** ContentCard's test system: host, standard path, and the login in the URL (the only way ppu99 reads it). */
 function useTestHost() {
   accessInput.hosts = 'ppu99.contentcard.com'
   accessInput.path = '/contentcard/contentcard.php'
-  accessInput.authMode = 'basic'
+  // ppu99 reads the login only from the URL (the Authorization header is ignored there)
+  accessInput.authMode = 'query'
 }
 
 const canSaveAccess = computed(
