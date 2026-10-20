@@ -55,6 +55,7 @@ type Access = {
   hosts: string[]
   path: string
   authMode: 'basic' | 'query'
+  amountUnit: 'units' | 'cents'
   userMasked: string
   passwordLast2: string
   cspidMasked: string
@@ -128,6 +129,7 @@ function accessOf(v: any): Access | null {
     hosts: strings(v.hosts),
     path: text(v.path),
     authMode: v.authMode === 'query' ? 'query' : 'basic',
+    amountUnit: v.amountUnit === 'cents' ? 'cents' : 'units',
     userMasked: text(v.userMasked),
     passwordLast2: text(v.passwordLast2),
     cspidMasked: text(v.cspidMasked),
@@ -348,6 +350,7 @@ const accessInput = reactive({
   hosts: '',
   path: '',
   authMode: 'basic' as 'basic' | 'query',
+  amountUnit: 'units' as 'units' | 'cents',
   user: '',
   password: '',
   cspid: '',
@@ -363,6 +366,10 @@ const access = computed(() => credentials.value?.saved || null)
 const authOptions = computed(() => [
   { text: t('eshop.prepaid.access.authBasic'), value: 'basic' },
   { text: t('eshop.prepaid.access.authQuery'), value: 'query' },
+])
+const amountUnitOptions = computed(() => [
+  { text: t('eshop.prepaid.access.amountUnits'), value: 'units' },
+  { text: t('eshop.prepaid.access.amountCents'), value: 'cents' },
 ])
 
 /** ContentCard's test system: host, standard path, and the login in the URL (the only way ppu99 reads it). */
@@ -388,6 +395,7 @@ async function saveAccess() {
       user: accessInput.user.trim(),
       password: accessInput.password.trim(),
       authMode: accessInput.authMode,
+      amountUnit: accessInput.amountUnit,
     }
     for (const k of ['path', 'cspid', 'serviceId', 'customerNo', 'terminalId', 'version'] as const) {
       const v = accessInput[k].trim()
@@ -493,6 +501,7 @@ function resetPage() {
     hosts: '',
     path: '',
     authMode: 'basic',
+    amountUnit: 'units',
     user: '',
     password: '',
     cspid: '',
@@ -654,6 +663,14 @@ watch(
                         · {{ access.customerNoMasked }} / {{ access.terminalIdMasked }}</span
                       >
                       <span v-if="access.version"> · v{{ access.version }}</span>
+                      <span>
+                        ·
+                        {{
+                          access.amountUnit === 'cents'
+                            ? t('eshop.prepaid.access.amountCentsShort')
+                            : t('eshop.prepaid.access.amountUnitsShort')
+                        }}</span
+                      >
                     </dd>
                   </div>
                   <div class="min-w-0">
@@ -801,6 +818,14 @@ watch(
                   maxlength="120"
                   autocomplete="off"
                   :label="t('eshop.prepaid.access.version')"
+                />
+                <VaSelect
+                  v-model="accessInput.amountUnit"
+                  :options="amountUnitOptions"
+                  value-by="value"
+                  text-by="text"
+                  :label="t('eshop.prepaid.access.amountUnit')"
+                  :messages="t('eshop.prepaid.access.amountUnitHelp')"
                 />
               </div>
               <div class="flex items-center gap-2 flex-wrap">
