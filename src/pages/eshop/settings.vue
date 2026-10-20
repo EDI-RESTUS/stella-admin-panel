@@ -149,6 +149,10 @@ const unitOptions = computed(() => [
   { text: t('eshop.settings.general.unitKg'), value: 'kg' },
   { text: t('eshop.settings.general.unitG'), value: 'g' },
 ])
+const confirmationEmailOptions = computed(() => [
+  { text: t('eshop.settings.general.confirmationEmailAfterWinmax'), value: 'afterWinmax' },
+  { text: t('eshop.settings.general.confirmationEmailAtPayment'), value: 'atPayment' },
+])
 
 function shopOptionsFor(region: EshopRegionRow) {
   const listed = new Set(region.priorityZoneIds)
@@ -507,6 +511,14 @@ async function runCheck() {
               />
               <div class="va-text-secondary text-xs mt-1">{{ t('eshop.settings.general.testPaymentsHelp') }}</div>
             </div>
+            <VaSelect
+              v-model="form.confirmationEmail"
+              :options="confirmationEmailOptions"
+              value-by="value"
+              text-by="text"
+              :label="t('eshop.settings.general.confirmationEmail')"
+              :messages="t('eshop.settings.general.confirmationEmailHelp')"
+            />
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">

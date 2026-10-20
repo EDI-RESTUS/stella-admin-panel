@@ -131,6 +131,8 @@ export type EshopSettingsForm = {
   allowSplit: boolean
   /** Test payments: a cash order counts as paid — the server allows it only where it is a test server. */
   testPayments: boolean
+  /** When the order-confirmation e-mail goes out: after the Winmax document posts (default) or at payment. */
+  confirmationEmail: 'afterWinmax' | 'atPayment'
   shops: EshopShopRow[]
   regions: EshopRegionRow[]
   /** district → region key, NO_REGION for none. */
@@ -155,6 +157,7 @@ const SETTINGS_KEYS = [
   'checkoutMode',
   'allowSplit',
   'testPayments',
+  'confirmationEmail',
   'shops',
   'regions',
   'districtRegions',
@@ -225,6 +228,7 @@ export function formFromSettings(s: any, districts: string[] = CYPRUS_DISTRICTS)
     checkoutMode: src.checkoutMode === 'on' ? 'on' : 'off',
     allowSplit: src.allowSplit === true,
     testPayments: src.testPayments === true,
+    confirmationEmail: src.confirmationEmail === 'atPayment' ? 'atPayment' : 'afterWinmax',
     // The PUT only ever stores 24-hex zone ids; anything else could not be saved back.
     shops: (Array.isArray(src.shops) ? src.shops : [])
       .filter((sh: any) => HEX24.test(text(sh?.zoneId)))
@@ -372,6 +376,7 @@ export function settingsPayloadFromForm(
       checkoutMode: form.checkoutMode === 'on' ? 'on' : 'off',
       allowSplit: form.allowSplit === true,
       testPayments: form.testPayments === true,
+      confirmationEmail: form.confirmationEmail === 'atPayment' ? 'atPayment' : 'afterWinmax',
       shops,
       regions,
       districtRegions,
