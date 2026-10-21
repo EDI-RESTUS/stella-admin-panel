@@ -2,7 +2,8 @@
 // E-shop stock of the navbar outlet: the state of the Winmax stock and weight
 // reads (GET /eshop/sync/:outletId), buttons to read now (admins — the backend
 // refuses the others), and one article looked up by code: the stock mirror
-// next to a live Winmax read, per shop, with its web status and weight.
+// next to a live Winmax read, per shop, with its web status (the live view
+// next to what is saved on the menu item) and weight.
 import { ref, computed, watch } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
@@ -151,10 +152,30 @@ async function lookUp() {
   }
 }
 
+/** A ContentCard voucher: sold as a digital code, no stock behind it. */
+const isVoucher = computed(() => lookup.value?.menuItem?.voucherProvider === 'contentcard')
+
+/** The web-status badge: the live view the lookup worked out (data.web) when it has one, else the saved field. */
 const itemStatus = computed(() => {
-  const item = lookup.value?.menuItem
-  if (item?.voucherProvider === 'contentcard') return webStatusView('digital')
-  return webStatusView(item?.eshopStock?.status)
+  if (isVoucher.value) return webStatusView('digital')
+  return webStatusView(lookup.value?.web?.status ?? lookup.value?.menuItem?.eshopStock?.status)
+})
+
+/**
+ * "Saved in Stella: …" — menuitems.eshopStock in words: the free-to-sell total of the active shops
+ * that keep a stock number and the Low Stock threshold (the highest of their minimums); both null =
+ * sold without a limit; no field at all = the stock reads have not reached the article yet.
+ */
+const savedText = computed(() => {
+  const saved = lookup.value?.menuItem?.eshopStock
+  if (!saved) return t('eshop.stock.savedNone')
+  const when = formatDateTime(saved.updatedAt) || '—'
+  if (saved.total === null || saved.total === undefined) return t('eshop.stock.savedUnlimited', { when })
+  return t('eshop.stock.savedTotals', {
+    total: formatNumber(saved.total) || '0',
+    minimum: formatNumber(saved.minimum) || '0',
+    when,
+  })
 })
 
 const weightText = computed(() => {
@@ -332,6 +353,10 @@ function liveOrMirror(row: any, field: 'orderedFromCustomers' | 'minimum'): stri
               <VaBadge :text="t(itemStatus.key)" :color="itemStatus.color" />
             </div>
             <div v-else class="text-warning">{{ t('eshop.stock.noMenuItem', { code: lookup.code }) }}</div>
+            <div v-if="lookup.menuItem && !isVoucher">
+              <span class="text-slate-500">{{ t('eshop.stock.saved') }}</span>
+              {{ savedText }}
+            </div>
             <div>
               <span class="text-slate-500">{{ t('eshop.stock.weight') }}</span>
               {{ weightText }}

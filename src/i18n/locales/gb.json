@@ -619,7 +619,7 @@
     },
     "stock": {
       "title": "E-shop stock",
-      "intro": "Stella keeps a copy of every shop's Winmax stock, read every minute; the website's Not Available and Low Stock come from it.",
+      "intro": "Stella keeps a copy of every shop's Winmax stock, read every minute; the website's Not Available and Low Stock come from it: the free-to-sell stock of the active shops added together is Not Available at 0 and Low Stock when it is at or below the highest of those shops' Winmax minimums. An article no active shop keeps a stock number for is sold without a limit.",
       "syncStatus": "Stock reads:",
       "running": "Running",
       "idle": "Idle",
@@ -648,6 +648,10 @@
       "lookUp": "Look up",
       "webStatus": "Web status:",
       "noMenuItem": "No menu item of this outlet has the code {code}.",
+      "saved": "Saved in Stella:",
+      "savedTotals": "{total} free to sell in the active shops; Low Stock at {minimum} or fewer (the highest shop minimum) — as of {when}",
+      "savedUnlimited": "no active shop keeps a stock number — sold without a limit (as of {when})",
+      "savedNone": "nothing yet — the stock reads have not reached this article",
       "weight": "Weight:",
       "weightMissing": "none in Winmax — no courier quote for this article.",
       "weightOk": "{raw} in Winmax = {grams} g",
@@ -656,7 +660,7 @@
       "noShop": "No shop",
       "noRow": "(no row)",
       "noShops": "The e-shop has no shops.",
-      "columnsHelp": "Winmax now: the stock Winmax holds at this moment. Stella's copy: what the stock reads saw (amber while it has not caught up). Free to sell: the copy minus the orders from customers and the e-shop's reservations.",
+      "columnsHelp": "Winmax now: the stock Winmax holds at this moment. Stella's copy: what the stock reads saw (amber while it has not caught up). Free to sell: the copy minus the orders from customers and the e-shop's reservations. The web status is the Free to sell of the active shops that keep a stock number added together: Not Available at 0, Low Stock at or below the highest Minimum among those shops.",
       "columns": {
         "shop": "Shop",
         "warehouse": "Warehouse",
