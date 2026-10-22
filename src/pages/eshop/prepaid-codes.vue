@@ -129,7 +129,7 @@ function accessOf(v: any): Access | null {
     hosts: strings(v.hosts),
     path: text(v.path),
     authMode: v.authMode === 'query' ? 'query' : 'basic',
-    amountUnit: v.amountUnit === 'cents' ? 'cents' : 'units',
+    amountUnit: v.amountUnit === 'units' ? 'units' : 'cents',
     userMasked: text(v.userMasked),
     passwordLast2: text(v.passwordLast2),
     cspidMasked: text(v.cspidMasked),
@@ -350,7 +350,7 @@ const accessInput = reactive({
   hosts: '',
   path: '',
   authMode: 'basic' as 'basic' | 'query',
-  amountUnit: 'units' as 'units' | 'cents',
+  amountUnit: 'cents' as 'units' | 'cents',
   user: '',
   password: '',
   cspid: '',
@@ -368,8 +368,8 @@ const authOptions = computed(() => [
   { text: t('eshop.prepaid.access.authQuery'), value: 'query' },
 ])
 const amountUnitOptions = computed(() => [
-  { text: t('eshop.prepaid.access.amountUnits'), value: 'units' },
   { text: t('eshop.prepaid.access.amountCents'), value: 'cents' },
+  { text: t('eshop.prepaid.access.amountUnits'), value: 'units' },
 ])
 
 /** ContentCard's test system: host, standard path, and the login in the URL (the only way ppu99 reads it). */
@@ -501,7 +501,7 @@ function resetPage() {
     hosts: '',
     path: '',
     authMode: 'basic',
-    amountUnit: 'units',
+    amountUnit: 'cents',
     user: '',
     password: '',
     cspid: '',
