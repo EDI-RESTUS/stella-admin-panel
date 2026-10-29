@@ -279,6 +279,150 @@
         </Transition>
       </div>
 
+      <!-- E-shop (POW: outlet.eshopFulfilment) — only for an outlet that has an
+           e-shop, and for a super-admin on any outlet (who writes the first
+           settings). Settings are admin-only; stock and weights are readable
+           by supervisors too (the backend's roles). -->
+      <div v-if="eshopVisible" class="flex flex-col gap-y-1 mb-2">
+        <span
+          class="flex items-center justify-between font-bold text-slate-800 uppercase tracking-wide text-xs cursor-pointer py-1 rounded-lg transition relative -ml-2 mr-2 pl-2 pr-2 hover:bg-slate-50"
+          @click="eshopOpen = !eshopOpen"
+        >
+          <span v-if="eshopOpen" class="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg bg-g-600"></span>
+
+          {{ t('eshop.nav.group') }}
+          <VaIcon :name="eshopOpen ? 'expand_less' : 'expand_more'" />
+        </span>
+
+        <Transition name="fade">
+          <div v-if="eshopOpen" class="flex flex-col gap-y-1">
+            <!-- Orders and stock holds: admins and supervisors (resolving an Exception is admin-only on the page) -->
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopOrders'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/orders"
+            >
+              <VaIcon name="mso-receipt_long" class="mr-2" />
+              {{ t('eshop.nav.orders') }}
+            </RouterLink>
+
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopHolds'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/holds"
+            >
+              <VaIcon name="mso-lock_clock" class="mr-2" />
+              {{ t('eshop.nav.holds') }}
+            </RouterLink>
+
+            <RouterLink
+              v-if="userRole.includes('admin')"
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopSettings'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/settings"
+            >
+              <VaIcon name="mso-tune" class="mr-2" />
+              {{ t('eshop.nav.settings') }}
+            </RouterLink>
+
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopStock'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/stock"
+            >
+              <VaIcon name="mso-inventory_2" class="mr-2" />
+              {{ t('eshop.nav.stock') }}
+            </RouterLink>
+
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopWeights'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/weights"
+            >
+              <VaIcon name="mso-weight" class="mr-2" />
+              {{ t('eshop.nav.weights') }}
+            </RouterLink>
+
+            <!-- Courier fees (saving: admins) and delivery costs: admins and supervisors -->
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopRates'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/courier-fees"
+            >
+              <VaIcon name="mso-local_shipping" class="mr-2" />
+              {{ t('eshop.nav.rates') }}
+            </RouterLink>
+
+            <RouterLink
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopShipping'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/delivery-costs"
+            >
+              <VaIcon name="mso-request_quote" class="mr-2" />
+              {{ t('eshop.nav.shipping') }}
+            </RouterLink>
+
+            <!-- Fetch marketplace feed (its settings and keys): admins -->
+            <RouterLink
+              v-if="userRole.includes('admin')"
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopFetch'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/fetch"
+            >
+              <VaIcon name="mso-sync_alt" class="mr-2" />
+              {{ t('eshop.nav.fetch') }}
+            </RouterLink>
+
+            <!-- Prepaid codes (ContentCard): settings and the ContentCard access — admins -->
+            <RouterLink
+              v-if="userRole.includes('admin')"
+              :class="[
+                'flex items-center py-1 rounded-lg transition mr-2 pl-2 -ml-2',
+                $route.name === 'eshopPrepaid'
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700',
+              ]"
+              to="/eshop/prepaid-codes"
+            >
+              <VaIcon name="mso-card_giftcard" class="mr-2" />
+              {{ t('eshop.nav.prepaid') }}
+            </RouterLink>
+          </div>
+        </Transition>
+      </div>
+
       <!-- Configuration -->
       <div v-if="userRole.includes('admin') || userRole === 'supervisor'" class="flex flex-col gap-y-1 mb-2">
         <span
@@ -470,11 +614,13 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from 'vue'
+import { defineComponent, ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useColors, useToast } from 'vuestic-ui'
 import { useI18n } from 'vue-i18n'
 import { useUsersStore } from '@/stores/users'
 import { useServiceStore } from '@/stores/services'
+import { useEshopOutlet } from '@/composables/useEshopOutlet'
 
 export default defineComponent({
   name: 'Sidebar',
@@ -512,6 +658,22 @@ export default defineComponent({
     const configOpen = ref(true)
     const adminOpen = ref(true)
 
+    // E-shop: the navbar outlet has one (outlet.eshopFulfilment), or a
+    // super-admin, on any outlet. Collapsed unless an E-shop page is open.
+    const route = useRoute()
+    const { hasEshop } = useEshopOutlet()
+    const eshopVisible = computed(
+      () => userRole.value === 'super-admin' || (['admin', 'supervisor'].includes(userRole.value) && hasEshop.value),
+    )
+    const eshopOpen = ref(false)
+    watch(
+      () => route.name,
+      (name) => {
+        if (String(name || '').startsWith('eshop')) eshopOpen.value = true
+      },
+      { immediate: true },
+    )
+
     return {
       userRole,
       writableVisible,
@@ -525,6 +687,8 @@ export default defineComponent({
       customerAppOpen,
       configOpen,
       adminOpen,
+      eshopVisible,
+      eshopOpen,
       init,
       t,
     }

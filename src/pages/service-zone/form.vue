@@ -247,11 +247,11 @@
                   Before pickup: a pre-order reaches the kitchen the zone's lead time before its pickup time (as today).
                   Same day / later days: a pre-order for today is sent the moment it is paid, like a normal order, with
                   its FUTURE line and pickup time on the ticket; one for a later day is sent at this outlet's opening
-                  time on that day (Opening Times, Cyprus time; a day without hours uses the lead time). A pre-order
-                  for today that is paid before the outlet has opened that day (after midnight, while it is still
-                  closed) waits and is sent at that day's opening time. In both cases a pickup sooner after opening
-                  than the zone's lead time is sent the lead time before the pickup. Switching moves the pre-orders
-                  already waiting to the new times.
+                  time on that day (Opening Times, Cyprus time; a day without hours uses the lead time). A pre-order for
+                  today that is paid before the outlet has opened that day (after midnight, while it is still closed)
+                  waits and is sent at that day's opening time. In both cases a pickup sooner after opening than the
+                  zone's lead time is sent the lead time before the pickup. Switching moves the pre-orders already
+                  waiting to the new times.
                 </div>
               </div>
               <!-- Skip tables still in use: before the zone counter hands a paid
@@ -1358,6 +1358,37 @@
                 class="w-full"
               />
             </div>
+
+            <!-- Welcome SMS: no defaults on purpose, so an outlet whose staff never
+                 touch it saves exactly what it stored before. -->
+            <div v-if="restaurantData.smsSettings.enabled" class="w-full mt-6">
+              <VaSwitch
+                v-model="restaurantData.smsSettings.welcomeEnabled"
+                label="Send a welcome SMS when a customer registers"
+                left-label
+                size="small"
+              />
+              <div class="text-sm mt-2 opacity-70">
+                Sent from this outlet's own SMS account once the customer's account is created: website and app, and
+                e-mail registration when a phone was given.
+              </div>
+              <template v-if="restaurantData.smsSettings.welcomeEnabled">
+                <VaTextarea
+                  v-model="restaurantData.smsSettings.welcomeTemplate"
+                  label="Welcome SMS"
+                  name="smsWelcomeTemplate"
+                  :min-rows="4"
+                  :max-rows="10"
+                  :rules="[welcomeSmsRule]"
+                  class="w-full mt-3"
+                />
+                <div class="text-xs mt-1 opacity-70">
+                  Use <span v-pre>{{ firstName }}</span> for the customer's first name,
+                  <span v-pre>{{ name }}</span> for the full name and <span v-pre>{{ brand }}</span> for the outlet
+                  name. {{ welcomeSmsSize }}
+                </div>
+              </template>
+            </div>
           </div>
         </VaCardContent>
       </VaCard>
@@ -1535,6 +1566,89 @@
                   :helper-text="t('outletForm.customerApp.senderNameHelp')"
                 />
               </div>
+
+              <!-- Firebase service account: which key signs this outlet's pushes.
+                   Every brand app has its own Firebase project, so the key is
+                   per outlet: panel upload > src/firebase/<slug>.json on the
+                   server > the server's default key. Separate endpoints
+                   (/outlets/:id/push/service-account), not part of the outlet
+                   save; the key is never returned. -->
+              <div
+                v-if="restaurantData.pushSettings.enabled"
+                class="mt-6 p-4 rounded"
+                style="border: 1px solid var(--va-background-border)"
+              >
+                <div class="font-bold text-sm mb-1">{{ t('outletForm.customerApp.serviceAccount') }}</div>
+                <div class="text-sm opacity-70 mb-3">{{ t('outletForm.customerApp.serviceAccountHelp') }}</div>
+                <div v-if="!restaurantId" class="text-sm">
+                  {{ t('outletForm.customerApp.serviceAccountCreateHint') }}
+                </div>
+                <div v-else-if="pushCredentials.loading" class="text-sm">
+                  {{ t('outletForm.customerApp.serviceAccountLoading') }}
+                </div>
+                <template v-else>
+                  <div class="text-sm mb-3">
+                    <span class="font-bold">{{ t('outletForm.customerApp.serviceAccountStatus') }}:</span>
+                    {{ pushCredentialsSummary }}
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <input
+                      ref="serviceAccountFile"
+                      type="file"
+                      accept=".json,application/json"
+                      class="hidden"
+                      @change="onServiceAccountFileChosen"
+                    />
+                    <VaButton
+                      size="small"
+                      preset="primary"
+                      :loading="pushCredentials.busy"
+                      @click="$refs.serviceAccountFile.click()"
+                    >
+                      {{
+                        pushCredentials.status && pushCredentials.status.upload && pushCredentials.status.upload.present
+                          ? t('outletForm.customerApp.serviceAccountReplace')
+                          : t('outletForm.customerApp.serviceAccountUpload')
+                      }}
+                    </VaButton>
+                    <VaButton
+                      size="small"
+                      preset="secondary"
+                      :disabled="!pushCredentials.status || !pushCredentials.status.configured || pushCredentials.busy"
+                      @click="testPushServiceAccount"
+                    >
+                      {{ t('outletForm.customerApp.serviceAccountTest') }}
+                    </VaButton>
+                    <VaButton
+                      v-if="
+                        pushCredentials.status && pushCredentials.status.upload && pushCredentials.status.upload.present
+                      "
+                      size="small"
+                      preset="secondary"
+                      color="danger"
+                      :disabled="pushCredentials.busy"
+                      @click="removePushServiceAccount"
+                    >
+                      {{ t('outletForm.customerApp.serviceAccountRemove') }}
+                    </VaButton>
+                  </div>
+                  <div
+                    v-if="pushCredentials.testResult"
+                    class="text-sm mt-3"
+                    :style="{ color: pushCredentials.testResult.ok ? 'var(--va-success)' : 'var(--va-danger)' }"
+                  >
+                    {{
+                      pushCredentials.testResult.ok
+                        ? t('outletForm.customerApp.serviceAccountTestOk', {
+                            project: pushCredentials.testResult.projectId,
+                          })
+                        : t('outletForm.customerApp.serviceAccountTestFailed', {
+                            error: pushCredentials.testResult.error,
+                          })
+                    }}
+                  </div>
+                </template>
+              </div>
             </div>
           </div>
         </VaCardContent>
@@ -1695,6 +1809,21 @@ const isOpeningTimeOfDay = (value) => {
 // "Use Winmax for stock": a database name the backend can open at all
 // (winmaxSql.service) — letters, digits and underscore.
 const WINMAX_DATABASE_NAME = /^[A-Za-z0-9_]+$/
+// SMS size: the GSM 7-bit alphabet (the extension characters take two places);
+// anything else (Greek lower case, emoji, curly quotes) makes the whole SMS
+// Unicode — 70 characters, or 67 per part when it is split, instead of 160/153.
+const GSM_BASIC =
+  '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà'
+const GSM_EXTENDED = '^{}\\[~]|€'
+const smsSizeOf = (text) => {
+  const chars = Array.from(String(text ?? ''))
+  if (chars.every((c) => GSM_BASIC.includes(c) || GSM_EXTENDED.includes(c))) {
+    const length = chars.reduce((n, c) => n + (GSM_EXTENDED.includes(c) ? 2 : 1), 0)
+    return { unicode: false, length, parts: length <= 160 ? 1 : Math.ceil(length / 153) }
+  }
+  const length = String(text ?? '').length // UTF-16 units: an emoji takes two
+  return { unicode: true, length, parts: length <= 70 ? 1 : Math.ceil(length / 67) }
+}
 // 'a', 'a and b', 'a, b and c'.
 const joinWithAnd = (parts) =>
   parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
@@ -1821,6 +1950,10 @@ export default {
       // create); the save sends only what differs from these.
       customerSettingsSnapshot: JSON.stringify(normaliseCustomerSettings(customerSettingsDefaults())),
       pushSettingsSnapshot: JSON.stringify(normalisePushSettings(pushSettingsDefaults())),
+      // Firebase service account of the push, loaded with the outlet
+      // (GET /outlets/:id/push/service-account): provenance and project only,
+      // the key never comes back. Managed by its own buttons, not by the save.
+      pushCredentials: { loading: false, busy: false, status: null, testResult: null },
       // Daily stock reset { stockDailyReset, stockDailyResetTime } as loaded (or
       // defaulted on create); the save sends the pair only when it differs.
       stockDailyResetSnapshot: JSON.stringify({
@@ -1950,6 +2083,8 @@ export default {
           senderId: '',
           baseUrl: '',
           otpTemplate: '',
+          welcomeEnabled: false,
+          welcomeTemplate: '',
         },
         turnstileSettings: {
           enabled: false,
@@ -2239,6 +2374,42 @@ export default {
     galleryType() {
       return this.isGalleryViewEnabled ? 'gallery' : 'list'
     },
+    /** "About 4 SMS per customer …" for the welcome SMS as typed. */
+    welcomeSmsSize() {
+      const text = String(this.restaurantData?.smsSettings?.welcomeTemplate ?? '').trim()
+      if (!text) return ''
+      const size = smsSizeOf(text)
+      if (size.unicode) {
+        return size.parts === 1
+          ? 'About 1 SMS per customer (a Unicode SMS: up to 70 characters).'
+          : `About ${size.parts} SMS per customer: emoji or Greek letters make it a Unicode SMS (67 characters per part).`
+      }
+      return size.parts === 1
+        ? 'About 1 SMS per customer (up to 160 characters).'
+        : `About ${size.parts} SMS per customer (153 characters per part).`
+    },
+    /** One line on which key signs this outlet's pushes (upload / server file / server default / none). */
+    pushCredentialsSummary() {
+      const s = this.pushCredentials.status
+      if (!s) return this.t('outletForm.customerApp.serviceAccountUnknown')
+      if (!s.configured) return this.t('outletForm.customerApp.serviceAccountNone')
+      let source
+      if (s.source === 'upload') {
+        const at = s.uploadedAt ? new Date(s.uploadedAt) : null
+        source = this.t('outletForm.customerApp.serviceAccountSourceUpload', {
+          file: s.fileName || 'service-account.json',
+          when: at && !Number.isNaN(at.getTime()) ? at.toLocaleString() : '',
+        })
+      } else if (s.source === 'file') {
+        source = this.t('outletForm.customerApp.serviceAccountSourceFile', { file: s.fileName })
+      } else {
+        source = this.t('outletForm.customerApp.serviceAccountSourceEnv')
+      }
+      return `${source} — ${this.t('outletForm.customerApp.serviceAccountProject', {
+        project: s.projectId,
+        email: s.clientEmail,
+      })}`
+    },
     selectedRest() {
       return this.serviceStore.selectedRest
     },
@@ -2444,6 +2615,108 @@ export default {
     this.fetchRestaurantDetails()
   },
   methods: {
+    /** The welcome SMS: needed while the switch is on; at most 480 characters (the server's limit). */
+    welcomeSmsRule(value) {
+      const text = String(value ?? '').trim()
+      if (!text) return 'Type the welcome SMS, or switch it off.'
+      return text.length <= 480 || 'At most 480 characters.'
+    },
+    /**
+     * Firebase service account of this outlet's push notifications. Every
+     * brand app has its own Firebase project, so the key the server signs
+     * with is per outlet: a panel upload, else src/firebase/<slug>.json on
+     * the server, else the server's default key. These calls are separate
+     * from the outlet save (the key never travels with the outlet document).
+     */
+    async loadPushCredentials() {
+      if (!this.restaurantId) return
+      const url = import.meta.env.VITE_API_BASE_URL
+      this.pushCredentials.loading = true
+      this.pushCredentials.testResult = null
+      try {
+        const response = await axios.get(`${url}/outlets/${this.restaurantId}/push/service-account`)
+        this.pushCredentials.status = response.data?.data || null
+      } catch (error) {
+        // e.g. 403 for a non-admin: the block then says the status is unknown.
+        this.pushCredentials.status = null
+      } finally {
+        this.pushCredentials.loading = false
+      }
+    },
+    /** The chosen JSON is read in the browser and sent as text; the backend validates it. */
+    async onServiceAccountFileChosen(event) {
+      const file = event?.target?.files?.[0]
+      if (event?.target) event.target.value = ''
+      if (!file || !this.restaurantId) return
+      const url = import.meta.env.VITE_API_BASE_URL
+      this.pushCredentials.busy = true
+      this.pushCredentials.testResult = null
+      try {
+        const text = await file.text()
+        const response = await axios.put(`${url}/outlets/${this.restaurantId}/push/service-account`, {
+          serviceAccount: text,
+          fileName: file.name,
+        })
+        this.pushCredentials.status = response.data?.data || null
+        this.init({
+          message: this.t('outletForm.customerApp.serviceAccountSaved', {
+            project: this.pushCredentials.status?.projectId || '',
+          }),
+          color: 'success',
+        })
+      } catch (error) {
+        this.init({
+          message: error?.response?.data?.message || this.t('outletForm.customerApp.serviceAccountSaveFailed'),
+          color: 'danger',
+        })
+      } finally {
+        this.pushCredentials.busy = false
+      }
+    },
+    async removePushServiceAccount() {
+      if (!this.restaurantId || !window.confirm(this.t('outletForm.customerApp.serviceAccountRemoveConfirm'))) return
+      const url = import.meta.env.VITE_API_BASE_URL
+      this.pushCredentials.busy = true
+      this.pushCredentials.testResult = null
+      try {
+        const response = await axios.delete(`${url}/outlets/${this.restaurantId}/push/service-account`)
+        this.pushCredentials.status = response.data?.data || null
+        this.init({ message: this.t('outletForm.customerApp.serviceAccountRemoved'), color: 'success' })
+      } catch (error) {
+        this.init({
+          message: error?.response?.data?.message || this.t('outletForm.customerApp.serviceAccountRemoveFailed'),
+          color: 'danger',
+        })
+      } finally {
+        this.pushCredentials.busy = false
+      }
+    },
+    /** Asks the server to prove the credentials against Google (an access token; nothing is sent to phones). */
+    async testPushServiceAccount() {
+      if (!this.restaurantId) return
+      const url = import.meta.env.VITE_API_BASE_URL
+      this.pushCredentials.busy = true
+      this.pushCredentials.testResult = null
+      try {
+        const response = await axios.post(`${url}/outlets/${this.restaurantId}/push/service-account/test`, {})
+        const result = response.data?.data || null
+        this.pushCredentials.testResult = result
+        this.init({
+          message: result?.ok
+            ? this.t('outletForm.customerApp.serviceAccountTestOk', { project: result.projectId })
+            : this.t('outletForm.customerApp.serviceAccountTestFailed', { error: result?.error || '' }),
+          color: result?.ok ? 'success' : 'danger',
+        })
+      } catch (error) {
+        this.init({
+          message:
+            error?.response?.data?.message || this.t('outletForm.customerApp.serviceAccountTestFailed', { error: '' }),
+          color: 'danger',
+        })
+      } finally {
+        this.pushCredentials.busy = false
+      }
+    },
     /**
      * Stella POS receipt header ← Winmax: reads the Winmax service zone whose
      * POSSaleDocumentTypeCode matches the SAVED sales document type and drops
@@ -2498,7 +2771,9 @@ export default {
           })
         } else if (!lines.length) {
           this.init({
-            message: `No Winmax service zone matches sales document type "${ctx.documentTypeCode || '?'}" — check the Winmax settings and document type, then save and retry.`,
+            message: `No Winmax service zone matches sales document type "${
+              ctx.documentTypeCode || '?'
+            }" — check the Winmax settings and document type, then save and retry.`,
             color: 'warning',
           })
         } else {
@@ -2839,7 +3114,9 @@ export default {
             res.posReceiptHeader = res.posReceiptHeader || ''
             res.posReceiptFooter = res.posReceiptFooter || ''
             res.posReceiptVatPercent =
-              res.posReceiptVatPercent === null || res.posReceiptVatPercent === undefined ? '' : String(res.posReceiptVatPercent)
+              res.posReceiptVatPercent === null || res.posReceiptVatPercent === undefined
+                ? ''
+                : String(res.posReceiptVatPercent)
             // Winmax retail loyalty: outlets saved before these fields existed
             // have no keys; arrays become the comma-separated inputs.
             res.winmaxRetailLoyalty = res.winmaxRetailLoyalty === true
@@ -2886,6 +3163,8 @@ export default {
               senderId: '',
               baseUrl: '',
               otpTemplate: '',
+              welcomeEnabled: false,
+              welcomeTemplate: '',
               ...(res.smsSettings || {}),
             }
             res.turnstileSettings = {
@@ -2952,6 +3231,7 @@ export default {
           this.restaurantData = res
           if (res) {
             this.loadStockZoneOptions()
+            this.loadPushCredentials()
             this.snapshotCustomerAppSettings()
             this.snapshotStockDailyReset()
             this.snapshotOrderingHours()
@@ -3276,6 +3556,9 @@ export default {
           senderId: this.restaurantData.smsSettings?.senderId || '',
           baseUrl: this.restaurantData.smsSettings?.baseUrl || '',
           otpTemplate: this.restaurantData.smsSettings?.otpTemplate || '',
+          // the welcome SMS (backend 06e7a7c): without these two the save erased them
+          welcomeEnabled: !!this.restaurantData.smsSettings?.welcomeEnabled,
+          welcomeTemplate: (this.restaurantData.smsSettings?.welcomeTemplate || '').slice(0, 480),
         },
         turnstileSettings: {
           enabled: !!this.restaurantData.turnstileSettings?.enabled,

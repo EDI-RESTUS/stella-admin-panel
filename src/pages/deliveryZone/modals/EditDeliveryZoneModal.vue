@@ -163,6 +163,12 @@
           Add Meeting Point
         </VaButton>
       </div>
+
+      <!-- Opening Times (the shop's own hours, display only) -->
+      <div>
+        <h3 class="va-h6 mb-3">Opening Times</h3>
+        <OpeningTimesByDay v-model="openingTimes" :remembered="openingTimesLastWeek" :disabled="loading" />
+      </div>
     </div>
 
     <template #footer>
@@ -185,6 +191,8 @@ import axios from 'axios'
 import { useToast, useModal } from 'vuestic-ui'
 import { useServiceStore } from '@/stores/services'
 import PostalCodeAddressesModal from './PostalCodeAddressesModal.vue'
+import OpeningTimesByDay from '@/components/opening-times/OpeningTimesByDay.vue'
+import { firstProblem, fromStored, toPayload, type ZoneOpeningTimes } from '@/services/openingTimes'
 
 const cityDistrictMap: Record<string, string> = {
   // Lemesos (Limassol)
@@ -267,6 +275,19 @@ const removedCodes = ref<string[]>([])
 const newPostalCode = ref('')
 const meetingPoints = ref<any[]>([])
 
+// The shop's own opening hours: sent only when changed (snapshot built by the
+// same toPayload from the loaded zone), so a zone nobody edits is never touched.
+const openingTimes = ref<ZoneOpeningTimes | null>(null)
+// The last week set, so switching the hours off and on gives it back even
+// after the editor was re-created by a loading state (save, meeting point).
+const openingTimesLastWeek = ref<ZoneOpeningTimes['byDay'] | null>(null)
+watch(openingTimes, (v) => {
+  if (v) openingTimesLastWeek.value = JSON.parse(JSON.stringify(v.byDay))
+})
+const openingTimesSnapshot = ref('null')
+let openingTimesLoaded = false
+const openingTimesChanged = computed(() => JSON.stringify(toPayload(openingTimes.value)) !== openingTimesSnapshot.value)
+
 const showAddressesModal = ref(false)
 const selectedPostalCode = ref('')
 
@@ -314,6 +335,11 @@ async function fetchZoneDetails() {
     postalCodes.value = [...(zone.postalCodes || [])]
     originalPostalCodes.value = [...(zone.postalCodes || [])]
     meetingPoints.value = [...(zone.meetingPoints || [])]
+    if (!openingTimesLoaded) {
+      openingTimes.value = fromStored(zone.openingTimes)
+      openingTimesSnapshot.value = JSON.stringify(toPayload(openingTimes.value))
+      openingTimesLoaded = true
+    }
   } catch (error: any) {
     const message = error?.response?.data?.message || 'Failed to load delivery zone details'
     init({ message, color: 'danger' })
@@ -445,8 +471,15 @@ async function addMeetingPoint() {
   }
 }
 
-// --- Save (postal codes only) ---
+// --- Save (postal codes, then the shop's own opening hours when changed) ---
 async function save() {
+  if (openingTimesChanged.value && openingTimes.value) {
+    const problem = firstProblem(openingTimes.value)
+    if (problem) {
+      init({ message: `Not saved: ${problem}`, color: 'danger' })
+      return
+    }
+  }
   loading.value = true
   try {
     const postalPayload: any = {}
@@ -455,12 +488,28 @@ async function save() {
 
     if (Object.keys(postalPayload).length) {
       await axios.patch(`${url}/deliveryZones/${props.rowData._id}/postalCodes`, postalPayload)
+      // Saved: a retry after a failure below must not send them again.
+      addedCodes.value = []
+      removedCodes.value = []
+    }
+
+    if (openingTimesChanged.value) {
+      // null removes the shop's own hours (never drop it from the body).
+      const body = { openingTimes: toPayload(openingTimes.value) }
+      await axios.patch(`${url}/deliveryZones/${props.rowData._id}`, body)
+      // Read back: a backend without the field answers 200 but keeps nothing.
+      const check = await axios.get(`${url}/deliveryZone/${servicesStore.selectedRest}?id=${props.rowData._id}`)
+      const stored = JSON.stringify(toPayload(fromStored(check.data?.data?.[0]?.openingTimes)))
+      if (stored !== JSON.stringify(body.openingTimes)) {
+        throw new Error('The server did not keep the opening hours (is the backend up to date?)')
+      }
+      openingTimesSnapshot.value = stored
     }
 
     init({ message: 'Delivery zone updated successfully', color: 'success' })
     isVisible.value = false
   } catch (error: any) {
-    const message = error?.response?.data?.message || 'Failed to update delivery zone'
+    const message = error?.response?.data?.message || error?.message || 'Failed to update delivery zone'
     init({ message, color: 'danger' })
   } finally {
     loading.value = false

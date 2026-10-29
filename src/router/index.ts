@@ -89,6 +89,73 @@ const routes: Array<RouteRecordRaw> = [
         meta: { roles: ['admin', 'super-admin', 'editor'] },
       },
       {
+        // POW e-shop (outlet.eshopFulfilment). The sidebar lists these for an
+        // outlet that has an e-shop, and for a super-admin on any outlet (who
+        // writes the first settings); on another outlet each page only says
+        // so. Roles = the backend's: settings for admins, stock and weights
+        // readable by supervisors too.
+        name: 'eshopSettings',
+        path: 'eshop/settings',
+        component: () => import('../pages/eshop/settings.vue'),
+        meta: { roles: ['admin', 'super-admin'] },
+      },
+      {
+        name: 'eshopStock',
+        path: 'eshop/stock',
+        component: () => import('../pages/eshop/stock.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
+        name: 'eshopWeights',
+        path: 'eshop/weights',
+        component: () => import('../pages/eshop/weights.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
+        // E-shop operations, readable by supervisors too (the backend's staff
+        // roles): orders with their fulfilment steps, stock holds, courier fee
+        // tables, delivery costs. Resolving an order's Exception and saving or
+        // filling a fee table stay admin-only on the pages, as on the backend.
+        name: 'eshopOrders',
+        path: 'eshop/orders',
+        component: () => import('../pages/eshop/orders.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
+        name: 'eshopHolds',
+        path: 'eshop/holds',
+        component: () => import('../pages/eshop/holds.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
+        name: 'eshopRates',
+        path: 'eshop/courier-fees',
+        component: () => import('../pages/eshop/rates.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
+        name: 'eshopShipping',
+        path: 'eshop/delivery-costs',
+        component: () => import('../pages/eshop/shipping.vue'),
+        meta: { roles: ['admin', 'super-admin', 'supervisor'] },
+      },
+      {
+        // POW on the Fetch marketplace: the stock and price feed's settings
+        // and keys, admins only (the backend's roles).
+        name: 'eshopFetch',
+        path: 'eshop/fetch',
+        component: () => import('../pages/eshop/fetch.vue'),
+        meta: { roles: ['admin', 'super-admin'] },
+      },
+      {
+        // Prepaid codes (ContentCard gift cards / game codes): the switch,
+        // limits, voucher zone and the ContentCard access — admins only.
+        name: 'eshopPrepaid',
+        path: 'eshop/prepaid-codes',
+        component: () => import('../pages/eshop/prepaid-codes.vue'),
+        meta: { roles: ['admin', 'super-admin'] },
+      },
+      {
         name: 'deliveryZone',
         path: 'deliveryZone',
         component: () => import('../pages/deliveryZone/index.vue'),
