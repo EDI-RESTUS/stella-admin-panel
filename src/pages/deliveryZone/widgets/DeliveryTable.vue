@@ -6,6 +6,7 @@ import { useServiceStore } from '@/stores/services'
 import { useUsersStore } from '@/stores/users'
 import PostCodeModal from '../modals/PostCodeModal.vue'
 import EditDeliveryZoneModal from '../modals/EditDeliveryZoneModal.vue'
+import { summary as hoursSummary } from '@/services/openingTimes'
 import axios from 'axios'
 
 const usersStore = useUsersStore()
@@ -274,6 +275,14 @@ const items = toRef(props, 'items')
             type="text"
             @change="updateData(rowData)"
           />
+          <!-- The shop's own opening hours (only zones that have them). -->
+          <div
+            v-if="hoursSummary(rowData.openingTimes)"
+            class="text-xs va-text-secondary mt-1"
+            title="Own opening hours (Cyprus time) — edit them with the edit button"
+          >
+            {{ hoursSummary(rowData.openingTimes) }}
+          </div>
         </div>
       </template>
       <template #cell(deliveryCharge)="{ rowData }">
