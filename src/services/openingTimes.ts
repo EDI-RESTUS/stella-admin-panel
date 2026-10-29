@@ -113,8 +113,19 @@ export const firstProblem = (v: ZoneOpeningTimes | null): string => {
   return Object.values(p.days).find(Boolean) || p.week
 }
 
-/** One line like the apps show it: "Mon–Sat 09:00–00:00, Sun 09:30–00:00"; '' without own hours. */
+/**
+ * The line the apps show (OutletsController.hoursLine): "Mon–Sat 09:00–00:00,
+ * Sun 09:30–00:00", "Tue–Sat 17:30–22:45 · Closed Mon, Sun", "Open 24 hours",
+ * or a daily window alone; '' without own hours.
+ */
 export const summary = (raw: any): string => {
+  const selected = String(raw?.selected ?? '').trim()
+  if (selected === 'is24h') return 'Open 24 hours'
+  if (selected === 'daily') {
+    const opens = toInputTime(raw?.daily?.opens)
+    const closes = toInputTime(raw?.daily?.closes)
+    return opens && closes ? `${opens}–${closes}` : ''
+  }
   const v = fromStored(raw)
   if (!v) return ''
   const groups: { from: number; to: number; w: OpeningWindow }[] = []
@@ -125,9 +136,23 @@ export const summary = (raw: any): string => {
     if (last && last.to === i - 1 && last.w.opens === w.opens && last.w.closes === w.closes) last.to = i
     else groups.push({ from: i, to: i, w })
   })
-  return groups
+  const week = groups
     .map(
       (g) => `${WEEKDAYS[g.from].short}${g.from === g.to ? '' : '–' + WEEKDAYS[g.to].short} ${g.w.opens}–${g.w.closes}`,
     )
     .join(', ')
+  if (!week) return ''
+  // The closed days, consecutive ones grouped ("Mon, Sun", "Sat–Sun").
+  const closed: { from: number; to: number }[] = []
+  WEEKDAYS.forEach((d, i) => {
+    const w = v.byDay[d.key]
+    if (w.opens && w.closes) return
+    const last = closed[closed.length - 1]
+    if (last && last.to === i - 1) last.to = i
+    else closed.push({ from: i, to: i })
+  })
+  const closedText = closed
+    .map((g) => `${WEEKDAYS[g.from].short}${g.from === g.to ? '' : '–' + WEEKDAYS[g.to].short}`)
+    .join(', ')
+  return closedText ? `${week} · Closed ${closedText}` : week
 }

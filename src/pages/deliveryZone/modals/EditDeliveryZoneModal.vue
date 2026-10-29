@@ -167,7 +167,7 @@
       <!-- Opening Times (the shop's own hours, display only) -->
       <div>
         <h3 class="va-h6 mb-3">Opening Times</h3>
-        <OpeningTimesByDay v-model="openingTimes" :disabled="loading" />
+        <OpeningTimesByDay v-model="openingTimes" :remembered="openingTimesLastWeek" :disabled="loading" />
       </div>
     </div>
 
@@ -278,6 +278,12 @@ const meetingPoints = ref<any[]>([])
 // The shop's own opening hours: sent only when changed (snapshot built by the
 // same toPayload from the loaded zone), so a zone nobody edits is never touched.
 const openingTimes = ref<ZoneOpeningTimes | null>(null)
+// The last week set, so switching the hours off and on gives it back even
+// after the editor was re-created by a loading state (save, meeting point).
+const openingTimesLastWeek = ref<ZoneOpeningTimes['byDay'] | null>(null)
+watch(openingTimes, (v) => {
+  if (v) openingTimesLastWeek.value = JSON.parse(JSON.stringify(v.byDay))
+})
 const openingTimesSnapshot = ref('null')
 let openingTimesLoaded = false
 const openingTimesChanged = computed(() => JSON.stringify(toPayload(openingTimes.value)) !== openingTimesSnapshot.value)

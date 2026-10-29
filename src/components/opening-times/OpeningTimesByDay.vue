@@ -13,13 +13,21 @@ import {
   type ZoneOpeningTimes,
 } from '@/services/openingTimes'
 
-const props = defineProps<{ modelValue: ZoneOpeningTimes | null; disabled?: boolean }>()
+// remembered: the week to give back when the switch goes on again (kept by
+// the parent, because this editor is re-created around loading states).
+const props = defineProps<{
+  modelValue: ZoneOpeningTimes | null
+  disabled?: boolean
+  remembered?: Record<WeekdayKey, OpeningWindow> | null
+}>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: ZoneOpeningTimes | null): void }>()
 
 const copy = (byDay: Record<WeekdayKey, OpeningWindow>) => JSON.parse(JSON.stringify(byDay))
 
 // The rows last held, so switching off and on again gives them back.
-const lastRows = ref<Record<WeekdayKey, OpeningWindow>>(props.modelValue ? copy(props.modelValue.byDay) : emptyByDay())
+const lastRows = ref<Record<WeekdayKey, OpeningWindow>>(
+  props.modelValue ? copy(props.modelValue.byDay) : props.remembered ? copy(props.remembered) : emptyByDay(),
+)
 watch(
   () => props.modelValue,
   (v) => {
